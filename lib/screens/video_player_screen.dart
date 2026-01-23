@@ -1,0 +1,144 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
+import '../l10n/app_localizations.dart';
+
+class VideoPlayerScreen extends StatefulWidget {
+  final String videoPath;
+
+  const VideoPlayerScreen({super.key, required this.videoPath});
+
+  @override
+  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+}
+
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isGif = false;
+  String? _errorMessage;
+
+  bool _isPlayerInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isGif = widget.videoPath.endsWith('.gif');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isGif && !_isPlayerInitialized) {
+      _isPlayerInitialized = true;
+      _initializePlayer();
+    }
+  }
+
+  Future<void> _initializePlayer() async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final file = File(widget.videoPath);
+      if (!await file.exists()) {
+        throw Exception("${l10n.videoFileNotFound}: ${widget.videoPath}");
+      }
+      final len = await file.length();
+      debugPrint("Video file size: $len bytes, path: ${widget.videoPath}");
+      if (len == 0) {
+        throw Exception(l10n.videoFileEmpty);
+      }
+
+      _videoPlayerController = VideoPlayerController.file(
+        file,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      
+      // Initialize with a timeout to prevent hanging
+      await _videoPlayerController.initialize().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          throw Exception(l10n.videoInitTimeout);
+        },
+      );
+      
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: _videoPlayerController.value.aspectRatio,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                errorMessage,
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        },
+      );
+      setState(() {});
+    } catch (e) {
+      debugPrint("Video initialization error: $e");
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!_isGif) {
+      _videoPlayerController.dispose();
+      _chewieController?.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text(l10n.videoPlayer),
+      ),
+      body: Center(
+        child: _errorMessage != null
+            ? Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.videoPlaybackError,
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${l10n.error}: $_errorMessage',
+                      style: const TextStyle(color: Colors.white70),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            : _isGif
+                ? Image.file(File(widget.videoPath))
+                : _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
+                    ? Chewie(controller: _chewieController!)
+                    : const CircularProgressIndicator(color: Colors.white),
+      ),
+    );
+  }
+}
