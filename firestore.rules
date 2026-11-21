@@ -1,0 +1,147 @@
+rules_version = '2';
+
+// Baby monitor rooms (D3, D8). See PLAN_NEXT.md section 3.
+//
+// rooms/{code}: created by the baby device (owner). The first parent that
+// "claims" the room within 10 minutes becomes the only viewer. Only these two
+// anonymous-auth users can read or write the room and its subcollections.
+// Nobody can list rooms. Documents carry `expiresAt` for TTL clean-up.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Same rule as RoomCode.isValid in lib/core/pairing/room_code.dart
+    function isValidCode(code) {
+      return code.matches('^[A-HJ-NP-Z2-9]{8}$');
+    }
+
+    function maxLifetime() {
+      return duration.value(25, 'h');
+    }
+
+    // Keys a new room document may contain.
+    function roomKeys() {
+      return ['roomCode', 'ownerUid', 'viewerUid', 'createdAt', 'expiresAt',
+              'isPaired', 'offer', 'answer', 'facingMode', 'cryAlert', 'cryDb',
+              'cryUpdated', 'videoSettings', 'noiseThreshold', 'viewerSession'];
+    }
+
+    // Fields the baby (owner) may change after creation.
+    function ownerFields() {
+      return ['offer', 'isPaired', 'facingMode', 'cryAlert', 'cryDb',
+              'cryUpdated', 'videoSettings', 'noiseThreshold', 'expiresAt'];
+    }
+
+    // Fields the parent (viewer) may change.
+    function viewerFields() {
+      return ['viewerSession', 'viewerJoinedAt', 'answer', 'isPaired',
+              'facingMode', 'videoSettings', 'noiseThreshold',
+              'viewerFcmToken', 'viewerLocale'];
+    }
+
+    function roomData(code) {
+      return get(/databases/$(database)/documents/rooms/$(code)).data;
+    }
+
+    function isRoomOwner(code) {
+      return signedIn() && roomData(code).ownerUid == request.auth.uid;
+    }
+
+    function isRoomMember(code) {
+      let room = roomData(code);
+      return signedIn()
+        && (room.ownerUid == request.auth.uid || room.viewerUid == request.auth.uid);
+    }
+
+    function validExpiry(data) {
+      return data.expiresAt is timestamp
+        && data.expiresAt <= request.time + maxLifetime();
+    }
+
+    match /rooms/{code} {
+      function isOwner() {
+        return signedIn() && resource.data.ownerUid == request.auth.uid;
+      }
+      function isViewer() {
+        return signedIn() && resource.data.viewerUid == request.auth.uid;
+      }
+      function changed() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+      function notExpired() {
+        return request.time < resource.data.expiresAt;
+      }
+      // Server time, so a wrong phone clock cannot extend the window.
+      function claimWindowOpen() {
+        return request.time < resource.data.createdAt + duration.value(10, 'm');
+      }
+
+      allow list: if false;
+      allow get: if isOwner() || isViewer();
+
+      // set() on an existing code is evaluated as an update and denied, which
+      // the app treats as a code collision and retries with a new code.
+      allow create: if signedIn()
+        && isValidCode(code)
+        && request.resource.data.keys().hasOnly(roomKeys())
+        && request.resource.data.roomCode == code
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.viewerUid == null
+        && request.resource.data.viewerSession == null
+        && request.resource.data.createdAt == request.time
+        && validExpiry(request.resource.data);
+
+      allow update: if
+          // Baby: stream state; may extend expiresAt (heartbeat) within limits.
+          (isOwner()
+            && changed().hasOnly(ownerFields())
+            && (!changed().hasAny(['expiresAt']) || validExpiry(request.resource.data)))
+          // Paired parent: join/leave sessions, answer, settings, push token.
+          || (isViewer() && notExpired() && changed().hasOnly(viewerFields()))
+          // First parent claims an unclaimed room within 10 minutes.
+          || (signedIn()
+            && resource.data.viewerUid == null
+            && request.resource.data.viewerUid == request.auth.uid
+            && resource.data.ownerUid != request.auth.uid
+            && notExpired()
+            && claimWindowOpen()
+            && changed().hasOnly(viewerFields().concat(['viewerUid'])));
+
+      allow delete: if isOwner();
+
+      match /callerCandidates/{id} {
+        allow read: if isRoomMember(code);
+        allow create: if isRoomMember(code)
+          && request.resource.data.keys().hasOnly(
+               ['candidate', 'sdpMid', 'sdpMLineIndex', 'session', 'expiresAt']);
+        allow delete: if isRoomOwner(code);
+      }
+
+      match /calleeCandidates/{id} {
+        allow read: if isRoomMember(code);
+        allow create: if isRoomMember(code)
+          && request.resource.data.keys().hasOnly(
+               ['candidate', 'sdpMid', 'sdpMLineIndex', 'session', 'expiresAt']);
+        allow delete: if isRoomOwner(code);
+      }
+
+      // Cry alerts are written by the baby; the Cloud Function (admin) reads
+      // new ones and sends FCM to the parent.
+      match /alerts/{id} {
+        allow read: if isRoomMember(code);
+        allow create: if isRoomOwner(code)
+          && request.resource.data.keys().hasOnly(
+               ['title', 'body', 'timestamp', 'db', 'expiresAt']);
+        allow delete: if isRoomOwner(code);
+      }
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
