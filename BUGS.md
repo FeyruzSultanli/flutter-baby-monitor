@@ -8,7 +8,7 @@
 - [x] ADIM 1: Onaylanan temizlik. Commit'ler: 3A `474ef31`, 3B `6f72d30`, WifiDirect kaldırma `9cc1419`, ölü kod `a4b75e3`. Analyze 0 error, 0 warning; build ✅
 - [x] ADIM 2: Derin kod incelemesi (bu dosya)
 - [x] ADIM 3: Otomatik testler. Commit'ler: `451e421`, `cd3af29`. 36 test ✅
-- [ ] ADIM 4: Güvenli düzeltmeler (devam ediyor; durumlar aşağıda)
+- [ ] ADIM 4: Güvenli düzeltmeler (devam ediyor; sıradaki: B12, B13, B14, sonra Orta maddeler)
 - [ ] ADIM 5: TEST_PLAN.md
 - [ ] ADIM 6: REPORT.md
 
@@ -76,14 +76,14 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Bebek ağlayınca bebeğin yanındaki telefon da yüksek öncelikli, sesli bir bildirim çalar.
 - **Öneri:** Alert dinleyicisinde `hasPendingWrites` olan yerel yazımları atlamak.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`fb29391`) — yerel (hasPendingWrites) alert yazımları atlanıyor. Cihazda doğrulanmalı.
 
 ### B05 — Ağlama sürdükçe 2 saniyede bir alert dokümanı ve bildirim gönderiliyor
 - **Dosya:** `home_screen.dart:1508-1525` (`_processNoiseLevel`): `statusChanged || timeToUpdate` doğruysa `if (alert) sendAlert(...)` çalışıyor.
 - **Nasıl ortaya çıkar:** Ebeveyn bir dakikada yaklaşık 30 sesli bildirim alır. Firestore'a da her 2 saniyede bir doküman yazılır.
 - **Öneri:** Alarmı sadece sessiz→ağlıyor geçişinde göndermek, araya en az 60 sn bekleme koymak. Oda dokümanındaki `cryAlert`/`cryDb` güncellemesi (gösterge çubuğu için) olduğu gibi kalır.
 - **Risk:** Düşük. Davranış daralır, genişlemez.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`56a2919`) — 60 sn cooldown; offline ebeveyndeki aynı spam (overlay her 2 sn sıfırlanınca yeni sistem bildirimi) de bu commit'le sınırlandı. Overlay/titreşim/ses çubuğu değişmedi. Cihazda doğrulanmalı.
 
 ### B06 — Bebek kendi offer'ını görünce `_isCaller=false` oluyor; sonraki ICE adayları yanlış koleksiyona yazılıyor
 - **Dosya:** `firestore_signaling.dart:59-64` (`connect` içinde offer alınınca `_isCaller = false`).
@@ -94,7 +94,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Aynı Wi-Fi'da çoğunlukla yine bağlanır (peer-reflexive adaylar sayesinde). Farklı ağlarda bağlantı kurulamama ihtimali artar.
 - **Öneri:** Gelen offer'da rolü sadece kendimiz offer göndermemişsek değiştirmek.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`31778e4`) — `_sentOffer` bayrağı. Cihazda doğrulanmalı (farklı ağlarda bağlantı başarısı).
 
 ### B07 — Sadece STUN var, TURN yok
 - **Dosya:** `webrtc_service.dart:73-78`, `multi_peer_service.dart:43`.
@@ -114,23 +114,18 @@ Kullanıcı yokken alınan kararlar:
 - **Risk:** Orta.
 - **Durum:** Açık (güvenli yerel düzeltme değil)
 
-### B09 — Nearby BYTES payload sınırı (32 KB) HIGH kalitede aşılabilir
-- **Dosya:** `home_screen.dart:949-1010` (`_processAndSendImage`) ve `_processImageInIsolate`.
-- **Sorun:**
-  - Nearby Connections'ta `sendBytesPayload` için üst sınır `ConnectionsClient.MAX_BYTES_DATA_SIZE` = 32768 bayt.
-  - HIGH kalitede kare 720×480 boyutunda ve JPEG kalitesi 75; bu genelde 32 KB'ı aşar.
-  - Gönderim hatası `debugPrint` ile yutuluyor.
-- **Nasıl ortaya çıkar:** HIGH seçilince ebeveyn tarafında görüntü donar. Ses ve durum mesajları çalışmaya devam eder.
-- **Öneri:** Kare sınırı aşarsa daha düşük kalite ve boyutla yeniden kodlamak. Böylece sadece zaten başarısız olacak kareler değişir.
-- **Risk:** Düşük.
-- **Durum:** Açık. Cihazda doğrulanmalı.
+### B09 — ~~Nearby BYTES payload sınırı (32 KB) HIGH kalitede aşılabilir~~ → **geçersiz**
+- **Dosya:** `home_screen.dart` `_processAndSendImage`.
+- **Sorun (ilk tahmin):** 32 KB sınırı. **Doğrulama:** projede kullanılan `play-services-nearby 19.2.0` içinde `ConnectionsClient.MAX_BYTES_DATA_SIZE = 1047552` (~1 MB; `javap` ile sabit okundu). HIGH kalite JPEG (~40-60 KB) bu sınırın çok altında.
+- **Kalan not:** 15 fps × ~50 KB ≈ 750 KB/s; Nearby Bluetooth'a düşerse bant genişliği yetmeyebilir (gecikme/kare kaybı) → TEST_PLAN'da ölçülecek.
+- **Durum:** Kapatıldı (sorun değil, kod değişmedi)
 
 ### B10 — Her kamera karesi için yeni bir `compute` isolate'ı açılıyor, eşzamanlılık sınırı yok
 - **Dosya:** `home_screen.dart:975` (`await compute(_processImageInIsolate, ...)`), `_startImageStream`.
 - **Sorun:** Dönüştürme FPS aralığından uzun sürerse isolate'lar üst üste biner. CPU, bellek ve ısı artar, gecikme birikir, kareler sırasız gelebilir.
 - **Öneri:** Önceki kare bitene kadar yenisini atlamak (in-flight bayrağı).
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`d0ac84f`) — `_frameInFlight` bayrağı; işlem sürerken gelen kareler atlanıyor. Cihazda doğrulanmalı (FPS/gecikme).
 
 ### B11 — Sessiz, boş ya da tek sayıda bayt içeren PCM parçasında dB = -Infinity/NaN veya RangeError
 - **Dosya:** `lib/core/audio/audio_level.dart` `pcm16ChunkToDb` (eskiden `home_screen.dart` `_calculateAndSendDb`).
@@ -142,7 +137,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Mikrofon tamamen sessizse ya da sürücü sıfır döndürüyorsa STATUS mesajı gönderilemez ve ebeveyn tarafında ses çubuğu donar. Loglarda yakalanmamış hata görülür.
 - **Öneri:** rms ≤ 0 ise 0 döndürmek, son tek baytı atmak.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`ffeab24`) + unit test.
 
 ### B12 — Offline bebek modunda mikrofon izni istenmiyor; açılışta izin istekleri çakışıyor
 - **Dosya:**
@@ -220,21 +215,21 @@ Kullanıcı yokken alınan kararlar:
 - **Sorun:** Offer ya da answer gelene kadar her oda güncellemesinde (cryAlert her 2 saniyede bir) NoSuchMethodError oluşuyor. Offer gelince de answer null olduğu için hata devam ediyor.
 - **Öneri:** `if (data['offer'] is Map)`.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`a1b3e4b`).
 
 ### B22 — Ebeveyn bağlanınca eski alarmlar yeniden bildirim olarak geliyor; `closeRoom` alarmları silmiyor
 - **Dosya:** `firestore_signaling.dart:76-81` (ilk snapshot mevcut tüm dokümanları "added" olarak getiriyor), `pairing_service.dart:57-68`.
 - **Nasıl ortaya çıkar:** Ebeveyn odaya bağlandığı ya da yeniden bağlandığı anda "bebek ağlıyor" bildirimleri gelir.
 - **Öneri:** İlk snapshot'ı atlamak. `closeRoom` içinde `alerts` alt koleksiyonunu da silmek.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`199bb77`) — ilk snapshot + bağlantıdan 30 sn önceki alarmlar atlanıyor; `closeRoom` alerts'i de siliyor. Cihazda doğrulanmalı.
 
 ### B23 — `FirestoreSignaling.connect` eski abonelikleri iptal etmiyor; dinleyicilerde `onError` yok
 - **Dosya:** `firestore_signaling.dart:54, 76`, `pairing_service.dart` `watchRoom`, `home_screen.dart:1602`.
 - **Nasıl ortaya çıkar:** `connect` ikinci kez çağrılırsa alarm ve offer olayları çift gelir. Firestore izin hatası, yakalanmamış istisnaya dönüşür.
 - **Öneri:** `connect` içinde önce iptal etmek, `onError` ile loglamak ve UI'a hata göstermek.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`7687a9b`).
 
 ### B24 — Yayın kapanınca wakelock açık kalıyor
 - **Dosya:** `home_screen.dart:597, 850` (enable), `_resetPairing` (disable yok).
