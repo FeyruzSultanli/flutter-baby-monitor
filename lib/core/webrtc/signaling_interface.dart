@@ -1,6 +1,15 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 abstract class SignalingInterface {
+  /// Current viewer session (B08). Offers, answers and candidates are tagged
+  /// with it, and only messages of this session are delivered.
+  String? get session;
+  set session(String? value);
+
+  /// Deletes stored ICE candidates of the current room (best effort), so a
+  /// new negotiation does not replay old ones.
+  Future<void> clearCandidates();
+
   /// Connects to the signaling channel (e.g. Firestore room or P2P socket).
   Future<void> connect(String roomId);
 

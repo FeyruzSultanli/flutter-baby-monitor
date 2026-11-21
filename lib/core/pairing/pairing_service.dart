@@ -7,6 +7,15 @@ import '../enums/connection_status.dart';
 import 'pairing_state.dart';
 import '../../models/video_settings.dart';
 
+/// Thrown by [PairingService.joinRoom] when the room does not exist (deleted
+/// by the baby, or a wrong code). Lets the parent stop automatic rejoining.
+class RoomNotFoundException implements Exception {
+  const RoomNotFoundException(this.roomCode);
+  final String roomCode;
+  @override
+  String toString() => 'Geçersiz oda kodu veya oda bulunamadı.';
+}
+
 /// Handles room lifecycle in Firestore (rooms/{roomCode}).
 class PairingService {
   PairingService({FirebaseFirestore? firestore})
@@ -50,6 +59,7 @@ class PairingService {
       'cryUpdated': FieldValue.serverTimestamp(),
       'videoSettings': const VideoSettings().toJson(),
       'noiseThreshold': noiseThreshold,
+      'viewerSession': null,
     });
 
     return code;
@@ -83,6 +93,14 @@ class PairingService {
   Future<bool> roomExists(String roomCode) async {
     final doc = await _rooms.doc(roomCode).get();
     return doc.exists;
+  }
+
+  /// The parent leaves the room; the baby closes the peer and waits (B08).
+  Future<void> leaveRoom(String roomCode) async {
+    await _rooms.doc(roomCode).set(
+      {'viewerSession': null, 'isPaired': false},
+      SetOptions(merge: true),
+    );
   }
 
   /// Marks room pairing state.
@@ -125,12 +143,21 @@ class PairingService {
     );
   }
 
-  /// Basic join validation and snapshot.
-  Future<PairingState> joinRoom(String roomCode) async {
+  /// Validates the room and joins it as viewer [session] (B08): the baby
+  /// reacts to the new session with a fresh offer. Also used to rejoin.
+  Future<PairingState> joinRoom(String roomCode, {required String session}) async {
     final doc = await _rooms.doc(roomCode).get();
     if (!doc.exists) {
-      throw Exception('Geçersiz oda kodu veya oda bulunamadı.');
+      throw RoomNotFoundException(roomCode);
     }
+    await _rooms.doc(roomCode).set(
+      {
+        'viewerSession': session,
+        'viewerJoinedAt': FieldValue.serverTimestamp(),
+        'isPaired': false,
+      },
+      SetOptions(merge: true),
+    );
     final data = doc.data() ?? {};
     return PairingState(
       roomCode: roomCode,
@@ -180,6 +207,7 @@ class PairingService {
             ? VideoSettings.fromJson(data['videoSettings'])
             : const VideoSettings(),
         noiseThreshold: (data['noiseThreshold'] as num?)?.toDouble(),
+        viewerSession: data['viewerSession'] as String?,
       );
     });
   }

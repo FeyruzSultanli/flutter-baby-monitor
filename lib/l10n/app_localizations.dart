@@ -168,6 +168,7 @@ class AppLocalizations {
       'nightModeKeepAppOpen': 'Keep the app open and do not lock the screen, or the stream stops',
       'autoNightMode': 'Night mode when connected',
       'autoNightModeSubtitle': 'Baby device: screen turns black at minimum brightness once the parent connects',
+      'roomClosed': 'The baby device closed the room. Ask for a new room code',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -323,6 +324,7 @@ class AppLocalizations {
       'nightModeKeepAppOpen': 'Yayının sürmesi için uygulamayı açık bırakın ve ekranı kilitlemeyin',
       'autoNightMode': 'Bağlanınca gece moduna geç',
       'autoNightModeSubtitle': 'Bebek cihazı: ebeveyn bağlanınca ekran en düşük parlaklıkta kararır',
+      'roomClosed': 'Bebek cihazı odayı kapattı. Yeni bir oda kodu isteyin',
     },
   };
 
@@ -479,6 +481,7 @@ class AppLocalizations {
   String get nightModeKeepAppOpen => _localizedValues[locale.languageCode]!['nightModeKeepAppOpen']!;
   String get autoNightMode => _localizedValues[locale.languageCode]!['autoNightMode']!;
   String get autoNightModeSubtitle => _localizedValues[locale.languageCode]!['autoNightModeSubtitle']!;
+  String get roomClosed => _localizedValues[locale.languageCode]!['roomClosed']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

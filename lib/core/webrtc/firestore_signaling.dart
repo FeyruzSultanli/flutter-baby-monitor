@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'signaling_interface.dart';
+import 'signaling_messages.dart';
 
 class FirestoreSignaling implements SignalingInterface {
   FirestoreSignaling({FirebaseFirestore? firestore})
@@ -10,6 +11,9 @@ class FirestoreSignaling implements SignalingInterface {
 
   final FirebaseFirestore _firestore;
   String? _currentRoomId;
+
+  @override
+  String? session;
 
   final _onOfferController = StreamController<RTCSessionDescription>.broadcast();
   final _onAnswerController = StreamController<RTCSessionDescription>.broadcast();
@@ -39,11 +43,26 @@ class FirestoreSignaling implements SignalingInterface {
   Future<void> sendCandidate(RTCIceCandidate candidate) async {
     if (_currentRoomId == null) return;
     final collection = _isCaller ? 'callerCandidates' : 'calleeCandidates';
-    await _rooms.doc(_currentRoomId).collection(collection).add({
-      'candidate': candidate.candidate,
-      'sdpMid': candidate.sdpMid,
-      'sdpMLineIndex': candidate.sdpMLineIndex,
-    });
+    await _rooms
+        .doc(_currentRoomId)
+        .collection(collection)
+        .add(candidateToMap(candidate, session));
+  }
+
+  @override
+  Future<void> clearCandidates() async {
+    final roomId = _currentRoomId;
+    if (roomId == null) return;
+    for (final collection in const ['callerCandidates', 'calleeCandidates']) {
+      try {
+        final docs = await _rooms.doc(roomId).collection(collection).get();
+        for (final doc in docs.docs) {
+          await doc.reference.delete();
+        }
+      } catch (e) {
+        debugPrint('Clearing $collection failed: $e');
+      }
+    }
   }
 
   bool _isCaller = true; // Default
@@ -64,20 +83,17 @@ class FirestoreSignaling implements SignalingInterface {
       final data = doc.data();
       if (data == null) return;
 
-      // Check for Offer. New rooms store `offer: null` (B21), so only a map
-      // counts as an offer.
-      final offerMap = data['offer'];
-      if (offerMap is Map) {
-        final offer = RTCSessionDescription(offerMap['sdp'], offerMap['type']);
+      // Only offers/answers of the current viewer session count (B08); `null`
+      // fields of a new room (B21) and stale ones of earlier joins are ignored.
+      final offer = sessionDescriptionFromMap(data['offer'], session);
+      if (offer != null) {
         // If we receive an offer we did not send ourselves, we are the callee
         if (!_sentOffer) _isCaller = false;
         _onOfferController.add(offer);
       }
 
-      // Check for Answer (also `null` until the parent answers)
-      final answerMap = data['answer'];
-      if (answerMap is Map) {
-        final answer = RTCSessionDescription(answerMap['sdp'], answerMap['type']);
+      final answer = sessionDescriptionFromMap(data['answer'], session);
+      if (answer != null) {
         _onAnswerController.add(answer);
       }
     }, onError: (Object e) => debugPrint('Room signaling listener error: $e'));
@@ -126,14 +142,10 @@ class FirestoreSignaling implements SignalingInterface {
       for (final change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           final data = change.doc.data();
-          if (data != null) {
-            final candidate = RTCIceCandidate(
-              data['candidate'],
-              data['sdpMid'],
-              data['sdpMLineIndex'],
-            );
-            _onCandidateController.add(candidate);
-          }
+          if (data == null) continue;
+          // Candidates of earlier sessions are ignored (B08).
+          final candidate = candidateFromMap(data, session);
+          if (candidate != null) _onCandidateController.add(candidate);
         }
       }
     }, onError: (Object e) => debugPrint('Candidates listener error: $e'));
@@ -156,7 +168,7 @@ class FirestoreSignaling implements SignalingInterface {
     _sentOffer = true;
     await _rooms.doc(_currentRoomId).set(
       {
-        'offer': {'sdp': offer.sdp, 'type': offer.type},
+        'offer': sessionDescriptionToMap(offer, session),
       },
       SetOptions(merge: true),
     );
@@ -170,7 +182,7 @@ class FirestoreSignaling implements SignalingInterface {
     _isCaller = false;
     await _rooms.doc(_currentRoomId).set(
       {
-        'answer': {'sdp': answer.sdp, 'type': answer.type},
+        'answer': sessionDescriptionToMap(answer, session),
         'isPaired': true,
       },
       SetOptions(merge: true),

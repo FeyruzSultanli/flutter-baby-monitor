@@ -34,6 +34,8 @@ import '../models/alert_model.dart';
 import '../core/alert_history_service.dart';
 import 'alert_history_screen.dart';
 import 'video_gallery_screen.dart';
+import '../core/webrtc/reconnect_backoff.dart';
+import '../core/webrtc/signaling_messages.dart';
 import '../core/webrtc/webrtc_service.dart';
 import '../core/services/hybrid_notification_manager.dart';
 import '../widgets/camera_preview_card.dart';
@@ -114,6 +116,12 @@ class _HomeScreenState extends State<HomeScreen>
   // Threshold changes are synced to the other device (debounced) so the
   // baby's detection can be calibrated from the parent (D5).
   Timer? _thresholdSyncTimer;
+
+  // Parent side of the session protocol (B08): our current viewer session and
+  // automatic rejoin after the connection was lost.
+  String? _viewerSession;
+  final ReconnectBackoff _rejoinBackoff = ReconnectBackoff();
+  Timer? _rejoinTimer;
 
   bool _isFullscreen = false;
   bool _fullscreenCryOverlay = false;
@@ -360,6 +368,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
     _batterySyncTimer?.cancel();
     _thresholdSyncTimer?.cancel();
+    _rejoinTimer?.cancel();
     _batteryStateSubscription?.cancel();
     // Resources that were not released before (B25).
     _noisePollTimer?.cancel();
@@ -507,7 +516,47 @@ class _HomeScreenState extends State<HomeScreen>
       }
     });
     _refreshBottomSheet();
-    if (status == ConnectionStatus.CONNECTED) _maybeEnterAutoNightMode();
+    if (status == ConnectionStatus.CONNECTED) {
+      _rejoinBackoff.reset();
+      _rejoinTimer?.cancel();
+      _maybeEnterAutoNightMode();
+    } else if (status == ConnectionStatus.FAILED) {
+      _scheduleRejoin();
+    }
+  }
+
+  /// Parent, online: after the connection failed, join the same room again
+  /// with a new session (2 s, 4 s, 8 s, 16 s, then every 30 s) until it
+  /// works, the room is gone, or the user disconnects (B08).
+  void _scheduleRejoin() {
+    if (_role != DeviceRole.PARENT || _isOfflineMode) return;
+    if (_viewerSession == null || _pairingState == null) return;
+    if (_rejoinTimer?.isActive ?? false) return;
+    final delay = _rejoinBackoff.next();
+    debugPrint('Rejoin attempt ${_rejoinBackoff.attempts} in ${delay.inSeconds} s');
+    _rejoinTimer = Timer(delay, () => unawaited(_rejoinRoom()));
+  }
+
+  Future<void> _rejoinRoom() async {
+    final roomCode = _pairingState?.roomCode;
+    final pairing = _pairingService;
+    final webrtc = _webrtcService;
+    if (!mounted || roomCode == null || pairing == null || webrtc == null) return;
+    if (_viewerSession == null || _role != DeviceRole.PARENT) return;
+    final session = newViewerSessionId();
+    _viewerSession = session;
+    try {
+      await pairing.joinRoom(roomCode, session: session);
+      if (!mounted || _viewerSession != session) return;
+      await webrtc.startAsParent(roomCode, session: session);
+    } on RoomNotFoundException {
+      // The baby closed the room: stop retrying.
+      _viewerSession = null;
+      if (mounted) _handlePairingError(AppLocalizations.of(context).roomClosed);
+    } catch (e) {
+      debugPrint('Rejoin failed: $e');
+      _scheduleRejoin();
+    }
   }
 
   void _handlePairingError(String message) {
@@ -612,6 +661,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _resetPairing({bool deleteRoom = false, bool restoreCamera = true}) async {
     final activeRoom = _pairingState?.roomCode;
+    _rejoinTimer?.cancel();
+    _rejoinBackoff.reset();
     await _exitNightMode();
 
     // Finish a running recording before its source stream goes away, so the
@@ -665,6 +716,9 @@ class _HomeScreenState extends State<HomeScreen>
       try {
         if (deleteRoom) {
           await _pairingService?.closeRoom(activeRoom);
+        } else if (_role == DeviceRole.PARENT && _viewerSession != null) {
+          // Clear our session so the baby closes its peer and waits (B08).
+          await _pairingService?.leaveRoom(activeRoom);
         } else {
           await _pairingService?.setPaired(activeRoom, false);
         }
@@ -672,6 +726,7 @@ class _HomeScreenState extends State<HomeScreen>
         debugPrint('Room cleanup failed: $e');
       }
     }
+    _viewerSession = null;
     if (!mounted) return;
     setState(() {
       _pairingState = null;
@@ -839,9 +894,14 @@ class _HomeScreenState extends State<HomeScreen>
     _refreshBottomSheet();
 
     try {
-      await _pairingService!.joinRoom(roomCode);
+      // Each join is a new viewer session; the baby answers it with a fresh
+      // offer, so leaving and joining the same room works (B08).
+      final session = newViewerSessionId();
+      _viewerSession = session;
+      _rejoinBackoff.reset();
+      await _pairingService!.joinRoom(roomCode, session: session);
       _listenRoomUpdates(roomCode);
-      await _webrtcService!.startAsParent(roomCode);
+      await _webrtcService!.startAsParent(roomCode, session: session);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppLocalizations.of(context).waitingForConnection}: $roomCode')),
@@ -1871,6 +1931,11 @@ class _HomeScreenState extends State<HomeScreen>
                _videoSettings = roomState.videoSettings;
              });
         }
+      }
+
+      if (_role == DeviceRole.BABY) {
+        // A parent joined (new session) or left (null): renegotiate (B08).
+        unawaited(_webrtcService?.onViewerSessionChanged(roomState.viewerSession));
       }
 
       if (_role == DeviceRole.BABY) {
