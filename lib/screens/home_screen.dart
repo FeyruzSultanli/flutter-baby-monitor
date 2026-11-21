@@ -426,7 +426,8 @@ class _HomeScreenState extends State<HomeScreen>
     _controller?.dispose();
     _alertController.dispose();
     if (_role == DeviceRole.BABY && _pairingState?.roomCode != null) {
-      unawaited(_pairingService?.closeRoom(_pairingState!.roomCode));
+      unawaited(_pairingService?.closeRoom(_pairingState!.roomCode).catchError(
+          (Object e) => debugPrint('Closing room on dispose failed: $e')));
     }
     _parentRoomController.dispose();
     _roomSub?.cancel();
@@ -581,6 +582,10 @@ class _HomeScreenState extends State<HomeScreen>
       // The room is gone (closed by the baby or expired): stop retrying.
       _viewerSession = null;
       if (mounted) _handlePairingError(AppLocalizations.of(context).roomClosed);
+    } on AnonymousAuthDisabledException {
+      // Retrying cannot help until sign-in is enabled in the console (B60).
+      _viewerSession = null;
+      if (mounted) _handlePairingError(AppLocalizations.of(context).anonymousAuthDisabled);
     } catch (e) {
       debugPrint('Rejoin failed: $e');
       if (token == _joinToken) _scheduleRejoin();
@@ -855,7 +860,8 @@ class _HomeScreenState extends State<HomeScreen>
           );
       final facingMode =
           _currentLens == CameraLensDirection.front ? 'user' : 'environment';
-      unawaited(_pairingService!.setFacing(newCode, facingMode));
+      unawaited(_pairingService!.setFacing(newCode, facingMode).catchError(
+          (Object e) => debugPrint('setFacing failed: $e')));
       await _disposeCameraController();
       setState(() {
         _pairingState = PairingState(
@@ -1710,7 +1716,8 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() {
           _currentLens = effectiveTarget;
         });
-        _pairingService?.setFacing(roomCode, facingMode);
+        unawaited(_pairingService?.setFacing(roomCode, facingMode).catchError(
+            (Object e) => debugPrint('setFacing failed: $e')));
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1819,11 +1826,11 @@ class _HomeScreenState extends State<HomeScreen>
         );
 
         if (alert && _takeCryNotificationSlot(now)) {
-          HybridNotificationManager().sendAlert(
+          unawaited(HybridNotificationManager().sendAlert(
             AppLocalizations.of(context).babyCryAlert,
             '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB',
             db: db,
-          );
+          ).catchError((Object e) => debugPrint('Sending cry alert failed: $e')));
         }
       }
       return;
