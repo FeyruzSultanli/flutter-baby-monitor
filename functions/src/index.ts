@@ -49,6 +49,15 @@ export const onCryAlertCreated = onDocumentCreated(
     }
 
     const { title, body } = buildCryPushText(target.locale, alert.db);
+
+    // In the local Functions emulator there is no FCM emulator: never call the
+    // real FCM API from tests, just record what would have been sent.
+    if (process.env.FUNCTIONS_EMULATOR === 'true') {
+      logger.info('EMULATOR: would send cry push', { roomId, alertId, title, body });
+      await roomRef.update({ lastPushPreview: { title, body } }).catch(() => undefined);
+      return;
+    }
+
     try {
       await getMessaging().send({
         token: target.token,
