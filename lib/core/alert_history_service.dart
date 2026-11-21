@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/alert_model.dart';
 
@@ -33,7 +34,7 @@ class AlertHistoryService {
         _alerts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       }
     } catch (e) {
-      print('Error loading alerts: $e');
+      debugPrint('Error loading alerts: $e');
     } finally {
       _loaded = true;
     }
@@ -56,7 +57,7 @@ class AlertHistoryService {
       final jsonList = _alerts.map((e) => e.toJson()).toList();
       await file.writeAsString(jsonEncode(jsonList));
     } catch (e) {
-      print('Error saving alerts: $e');
+      debugPrint('Error saving alerts: $e');
     }
   }
 

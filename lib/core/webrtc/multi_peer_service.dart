@@ -156,9 +156,7 @@ class MultiPeerService extends ChangeNotifier {
     _peers[roomId] = manager;
     
     // Eğer ilk eklenen kameraysa aktif yap
-    if (_activeRoomId == null) {
-      _activeRoomId = roomId;
-    }
+    _activeRoomId ??= roomId;
 
     // Bağlantıyı başlat
     await manager.connect();

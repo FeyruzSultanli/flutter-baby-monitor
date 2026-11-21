@@ -19,7 +19,6 @@ class NoiseLevelBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final normalized = (currentDb / 90.0).clamp(0.0, 1.0);
     final isHigh = currentDb >= thresholdDb;
-    final bool isCompact = MediaQuery.of(context).size.width < 360;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

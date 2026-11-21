@@ -5,7 +5,7 @@ import '../core/webrtc/firestore_signaling.dart'; // Varsayılan signaling servi
 import '../l10n/app_localizations.dart';
 
 class MultiCameraScreen extends StatefulWidget {
-  const MultiCameraScreen({Key? key}) : super(key: key);
+  const MultiCameraScreen({super.key});
 
   @override
   State<MultiCameraScreen> createState() => _MultiCameraScreenState();
@@ -41,13 +41,13 @@ class _MultiCameraScreenState extends State<MultiCameraScreen> {
 
   Future<void> _addCamera() async {
     final l10n = AppLocalizations.of(context);
-    final TextEditingController _controller = TextEditingController();
+    final TextEditingController controller = TextEditingController();
     final String? roomId = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.addCamera),
         content: TextField(
-          controller: _controller,
+          controller: controller,
           decoration: InputDecoration(hintText: l10n.enterRoomId),
         ),
         actions: [
@@ -56,7 +56,7 @@ class _MultiCameraScreenState extends State<MultiCameraScreen> {
             child: Text(l10n.cancel),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, _controller.text),
+            onPressed: () => Navigator.pop(context, controller.text),
             child: Text(l10n.add),
           ),
         ],

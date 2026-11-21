@@ -40,7 +40,6 @@ import '../widgets/camera_preview_card.dart';
 import '../widgets/fullscreen_view.dart';
 import '../widgets/noise_level_bar.dart';
 import '../widgets/settings_sheet.dart';
-import '../widgets/status_chips_row.dart';
 import '../models/video_settings.dart';
 import 'multi_camera_screen.dart';
 
@@ -93,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen>
   Uint8List? get _currentImageBytes => _currentImageBytesNotifier.value;
   DateTime _lastFrameTime = DateTime.now();
   bool _isStreaming = false;
-  List<Map<String, String>> _discoveredEndpoints = []; // {id, name}
+  final List<Map<String, String>> _discoveredEndpoints = []; // {id, name}
   final StreamController<List<Map<String, String>>> _discoveryStreamController = StreamController.broadcast();
 
   // Audio Streaming (Offline)
@@ -2125,7 +2124,7 @@ class _HomeScreenState extends State<HomeScreen>
       } else {
         // Start Recording
         // Request permissions
-        Map<Permission, PermissionStatus> statuses = await [
+        await [
           Permission.storage,
           Permission.photos,
           Permission.manageExternalStorage, // For Android 11+ sometimes needed
@@ -2170,7 +2169,6 @@ class _HomeScreenState extends State<HomeScreen>
     final hasOfflinePreview = _currentImageBytes != null;
     final canShowPreview = hasCameraPreview || hasWebRtcPreview || hasOfflinePreview;
     final scheme = Theme.of(context).colorScheme;
-    final size = MediaQuery.of(context).size;
 
     if (_isFullscreen) {
       return ValueListenableBuilder<Uint8List?>(
@@ -2668,7 +2666,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                       Text(
-                        _pairingState!.roomCode!,
+                        _pairingState!.roomCode,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,

@@ -36,12 +36,6 @@ class CameraPreviewCard extends StatelessWidget {
     final canShowCamera = controller != null && controller!.value.isInitialized;
     final hasOfflineImage = offlineImage != null;
     final canShow = hasWebRtc || canShowCamera || hasOfflineImage;
-    final double? webrtcAspect = (webrtcRenderer?.videoWidth ?? 0) > 0 &&
-            (webrtcRenderer?.videoHeight ?? 0) > 0
-        ? webrtcRenderer!.videoWidth / webrtcRenderer!.videoHeight
-        : null;
-    final scheme = Theme.of(context).colorScheme;
-    final bool isCompact = MediaQuery.of(context).size.width < 360;
 
     return Container(
       color: Colors.black,

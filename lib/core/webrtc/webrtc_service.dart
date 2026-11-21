@@ -137,7 +137,6 @@ class WebRTCService {
       }
 
       _peerConnection!.onIceCandidate = (candidate) {
-        if (candidate == null) return;
         _signalingService.sendCandidate(candidate);
       };
 
@@ -151,7 +150,7 @@ class WebRTCService {
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
           _setStatus(ConnectionStatus.CONNECTED);
           if (_pairingService != null) {
-            await _pairingService!.setPaired(roomCode, true);
+            await _pairingService.setPaired(roomCode, true);
           }
         } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
             state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
@@ -172,7 +171,6 @@ class WebRTCService {
 
       _answerSub = _signalingService.onAnswer.listen(
         (answer) async {
-          if (answer == null) return;
           final existingRemote = await _peerConnection?.getRemoteDescription();
           if (existingRemote != null) return;
           await _peerConnection?.setRemoteDescription(answer);
@@ -204,7 +202,6 @@ class WebRTCService {
       _peerConnection = await _createPeerConnection();
 
       _peerConnection!.onIceCandidate = (candidate) {
-        if (candidate == null) return;
         _signalingService.sendCandidate(candidate);
       };
 
@@ -212,7 +209,7 @@ class WebRTCService {
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
           _setStatus(ConnectionStatus.CONNECTED);
           if (_pairingService != null) {
-            await _pairingService!.setPaired(roomCode, true);
+            await _pairingService.setPaired(roomCode, true);
           }
         } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
             state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
@@ -231,7 +228,6 @@ class WebRTCService {
 
       // Wait for offer
       _offerSub = _signalingService.onOffer.listen((offer) async {
-         if (offer == null) return;
          // Check if we already have a remote description to avoid race conditions
          if (await _peerConnection?.getRemoteDescription() != null) return;
          
@@ -304,10 +300,10 @@ class WebRTCService {
     _localStream = newStream;
     _setStatus(ConnectionStatus.CONNECTED);
     if (!remoteRequest && _pairingService != null) {
-      await _pairingService!.setFacing(roomCode, facingMode);
+      await _pairingService.setFacing(roomCode, facingMode);
     }
     if (_pairingService != null) {
-      await _pairingService!.setPaired(roomCode, true);
+      await _pairingService.setPaired(roomCode, true);
     }
   }
 
