@@ -21,6 +21,7 @@ import '../l10n/app_localizations.dart';
 import '../core/recording/video_recorder_service.dart';
 import '../core/enums/connection_status.dart';
 import '../core/enums/device_role.dart';
+import '../core/feature_flags.dart';
 import '../core/audio/audio_level.dart';
 import '../core/offline/offline_payload.dart';
 import '../core/pairing/pairing_service.dart';
@@ -394,10 +395,11 @@ class _HomeScreenState extends State<HomeScreen>
         value: _MenuAction.parentMode,
         child: Text(l10n.parentMode),
       ),
-      PopupMenuItem(
-        value: _MenuAction.multiCameraMode,
-        child: Text(l10n.multiCameraMode),
-      ),
+      if (kMultiCameraEnabled)
+        PopupMenuItem(
+          value: _MenuAction.multiCameraMode,
+          child: Text(l10n.multiCameraMode),
+        ),
       const PopupMenuDivider(),
     ];
 
