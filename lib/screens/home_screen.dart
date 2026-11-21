@@ -23,6 +23,7 @@ import '../core/recording/video_recorder_service.dart';
 import '../core/enums/connection_status.dart';
 import '../core/enums/device_role.dart';
 import '../core/feature_flags.dart';
+import '../core/debug/debug_hooks.dart';
 import '../core/audio/audio_level.dart';
 import '../core/audio/cry_detector.dart';
 import '../core/offline/offline_payload.dart';
@@ -1729,6 +1730,12 @@ class _HomeScreenState extends State<HomeScreen>
     // Use WebRTC stats polling instead of a separate mic reader (e.g. noise_meter) to avoid mic conflict on devices like Redmi Note 9 Pro
     _noisePollTimer?.cancel();
     _noisePollTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) async {
+      // Debug builds only: integration tests can inject a "fake cry" level.
+      final fakeDb = DebugHooks.fakeNoiseDb;
+      if (fakeDb != null) {
+        _processNoiseLevel(fakeDb);
+        return;
+      }
       if (_webrtcService == null) return;
       final level = await _webrtcService!.getAudioLevel();
       if (level != null) {
@@ -2103,6 +2110,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildConnectionBadge(ColorScheme scheme) {
     final color = _connectionStatusColor(scheme);
     return Container(
+      key: const Key('connectionBadge'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
@@ -2261,6 +2269,7 @@ class _HomeScreenState extends State<HomeScreen>
         const SizedBox(height: 6),
         if (!_isOfflineMode) ...[
           TextField(
+            key: const Key('roomCodeField'),
             controller: _parentRoomController,
             keyboardType: TextInputType.visiblePassword, // letters + digits, no autocorrect
             textCapitalization: TextCapitalization.characters,
@@ -2284,6 +2293,7 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             Expanded(
               child: FilledButton.icon(
+                key: const Key('joinRoomButton'),
                 onPressed: _pairingBusy || (!_firebaseReady && !_isOfflineMode)
                     ? null
                     : (_isOfflineMode ? _startDiscovery : _joinRoomWithCode),
@@ -2621,6 +2631,7 @@ class _HomeScreenState extends State<HomeScreen>
                 },
               ),
               IconButton(
+                key: const Key('settingsButton'),
                 icon: const Icon(Icons.settings_outlined),
                 tooltip: l10n.settings,
                 visualDensity: VisualDensity.compact,
@@ -2653,6 +2664,7 @@ class _HomeScreenState extends State<HomeScreen>
                 },
               ),
               PopupMenuButton<_MenuAction>(
+                key: const Key('mainMenuButton'),
                 onSelected: _onMenuActionSelected,
                 itemBuilder: (context) => _buildMenuItems(),
                 icon: const Icon(Icons.more_vert_rounded),
@@ -2835,6 +2847,7 @@ class _HomeScreenState extends State<HomeScreen>
                   top: 12,
                   left: 12,
                   child: _buildOverlayButton(
+                    key: const Key('nightModeButton'),
                     icon: _nightMode ? Icons.dark_mode : Icons.dark_mode_outlined,
                     onTap: _toggleNightMode,
                     active: _nightMode,
@@ -2912,11 +2925,13 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildOverlayButton({
+    Key? key,
     required IconData icon,
     required VoidCallback onTap,
     bool active = false,
   }) {
     return GestureDetector(
+      key: key,
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -3093,6 +3108,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           _buildControlCard(
             scheme,
+            key: const Key('recordButton'),
             icon: _recorderService.isRecording ? Icons.stop_circle_outlined : Icons.fiber_manual_record_outlined,
             label: _recorderService.isRecording ? l10n.stopRecording : l10n.startRecording,
             onTap: _toggleRecording,
@@ -3115,6 +3131,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         _buildControlCard(
           scheme,
+          key: const Key('disconnectButton'),
           icon: Icons.stop_circle_outlined,
           label: l10n.disconnect,
           onTap: () => _resetPairing(deleteRoom: isBaby),
@@ -3127,6 +3144,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildControlCard(
     ColorScheme scheme, {
+    Key? key,
     required IconData icon,
     required String label,
     required VoidCallback onTap,
@@ -3134,6 +3152,7 @@ class _HomeScreenState extends State<HomeScreen>
     bool isOutlined = false,
   }) {
     return Material(
+      key: key,
       color: isOutlined ? Colors.transparent : color.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
