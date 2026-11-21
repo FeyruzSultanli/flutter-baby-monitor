@@ -972,32 +972,39 @@ class _HomeScreenState extends State<HomeScreen>
     
     final now = DateTime.now();
     final bool alert = db >= _noiseThreshold;
-    
+
+    // Publish (local UI + parent) on alert changes or every 200 ms. Audio
+    // chunks arrive many times per second; rebuilding the whole HomeScreen
+    // for each one wasted CPU/battery on the baby device (B20).
+    final shouldPublish = alert != _lastCryAlertSent ||
+        _lastCrySentAt == null ||
+        now.difference(_lastCrySentAt!) > const Duration(milliseconds: 200);
+    if (!shouldPublish) return;
+
+    _lastCryAlertSent = alert;
+    _lastCrySentAt = now;
+
     // Update local UI (Baby side)
-    setState(() {
-      _currentDecibel = db;
-      _noiseAlert = alert;
-    });
+    if (mounted) {
+      setState(() {
+        _currentDecibel = db;
+        _noiseAlert = alert;
+      });
+    }
 
     // Send to Parent
-    // Offline mode: Send frequently for smooth UI (e.g., every 200ms)
-    // or if status changed.
-    if (alert != _lastCryAlertSent || 
-        (_lastCrySentAt == null || now.difference(_lastCrySentAt!) > const Duration(milliseconds: 200))) {
-      
-      _lastCryAlertSent = alert;
-      _lastCrySentAt = now;
+    final endpointId = _connectedEndpointId;
+    if (endpointId == null) return;
+    final payloadMap = {
+      'type': 'STATUS',
+      'db': db,
+      'alert': alert,
+    };
+    final payload =
+        OfflinePayload.encodeJson(OfflinePayloadType.control, payloadMap);
 
-      final payloadMap = {
-        'type': 'STATUS',
-        'db': db,
-        'alert': alert,
-      };
-      final payload =
-          OfflinePayload.encodeJson(OfflinePayloadType.control, payloadMap);
-
-      Nearby().sendBytesPayload(_connectedEndpointId!, payload);
-    }
+    unawaited(Nearby().sendBytesPayload(endpointId, payload).catchError(
+        (Object e) => debugPrint('Status payload send error: $e')));
   }
 
   Future<void> _processAndSendImage(CameraImage image) async {
