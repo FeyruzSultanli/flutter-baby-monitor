@@ -79,7 +79,6 @@ class _HomeScreenState extends State<HomeScreen>
   VideoSettings _videoSettings = const VideoSettings();
   
   final VideoRecorderService _recorderService = VideoRecorderService();
-  String? _recordingPath;
 
   // Offline / Wi-Fi Direct Mode
   bool _isOfflineMode = false;
@@ -327,6 +326,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    if (_recorderService.isRecording) {
+      unawaited(_recorderService.stopAny().catchError(
+          (Object e) => debugPrint('Stopping recording on dispose failed: $e')));
+    }
     _batterySyncTimer?.cancel();
     _batteryStateSubscription?.cancel();
     _discoveryStreamController.close();
@@ -552,6 +555,18 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _resetPairing({bool deleteRoom = false, bool restoreCamera = true}) async {
     final activeRoom = _pairingState?.roomCode;
+
+    // Finish a running recording before its source stream goes away, so the
+    // file is finalized instead of left unplayable (B14).
+    if (_recorderService.isRecording) {
+      try {
+        await _recorderService.stopAny();
+      } catch (e) {
+        debugPrint('Stopping recording on reset failed: $e');
+      }
+      if (mounted) setState(() {});
+    }
+
     await _webrtcService?.hangUp();
     
     // Dispose P2P
@@ -2034,15 +2049,8 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _toggleRecording() async {
     try {
       if (_recorderService.isRecording) {
-        // Stop Recording
-        if (_isOfflineMode) {
-          await _recorderService.stopOfflineRecording();
-        } else {
-          if (_recordingPath != null) {
-            await _recorderService.stopWebRTCRecording(_recordingPath!);
-            _recordingPath = null;
-          }
-        }
+        // Stop Recording (whichever kind is running, even if the mode changed)
+        await _recorderService.stopAny();
         if (mounted) {
           setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(
@@ -2065,7 +2073,7 @@ class _HomeScreenState extends State<HomeScreen>
         } else {
           final stream = _webrtcService?.remoteRenderer.srcObject;
           if (stream != null) {
-            _recordingPath = await _recorderService.startWebRTCRecording(stream);
+            await _recorderService.startWebRTCRecording(stream);
           } else {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
