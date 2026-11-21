@@ -467,6 +467,17 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Etki:** Bağlıyken uygulama kapatılırsa debug'da assertion, release'te istisna.
 - **Durum:** Düzeltildi (`771e3bc`): `_disposing` bayrağı.
 
+### B63 — iOS: `sound_stream` açılışta ses motorunu başlatıyor, simülatörde uygulama çöküyor (Yüksek, iOS)
+- **Dosya:** `ios/Runner/AppDelegate.swift`, `home_screen.dart` `_initAudioServices` / `_stopAudioStream`.
+- **Sorun:** `SwiftSoundStreamPlugin.init` → `attachPlayer` → `AVAudioEngine.mainMixerNode`. iOS 26.5 ve 27 simülatörlerinde CoreAudio RPC zaman aşımı yüzünden `abort`. Gerçek cihazda da, kullanılmadığı halde ses donanımını açılışta alıyor.
+- **Durum:** Düzeltildi (`4a28326`): eklenti iOS'ta kaydedilmiyor; Dart tarafı onu yalnızca Android'de çağırıyor (DECISIONS A11). Gerçek iPhone'da doğrulanmalı.
+
+### B64 — Uzak ICE adayları answer uygulanmadan geliyor ve kayboluyor (Yüksek)
+- **Dosya:** `webrtc_service.dart` (aday dinleyicileri).
+- **Sorun:** Ebeveynin adayları, bebek cevabı (answer) uygulamadan önce gelebiliyor. Bu durumda `addCandidate` "remote description was null" hatası veriyor: iOS'ta yakalanmayan bir istisna, Android'de sessizce yok sayılıyor. Adaylar kayboluyor; bu da özellikle farklı ağlarda bağlantı şansını düşürüyor.
+- **Nasıl bulundu:** iOS simülatörü E2E testi.
+- **Durum:** Düzeltildi (`0f50f77`): adaylar uzak açıklama ayarlanana kadar kuyrukta bekliyor, ardından ekleniyor.
+
 ---
 
 ## Hiç çalışmayan veya yarım kalmış özellikler
