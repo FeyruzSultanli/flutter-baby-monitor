@@ -70,6 +70,9 @@ class PeerConnectionManager {
       // Offer dinle (Ebeveyn tarafı Answerer olduğu için Offer bekler)
       _offerSub = signalingService.onOffer.listen((offer) async {
         if (_peerConnection == null) return;
+        // The room snapshot re-emits the same offer on every room update;
+        // answering each time looped answer -> snapshot -> answer (B15).
+        if (await _peerConnection?.getRemoteDescription() != null) return;
         
         await _peerConnection!.setRemoteDescription(offer);
         
