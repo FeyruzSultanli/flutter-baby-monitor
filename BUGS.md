@@ -451,6 +451,15 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 ### B60 — Hatası yakalanmayan future'lar; giriş kapalıyken sonsuz yeniden katılma (Düşük)
 - **Durum:** Düzeltildi (`66d3ab0`).
 
+## Emülatör E2E testlerinde bulunanlar
+
+### B61 — Katıldıktan sonra kapanmış eşleşme sayfasının setState'i çağrılıyor (Orta)
+- **Dosya:** `home_screen.dart` `_refreshBottomSheet`, `_showPairingSheet`.
+- **Sorun:** Sayfa kapanırken çıkış animasyonu sırasında yeniden çiziliyor ve `setState`'ini `whenComplete` onu temizledikten sonra tekrar kaydediyor. Katılımdan sonra dispose edilmiş bu State'in `setState`'i çağrılıyordu.
+- **Nasıl bulundu:** Android emülatöründe ebeveyn E2E testi (debug assertion).
+- **Etki:** Debug'da test/assertion hatası; release'te loglanan bir istisna.
+- **Durum:** Düzeltildi (`0a4932c`): yalnızca sayfanın context'i hâlâ mounted ise çağrılıyor. E2E ile doğrulandı.
+
 ---
 
 ## Hiç çalışmayan veya yarım kalmış özellikler
