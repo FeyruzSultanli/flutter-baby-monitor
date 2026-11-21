@@ -900,8 +900,19 @@ class _HomeScreenState extends State<HomeScreen>
     return true;
   }
 
+  /// Nearby Connections (and the androidInfo calls below) exist only on
+  /// Android; on other platforms show a message instead of crashing (B46).
+  bool _ensureOfflineSupported() {
+    if (Platform.isAndroid) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context).offlineAndroidOnly)),
+    );
+    return false;
+  }
+
   Future<void> _startAdvertising() async {
     if (_pairingBusy) return;
+    if (!_ensureOfflineSupported()) return;
     if (!await _checkP2PPermissions()) return;
 
     setState(() => _pairingBusy = true);
@@ -1092,6 +1103,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _startDiscovery() async {
+    if (!_ensureOfflineSupported()) return;
     if (!await _checkP2PPermissions()) return;
 
     _discoveredEndpoints.clear();

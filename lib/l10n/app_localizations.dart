@@ -161,6 +161,7 @@ class AppLocalizations {
       'videoSettingsUpdated': 'Video settings updated',
       'unknownDevice': 'Unknown device',
       'addFirstCameraHint': 'Tap the + button to add your first camera',
+      'offlineAndroidOnly': 'Offline mode is only available on Android',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -309,6 +310,7 @@ class AppLocalizations {
       'videoSettingsUpdated': 'Video ayarları güncellendi',
       'unknownDevice': 'Bilinmeyen cihaz',
       'addFirstCameraHint': 'İlk kameranızı eklemek için + düğmesine dokunun',
+      'offlineAndroidOnly': 'Offline mod yalnızca Android\'de kullanılabilir',
     },
   };
 
@@ -458,6 +460,7 @@ class AppLocalizations {
   String get videoSettingsUpdated => _localizedValues[locale.languageCode]!['videoSettingsUpdated']!;
   String get unknownDevice => _localizedValues[locale.languageCode]!['unknownDevice']!;
   String get addFirstCameraHint => _localizedValues[locale.languageCode]!['addFirstCameraHint']!;
+  String get offlineAndroidOnly => _localizedValues[locale.languageCode]!['offlineAndroidOnly']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
