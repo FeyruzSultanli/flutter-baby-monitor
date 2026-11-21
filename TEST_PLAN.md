@@ -246,3 +246,10 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 12.16 | D5 eşik senkronu (`04ce566`) | Online bağlıyken E'de Ayarlar → eşiği 60'tan 75'e çekin. 2 sn bekleyin. B'de Ayarlar'ı açın. | B'nin eşiği de 75 görünür; ses çubuğundaki "Eşik" yazısı iki cihazda 75. | ✅/❌ |
 | 12.17 | D5 | 12.16'dan sonra 60–70 dB civarı bir sesle test edin. | 75 eşiğinde alarm çalmaz; eşiği 60'a indirince çalar. Kalibrasyon için uygun eşiği not edin. | Uygun eşik: ___ dB |
 | 12.18 | D5 | Aynı testleri offline'da yapın (E'de eşik değişimi → B). | Offline'da da eşik B'ye geçer. | ✅/❌ |
+| 12.19 | B08 yeniden katılma (`dd72f41`) | **İki telefona da yeni sürümü kurun** (eski sürümle eşleşmez). Online bağlanın; E'de "Bağlantıyı kes"; aynı kodla tekrar katılın. | 10 sn içinde görüntü tekrar gelir. B'nin kamerası bu sırada kapanmaz. | ✅/❌ + süre: |
+| 12.20 | B08 | Bağlıyken E uygulamasını son uygulamalardan kapatın, açın, aynı kodu girin. | Bağlanır. | ✅/❌ |
+| 12.21 | B08 | Bağlıyken E'den 5 kez çık-gir yapın. | Her seferinde bağlanır; B'de kamera önizlemesi hiç kesilmez; Firebase konsolunda `callerCandidates`/`calleeCandidates` yalnızca son oturumun adaylarını içerir. | ✅/❌ |
+| 12.22 | B08 otomatik yeniden katılma | Bağlıyken E'nin Wi-Fi'ını 30 sn kapatıp açın. | E önce "bağlanıyor" gösterir; Wi-Fi gelince en geç ~30 sn içinde kendiliğinden yeniden bağlanır (logda `Rejoin attempt`). | ✅/❌ + süre: |
+| 12.23 | B36 | Bağlıyken B'nin Wi-Fi'ını 5 sn kapatıp açın. | E'de kısa süre "bağlanıyor", sonra görüntü geri gelir; hata mesajı çıkmaz. | ✅/❌ |
+| 12.24 | B08 | Bağlıyken B'de "Bağlantıyı kes" (oda silinir). | E bir süre yeniden dener, sonra "Bebek cihazı odayı kapattı" mesajıyla durur. | ✅/❌ |
+| 12.25 | B08 | B yayın yapıyor, E henüz bağlanmadı: B'nin yanında ağlama sesi. | B'nin ses çubuğu hareket eder (bekleme peer'ı ses seviyesini ölçüyor). | ✅/❌ |

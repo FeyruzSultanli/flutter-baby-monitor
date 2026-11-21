@@ -117,7 +117,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Bağlantı koptuğunda (Wi-Fi değişimi, uygulamanın yeniden açılması) ebeveynin yeniden bağlanabilmesi için bebek tarafında oda yeniden oluşturulmalı.
 - **Öneri:** Bebek, `isPaired` false olduğunda ya da peer bağlantısı `failed/disconnected` durumuna geçtiğinde aynı odada yeni bir offer üretsin (ICE restart veya yeni peer connection). Eski answer ve adaylar temizlensin. Bu sinyal protokolünü değiştiren orta büyüklükte bir iş olduğu için bu turda yapılmadı.
 - **Risk:** Orta.
-- **Durum:** Açık (güvenli yerel düzeltme değil)
+- **Durum:** Düzeltildi (`dd72f41`): oturum protokolü. Her katılımda yeni bir `viewerSession` yazılıyor; bebek kamerayı kapatmadan yeni peer ve offer üretiyor; offer, answer ve adaylar oturuma göre filtreleniyor; ebeveyn bağlantı düşünce otomatik olarak yeniden katılıyor (2/4/8/16/30 sn). **Eski ve yeni sürüm birbiriyle eşleşemez.** Cihazda doğrulanmalı.
 
 ### B09 — ~~Nearby BYTES payload sınırı (32 KB) HIGH kalitede aşılabilir~~ → **geçersiz**
 - **Dosya:** `home_screen.dart` `_processAndSendImage`.
@@ -178,7 +178,7 @@ Kullanıcı yokken alınan kararlar:
   - Tüm kameraların sesi aynı anda çalıyor.
   - Alarm desteği yok.
 - **Öneri:** Bkz. D6. En az düzeltme olarak MultiPeer'e remote description guard'ı eklenebilir.
-- **Durum:** Kısmen düzeltildi (`ac1e136`): her offer'a artık tek bir cevap veriliyor. Karar D6 uygulandı (`fe862a2`): menü girişi `kMultiCameraEnabled = false` bayrağıyla gizlendi, kod silinmedi. İzleyici başına oturum gerekirse ileride tekrar açılabilir.
+- **Durum:** Kısmen düzeltildi (`ac1e136`): her offer'a artık tek bir cevap veriliyor. Karar D6 uygulandı (`fe862a2`): menü girişi `kMultiCameraEnabled = false` bayrağıyla gizlendi, kod silinmedi. İzleyici başına oturum gerekirse ileride tekrar açılabilir. **Not (`dd72f41`):** MultiPeerService oturum kimliği göndermiyor; yeni protokolde offer'lar oturumlu olduğu için multi-camera artık bağlanamaz. Özellik gizli olduğu için şimdilik sorun değil; tekrar açılırsa izleyici başına oturum eklenmeli.
 
 ### B16 — WebRTC kayıtlarında ses yok
 - **Dosya:** `video_recorder_service.dart:38-44`: `_mediaRecorder!.start(filePath, videoTrack: ...)` çağrısında `audioChannel` verilmiyor.
@@ -329,7 +329,7 @@ Kullanıcı yokken alınan kararlar:
 - **Dosya:** `webrtc_service.dart:156, 215`.
 - **Sorun:** Disconnected durumu çoğunlukla geçici ve kendiliğinden düzeliyor. Kullanıcı yine de hata görüyor.
 - **Öneri:** Disconnected'ı CONNECTING olarak göstermek, ancak `failed` gelirse FAILED yapmak. UI davranışını değiştirdiği için B08 ile birlikte ele alınmalı.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`dd72f41`): `disconnected` durumu 10 sn boyunca 'bağlanıyor' olarak gösteriliyor, ancak sonra FAILED oluyor. Ebeveyn FAILED'da otomatik olarak yeniden katılıyor. Cihazda doğrulanmalı.
 
 ### B37 — Online modda video ayarları (fps/kalite) WebRTC'ye uygulanmıyor
 - **Dosya:** `home_screen.dart:1304-1335`.
