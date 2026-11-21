@@ -18,7 +18,7 @@ class PairingService {
       _firestore.collection('rooms');
 
   /// Creates a 6-digit numeric room and stores a fresh document.
-  Future<String> createRoom({String? previousCode}) async {
+  Future<String> createRoom({String? previousCode, double? noiseThreshold}) async {
     if (previousCode != null) {
       await closeRoom(previousCode);
     }
@@ -49,6 +49,7 @@ class PairingService {
       'cryDb': null,
       'cryUpdated': FieldValue.serverTimestamp(),
       'videoSettings': const VideoSettings().toJson(),
+      'noiseThreshold': noiseThreshold,
     });
 
     return code;
@@ -110,6 +111,13 @@ class PairingService {
     );
   }
 
+  Future<void> updateNoiseThreshold(String roomCode, double threshold) async {
+    await _rooms.doc(roomCode).set(
+      {'noiseThreshold': threshold},
+      SetOptions(merge: true),
+    );
+  }
+
   Future<void> updateVideoSettings(String roomCode, VideoSettings settings) async {
     await _rooms.doc(roomCode).set(
       {'videoSettings': settings.toJson()},
@@ -137,6 +145,7 @@ class PairingService {
       videoSettings: data['videoSettings'] != null
           ? VideoSettings.fromJson(data['videoSettings'])
           : const VideoSettings(),
+      noiseThreshold: (data['noiseThreshold'] as num?)?.toDouble(),
     );
   }
 
@@ -170,6 +179,7 @@ class PairingService {
         videoSettings: data['videoSettings'] != null
             ? VideoSettings.fromJson(data['videoSettings'])
             : const VideoSettings(),
+        noiseThreshold: (data['noiseThreshold'] as num?)?.toDouble(),
       );
     });
   }

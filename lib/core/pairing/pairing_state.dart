@@ -13,6 +13,7 @@ class PairingState {
     this.cryDecibel,
     this.cryUpdatedAt,
     this.videoSettings = const VideoSettings(),
+    this.noiseThreshold,
   });
 
   final String roomCode;
@@ -24,6 +25,9 @@ class PairingState {
   final double? cryDecibel;
   final DateTime? cryUpdatedAt;
   final VideoSettings videoSettings;
+  /// Cry threshold used by the baby device (shared between both devices so
+  /// it can be calibrated from the parent; D5). Null if not stored yet.
+  final double? noiseThreshold;
 
   PairingState copyWith({
     bool? isPaired,
@@ -34,6 +38,7 @@ class PairingState {
     double? cryDecibel,
     DateTime? cryUpdatedAt,
     VideoSettings? videoSettings,
+    double? noiseThreshold,
   }) {
     return PairingState(
       roomCode: roomCode,
@@ -45,6 +50,7 @@ class PairingState {
       cryDecibel: cryDecibel ?? this.cryDecibel,
       cryUpdatedAt: cryUpdatedAt ?? this.cryUpdatedAt,
       videoSettings: videoSettings ?? this.videoSettings,
+      noiseThreshold: noiseThreshold ?? this.noiseThreshold,
     );
   }
 }

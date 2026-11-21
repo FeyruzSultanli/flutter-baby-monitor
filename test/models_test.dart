@@ -90,6 +90,14 @@ void main() {
       expect(s.cryUpdatedAt, updated);
     });
 
+    test('noiseThreshold defaults to null and survives copyWith', () {
+      final s = PairingState(roomCode: '1');
+      expect(s.noiseThreshold, isNull);
+      final withThreshold = s.copyWith(noiseThreshold: 72);
+      expect(withThreshold.noiseThreshold, 72);
+      expect(withThreshold.copyWith(isPaired: true).noiseThreshold, 72);
+    });
+
     test('copyWith clears errorMessage unless it is passed again', () {
       final failed = PairingState(roomCode: '1', errorMessage: 'boom');
       expect(failed.copyWith(isPaired: true).errorMessage, isNull);

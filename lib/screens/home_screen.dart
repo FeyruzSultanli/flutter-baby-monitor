@@ -111,6 +111,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool _noiseAlert = false;
   // Alarm only after >= 2 s above the threshold (D5 / B27).
   final CryDetector _cryDetector = CryDetector(threshold: 60.0);
+  // Threshold changes are synced to the other device (debounced) so the
+  // baby's detection can be calibrated from the parent (D5).
+  Timer? _thresholdSyncTimer;
 
   bool _isFullscreen = false;
   bool _fullscreenCryOverlay = false;
@@ -356,6 +359,7 @@ class _HomeScreenState extends State<HomeScreen>
           (Object e) => debugPrint('Stopping recording on dispose failed: $e')));
     }
     _batterySyncTimer?.cancel();
+    _thresholdSyncTimer?.cancel();
     _batteryStateSubscription?.cancel();
     // Resources that were not released before (B25).
     _noisePollTimer?.cancel();
@@ -682,6 +686,45 @@ class _HomeScreenState extends State<HomeScreen>
     _refreshBottomSheet();
   }
 
+  /// Applies a new cry threshold. Local changes are sent to the other device
+  /// after a short debounce; remote values are ignored while a local change
+  /// is still waiting to be sent, so an older remote value cannot undo it.
+  void _setNoiseThreshold(double value, {bool fromRemote = false}) {
+    if (fromRemote && (_thresholdSyncTimer?.isActive ?? false)) return;
+    if ((value - _noiseThreshold).abs() < 0.01) return;
+    if (!mounted) return;
+    setState(() {
+      _noiseThreshold = value;
+      _cryDetector.threshold = value;
+    });
+    if (fromRemote) return;
+    _thresholdSyncTimer?.cancel();
+    _thresholdSyncTimer =
+        Timer(const Duration(milliseconds: 500), () => unawaited(_syncNoiseThreshold()));
+  }
+
+  Future<void> _syncNoiseThreshold() async {
+    final value = _noiseThreshold;
+    try {
+      if (_isOfflineMode) {
+        final endpointId = _connectedEndpointId;
+        if (endpointId == null) return;
+        await Nearby().sendBytesPayload(
+          endpointId,
+          OfflinePayload.encodeJson(
+              OfflinePayloadType.control, {'type': 'THRESHOLD', 'value': value}),
+        );
+      } else {
+        final roomCode = _pairingState?.roomCode;
+        final pairing = _pairingService;
+        if (roomCode == null || pairing == null) return;
+        await pairing.updateNoiseThreshold(roomCode, value);
+      }
+    } catch (e) {
+      debugPrint('Threshold sync failed: $e');
+    }
+  }
+
   /// Returns true (and starts a new cooldown) if a cry notification may be
   /// sent now; false while the previous one is still within the cooldown.
   bool _takeCryNotificationSlot(DateTime now) {
@@ -714,7 +757,10 @@ class _HomeScreenState extends State<HomeScreen>
     });
     try {
       final newCode = await _pairingService!
-          .createRoom(previousCode: _pairingState?.roomCode);
+          .createRoom(
+            previousCode: _pairingState?.roomCode,
+            noiseThreshold: _noiseThreshold,
+          );
       final facingMode =
           _currentLens == CameraLensDirection.front ? 'user' : 'environment';
       unawaited(_pairingService!.setFacing(newCode, facingMode));
@@ -1261,6 +1307,8 @@ class _HomeScreenState extends State<HomeScreen>
         _startImageStream();
         _startAudioStream();
         _maybeEnterAutoNightMode();
+        // The baby's threshold is the active one; tell the new parent.
+        unawaited(_syncNoiseThreshold());
       } else if (_role == DeviceRole.PARENT) {
         // Ensure player is initialized but DO NOT start yet.
         // We will start it when the first audio packet arrives to avoid buffer underrun.
@@ -1334,6 +1382,9 @@ class _HomeScreenState extends State<HomeScreen>
         if (map['type'] == 'SETTINGS') {
            final newSettings = VideoSettings.fromJson(map['data']);
            _applyRemoteSettings(newSettings);
+        } else if (map['type'] == 'THRESHOLD') {
+           final value = map['value'];
+           if (value is num) _setNoiseThreshold(value.toDouble(), fromRemote: true);
         } else if (map['type'] == 'SWITCH_CAMERA') {
            // Handle Camera Switch Request from Parent
            if (_role == DeviceRole.BABY) {
@@ -1799,6 +1850,12 @@ class _HomeScreenState extends State<HomeScreen>
           );
         }
       });
+
+      // Threshold set on the other device (calibration, D5)
+      final remoteThreshold = roomState.noiseThreshold;
+      if (remoteThreshold != null) {
+        _setNoiseThreshold(remoteThreshold, fromRemote: true);
+      }
 
       // Check for settings update
       if (_role == DeviceRole.BABY) {
@@ -2411,12 +2468,7 @@ class _HomeScreenState extends State<HomeScreen>
                       isOfflineMode: _isOfflineMode,
                       videoSettings: _videoSettings,
                       onVideoSettingsChanged: _updateVideoSettings,
-                      onNoiseThresholdChanged: (v) {
-                        setState(() {
-                          _noiseThreshold = v;
-                          _cryDetector.threshold = v;
-                        });
-                      },
+                      onNoiseThresholdChanged: _setNoiseThreshold,
                       onKeepScreenOnChanged: _setKeepScreenOn,
                       autoNightMode: _autoNightMode,
                       onAutoNightModeChanged: (v) {
