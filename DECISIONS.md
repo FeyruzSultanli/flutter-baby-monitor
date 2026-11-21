@@ -24,6 +24,20 @@
 - **Seçim:** Yalnızca debug derlemede ve `--dart-define=USE_FIREBASE_EMULATOR=true` verilirse (`kDebugMode` derleme zamanı sabiti). Android'de host adresi `10.0.2.2`, iOS simülatöründe `localhost`. Düz HTTP izni yalnızca `src/debug` manifestinde bu adresler için var.
 - **Neden:** Release her zaman gerçek Firebase'e bağlanmalı; emülatör kodu release'e girmemeli.
 
+### A5 — iOS minimum sürüm
+- **Seçenekler:** 13 (Flutter varsayılanı) / 15 / 16.
+- **Seçim:** iOS 15 (Podfile + Runner hedefi).
+- **Neden:** Firebase, WebRTC ve kamera eklentileri ≥13 istiyor; 15 ileride çıkacak eklenti sürümleri için pay bırakıyor ve iPhone 6s/SE (1. nesil) ve sonrasını kapsıyor.
+
+### A6 — iOS izin metinleri ve Xcode projesi
+- **Seçim:** Temel metinler İngilizce `Info.plist`'te; Türkçe ve İngilizce `tr.lproj`/`en.lproj` `InfoPlist.strings` dosyalarında.
+- **Nasıl:** Dosyaları projeye CocoaPods'un `xcodeproj` gem'i ile ekledim. `project.pbxproj`'u elle ya da regex'le düzenlemek yerine projenin kendi API'si kullanıldı; bu güvenli ve yapısal bir yöntem.
+- **Neden:** iOS, izin metnini cihaz diline göre seçer.
+
+### A7 — iOS'ta offline
+- **Seçim:** Ayarlarda anahtarın yerine "Offline mod yalnızca Android'de kullanılabilir" açıklaması gösteriliyor; kontrol kartı gizli. Android aynen kalıyor.
+- **Neden:** Kullanıcının istediği bu; kod silinmedi.
+
 ## Cavid'in kararı bekleniyor
 
-(Ürün kararı gerektiren konular buraya yazılır.)
+- **Android ↔ iOS offline:** Gerekli mi? Seçenekler ve önerim (yerel Wi-Fi üzerinden WebRTC + LAN signaling, sonra hotspot) PLAN_NEXT.md bölüm 6'da.

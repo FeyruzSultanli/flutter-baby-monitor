@@ -440,3 +440,21 @@ match /rooms/{code} {
   - D2'nin istemci kısmı D3'e bağlı (token alanı ve kurallar).
   - B08 şeması D3 kurallarına girdi olacak.
   - D1-a ve D1-b bağımsız.
+
+---
+
+## 6. Android ↔ iOS offline bağlantı (yalnızca plan; kod yazılmadı)
+
+**Bugünkü durum:** Offline mod, Google Nearby Connections (`nearby_connections` paketi) kullanıyor ve yalnızca Android'de çalışıyor. iOS'ta offline seçeneği açıklamayla gizlendi (`94a21df`). Android ↔ Android offline aynen çalışıyor.
+
+| Seçenek | Nasıl | Artı | Eksi | Büyüklük |
+|---|---|---|---|---|
+| **A. Yerel Wi-Fi üzerinden WebRTC + LAN signaling** | İki telefon aynı Wi-Fi'da (internetsiz bir router da olur). Bebek, cihaz içinde küçük bir HTTP/WebSocket signaling sunucusu açar (`dart:io` `HttpServer`). Ebeveyn onu mDNS/Bonjour ile bulur (`bonsoir` / `nsd` paketi) ya da QR koddaki IP:port ile bağlanır. Medya WebRTC ile gider; STUN/TURN gerekmez, host adayları yeter. | Platformlar arası çalışır. Online moddaki WebRTC kodu (oturumlar, B08) yeniden kullanılır. JPEG akışından çok daha iyi görüntü ve ses. İnternet gerekmez. | Aynı Wi-Fi ağı şart, yani gerçek cihazdan cihaza bağlantı değil. iOS "yerel ağ" izni sorar. Bazı router'lar istemcileri birbirinden yalıtır (AP isolation). Arka plan kısıtları aynen geçerli. | M–L (~3–4 gün) |
+| **B. A + telefon hotspot'u** | Ağ yoksa Android bebek `LocalOnlyHotspot` açar (Android 8+, programla). iPhone, QR'daki SSID/şifreyle `NEHotspotConfiguration` üzerinden bağlanır. Sonrası A ile aynı. | Router gerekmez, gerçekten "ağsız" ortamda çalışır. | iOS hotspot **açamaz**; iPhone bebek olursa Android ebeveyn, iPhone'un kişisel erişim noktasına elle bağlanmalı. Hotspot internet paylaşmaz. Pil tüketimi yüksek. | +1–2 gün (A'nın üstüne) |
+| **C. Google Nearby Connections iOS SDK** | Google'ın deneysel iOS Nearby Connections kütüphanesi (`google/nearby`) için kendi Flutter eklentimizi yazmak. | Android'deki mevcut offline akışla aynı protokol; Bluetooth + Wi-Fi'ı kendisi seçer. | Deneysel; iOS ↔ Android birlikte çalışması sınırlı ve belgeleri zayıf. Eklenti bakımı bize kalır. | L, belirsiz |
+| **D. Apple Multipeer Connectivity** | iOS ↔ iOS için. | Apple'ın kendi API'si, kararlı. | Android ile **çalışmaz**. | M (yalnızca iOS ↔ iOS) |
+| **E. Bluetooth LE** | Signaling ve ses BLE üzerinden. | Her iki platformda var. | Görüntü için bant genişliği çok düşük; yalnızca ses ya da alarm olabilir. | M, sınırlı fayda |
+
+**Önerim: A, ardından B.** Önce yerel Wi-Fi'da WebRTC (A). Bu, Android ↔ iOS, iOS ↔ iOS ve Android ↔ Android için tek bir offline yol olur. Mevcut Nearby yolu Android ↔ Android için yedek olarak kalabilir. Router olmayan ortamlar için sonra B eklenir. C'yi kararlı hale gelene kadar önermiyorum.
+
+**Cavid'in kararı bekleniyor:** Android ↔ iOS offline gerekli mi? Gerekliyse A ile başlayalım mı? (DECISIONS.md'de de var.)
