@@ -844,6 +844,10 @@ class _HomeScreenState extends State<HomeScreen>
       _pairingError = null;
     });
     try {
+      // The previous room is deleted inside createRoom; stop listening to it
+      // first so its deletion is not reported as an error (B57).
+      await _roomSub?.cancel();
+      _roomSub = null;
       final newCode = await _pairingService!
           .createRoom(
             previousCode: _pairingState?.roomCode,
@@ -2032,6 +2036,17 @@ class _HomeScreenState extends State<HomeScreen>
       // e.g. Firestore permission or network errors (B23)
       debugPrint('Room listener error: $e');
       if (!mounted) return;
+      // With the security rules, a deleted (or expired) room is no longer
+      // readable, so its listener ends with permission-denied rather than an
+      // empty snapshot (B57): tell the user the room was closed.
+      if (e is FirebaseException && e.code == 'permission-denied') {
+        if (_role == DeviceRole.PARENT) {
+          _viewerSession = null;
+          _rejoinTimer?.cancel();
+        }
+        _handlePairingError(AppLocalizations.of(context).roomClosed);
+        return;
+      }
       _handlePairingError('${AppLocalizations.of(context).error}: $e');
     });
   }
