@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -36,6 +37,7 @@ import '../core/webrtc/webrtc_service.dart';
 import '../core/services/hybrid_notification_manager.dart';
 import '../widgets/camera_preview_card.dart';
 import '../widgets/fullscreen_view.dart';
+import '../widgets/night_mode_overlay.dart';
 import '../widgets/noise_level_bar.dart';
 import '../widgets/settings_sheet.dart';
 import '../models/video_settings.dart';
@@ -113,6 +115,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool _keepScreenOn = false;
   bool _nightMode = false;
+  // Enter night mode automatically once a parent connects (baby device, D1-a).
+  bool _autoNightMode = false;
 
   void Function(void Function())? _bottomSheetSetState;
   StreamSubscription<PairingState>? _roomSub;
@@ -373,6 +377,10 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }));
     }
+    if (_nightMode) {
+      unawaited(ScreenBrightness.instance.resetApplicationScreenBrightness().catchError(
+          (Object e) => debugPrint('Resetting brightness on dispose failed: $e')));
+    }
     _currentImageBytesNotifier.dispose();
     _discoveryStreamController.close();
     _controller?.dispose();
@@ -467,7 +475,6 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted) return;
     setState(() {
       _role = role;
-      _nightMode = false;
     });
     if (role == DeviceRole.PARENT) {
       await _disposeCameraController();
@@ -494,6 +501,7 @@ class _HomeScreenState extends State<HomeScreen>
       }
     });
     _refreshBottomSheet();
+    if (status == ConnectionStatus.CONNECTED) _maybeEnterAutoNightMode();
   }
 
   void _handlePairingError(String message) {
@@ -598,6 +606,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _resetPairing({bool deleteRoom = false, bool restoreCamera = true}) async {
     final activeRoom = _pairingState?.roomCode;
+    await _exitNightMode();
 
     // Finish a running recording before its source stream goes away, so the
     // file is finalized instead of left unplayable (B14).
@@ -1248,6 +1257,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (_role == DeviceRole.BABY) {
         _startImageStream();
         _startAudioStream();
+        _maybeEnterAutoNightMode();
       } else if (_role == DeviceRole.PARENT) {
         // Ensure player is initialized but DO NOT start yet.
         // We will start it when the first audio packet arrives to avoid buffer underrun.
@@ -1718,10 +1728,57 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _toggleNightMode() {
-    if (_role != DeviceRole.BABY) return;
-    setState(() {
-      _nightMode = !_nightMode;
-    });
+    if (_nightMode) {
+      unawaited(_exitNightMode());
+    } else {
+      unawaited(_enterNightMode());
+    }
+  }
+
+  /// Night mode (D1-a): black full-screen layer, minimum app brightness and a
+  /// wakelock, while streaming continues underneath. Baby device only.
+  Future<void> _enterNightMode() async {
+    if (!mounted || _nightMode || _role != DeviceRole.BABY) return;
+    setState(() => _nightMode = true);
+    try {
+      await WakelockPlus.enable();
+    } catch (e) {
+      debugPrint('Wakelock enable failed: $e');
+    }
+    try {
+      // Only this app's window; the system brightness setting is untouched.
+      await ScreenBrightness.instance.setApplicationScreenBrightness(0.0);
+    } catch (e) {
+      debugPrint('Setting brightness failed: $e');
+    }
+  }
+
+  Future<void> _exitNightMode() async {
+    if (!_nightMode) return;
+    if (mounted) {
+      setState(() => _nightMode = false);
+    } else {
+      _nightMode = false;
+    }
+    try {
+      await ScreenBrightness.instance.resetApplicationScreenBrightness();
+    } catch (e) {
+      debugPrint('Resetting brightness failed: $e');
+    }
+    // Keep the wakelock while broadcasting or if the user asked for it.
+    if (!_keepScreenOn && _pairingState == null) {
+      try {
+        await WakelockPlus.disable();
+      } catch (e) {
+        debugPrint('Wakelock disable failed: $e');
+      }
+    }
+  }
+
+  void _maybeEnterAutoNightMode() {
+    if (_autoNightMode && _role == DeviceRole.BABY && !_nightMode) {
+      unawaited(_enterNightMode());
+    }
   }
 
   void _listenRoomUpdates(String roomCode) {
@@ -1809,9 +1866,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _enterFullscreen() {
+    unawaited(_exitNightMode());
     setState(() {
       _isFullscreen = true;
-      _nightMode = false;
     });
   }
 
@@ -2269,14 +2326,12 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
           ),
-          // Night Mode Overlay (Dimming Effect 80%)
+          // Night mode: opaque black layer; double tap / back exits (D1-a)
           if (_nightMode)
             Positioned.fill(
-              child: IgnorePointer(
-                ignoring: true, // Allows clicks to pass through to the buttons below
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.8), // Simulates brightness dropping to ~20%
-                ),
+              child: NightModeOverlay(
+                status: _connectionStatus,
+                onExit: () => unawaited(_exitNightMode()),
               ),
             ),
         ],
@@ -2362,6 +2417,10 @@ class _HomeScreenState extends State<HomeScreen>
                         });
                       },
                       onKeepScreenOnChanged: _setKeepScreenOn,
+                      autoNightMode: _autoNightMode,
+                      onAutoNightModeChanged: (v) {
+                        setState(() => _autoNightMode = v);
+                      },
                       onOfflineModeChanged: (val) async {
                         Navigator.pop(context);
                         setState(() {

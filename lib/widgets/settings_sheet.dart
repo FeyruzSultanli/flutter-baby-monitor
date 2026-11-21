@@ -16,6 +16,8 @@ class SettingsSheet extends StatefulWidget {
     this.onOfflineModeChanged,
     this.videoSettings,
     this.onVideoSettingsChanged,
+    this.autoNightMode = false,
+    this.onAutoNightModeChanged,
   });
 
   final double noiseThreshold;
@@ -26,6 +28,8 @@ class SettingsSheet extends StatefulWidget {
   final ValueChanged<bool>? onOfflineModeChanged;
   final VideoSettings? videoSettings;
   final ValueChanged<VideoSettings>? onVideoSettingsChanged;
+  final bool autoNightMode;
+  final ValueChanged<bool>? onAutoNightModeChanged;
 
   @override
   State<SettingsSheet> createState() => _SettingsSheetState();
@@ -34,6 +38,7 @@ class SettingsSheet extends StatefulWidget {
 class _SettingsSheetState extends State<SettingsSheet> {
   late double _sliderValue;
   late bool _localKeepScreenOn;
+  late bool _localAutoNightMode;
   late VideoSettings _localVideoSettings;
 
   @override
@@ -41,6 +46,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
     super.initState();
     _sliderValue = widget.noiseThreshold;
     _localKeepScreenOn = widget.keepScreenOn;
+    _localAutoNightMode = widget.autoNightMode;
     _localVideoSettings = widget.videoSettings ?? const VideoSettings();
   }
 
@@ -231,6 +237,18 @@ class _SettingsSheetState extends State<SettingsSheet> {
                 widget.onKeepScreenOnChanged(v);
               },
             ),
+
+            // -------------------------- GECE MODU --------------------------
+            if (widget.onAutoNightModeChanged != null)
+              SwitchListTile(
+                title: Text(l10n.autoNightMode),
+                subtitle: Text(l10n.autoNightModeSubtitle),
+                value: _localAutoNightMode,
+                onChanged: (v) {
+                  setState(() => _localAutoNightMode = v);
+                  widget.onAutoNightModeChanged!(v);
+                },
+              ),
           ],
         ),
       ),

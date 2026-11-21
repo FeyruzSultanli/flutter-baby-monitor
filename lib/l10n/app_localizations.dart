@@ -164,6 +164,10 @@ class AppLocalizations {
       'offlineAndroidOnly': 'Offline mode is only available on Android',
       'offlineRecordingInfo': 'Offline recordings are silent, low-resolution GIFs. Maximum length',
       'offlineRecordingLimitReached': 'Offline recording reached its time limit and was saved',
+      'nightModeExitHint': 'Night mode. Double-tap to exit',
+      'nightModeKeepAppOpen': 'Keep the app open and do not lock the screen, or the stream stops',
+      'autoNightMode': 'Night mode when connected',
+      'autoNightModeSubtitle': 'Baby device: screen turns black at minimum brightness once the parent connects',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -315,6 +319,10 @@ class AppLocalizations {
       'offlineAndroidOnly': 'Offline mod yalnızca Android\'de kullanılabilir',
       'offlineRecordingInfo': 'Offline kayıtlar sessiz ve düşük çözünürlüklü GIF olur. En fazla süre',
       'offlineRecordingLimitReached': 'Offline kayıt süre sınırına ulaştı ve kaydedildi',
+      'nightModeExitHint': 'Gece modu. Çıkmak için iki kez dokunun',
+      'nightModeKeepAppOpen': 'Yayının sürmesi için uygulamayı açık bırakın ve ekranı kilitlemeyin',
+      'autoNightMode': 'Bağlanınca gece moduna geç',
+      'autoNightModeSubtitle': 'Bebek cihazı: ebeveyn bağlanınca ekran en düşük parlaklıkta kararır',
     },
   };
 
@@ -467,6 +475,10 @@ class AppLocalizations {
   String get offlineAndroidOnly => _localizedValues[locale.languageCode]!['offlineAndroidOnly']!;
   String get offlineRecordingInfo => _localizedValues[locale.languageCode]!['offlineRecordingInfo']!;
   String get offlineRecordingLimitReached => _localizedValues[locale.languageCode]!['offlineRecordingLimitReached']!;
+  String get nightModeExitHint => _localizedValues[locale.languageCode]!['nightModeExitHint']!;
+  String get nightModeKeepAppOpen => _localizedValues[locale.languageCode]!['nightModeKeepAppOpen']!;
+  String get autoNightMode => _localizedValues[locale.languageCode]!['autoNightMode']!;
+  String get autoNightModeSubtitle => _localizedValues[locale.languageCode]!['autoNightModeSubtitle']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
