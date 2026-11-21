@@ -25,8 +25,11 @@ lib/
       firestore_signaling.dart       Online signaling (rooms/{id}, callerCandidates/calleeCandidates, alerts)
       webrtc_service.dart            Tek peer bağlantı, renderer'lar, STUN: stun.l.google.com
       multi_peer_service.dart        Çoklu peer yönetimi
-      signaling_service.dart         Eski/ek Firestore signaling yardımcıları
-    pairing/                 PairingService (Firestore oda oluşturma/katılma/silme), PairingState
+      signaling_messages.dart, reconnect_backoff.dart  Oturum etiketli mesajlar, yeniden katılma gecikmesi
+    pairing/                 PairingService (Firestore oda oluşturma/katılma/silme), PairingState, RoomCode
+    auth/                    Anonim Firebase Auth (oda sahipliği; firestore.rules buna dayanır)
+    firebase/emulator_config.dart  Yalnızca debug + --dart-define=USE_FIREBASE_EMULATOR=true ile Emulator Suite
+    debug/debug_hooks.dart   Yalnızca debug: E2E için sahte ses seviyesi kancası
     services/                NotificationService (FCM + flutter_local_notifications), HybridNotificationManager (singleton)
     recording/               VideoRecorderService (camera kayıt → gal ile galeriye)
     offline/offline_payload.dart  Nearby byte payload kodlama/çözme (OfflinePayload, OfflinePayloadType)
@@ -64,11 +67,12 @@ flutter build apk --debug
 
 ## Bilinen kısıtlar
 
-- Offline mod (Nearby Connections: Bluetooth + Wi-Fi) **sadece Android**'de çalışır. Offline modda `WebRTCService` oluşturulmaz.
-- Kamera, mikrofon, WebRTC ve P2P **emülatörde/simülatörde güvenilir çalışmaz**; gerçek cihazda test et.
+- Offline mod (Nearby Connections: Bluetooth + Wi-Fi) **sadece Android**'de çalışır; iOS'ta arayüzde gizli. Offline modda `WebRTCService` oluşturulmaz. `sound_stream` iOS'ta `AppDelegate`'te kaydedilmez (B63).
+- Nearby, gerçek ses/kamera kalitesi, arka plan ve push **emülatörde test edilemez**; gerçek cihazda test et.
+- Uçtan uca emülatör testleri: `scripts/firebase_emulators.sh` (Auth + Firestore + Functions, `firebase.emulators.json`) açıkken `python3 scripts/run_e2e.py --platform android|ios|mixed`. Testler `integration_test/`, sonuçlar `test-results/` (git dışı). iOS simülatörü için `flutter build ios --simulator` yerine `flutter test -d <udid>` kullanılır (DECISIONS A12).
 - `home_screen.dart` çok büyük; değişiklik yaparken ilgili bölümü dikkatle bul, istenmeden büyük refactor yapma.
 - `flutter analyze`: 0 error / 0 warning; kalan info'lar enum isimlendirme (`BABY`, `CONNECTED`…; Firestore'daki durum metinleriyle ilişkili) ve `use_build_context_synchronously` — bilinçli olarak bırakıldı.
-- Bilinen hatalar, karar bekleyen konular ve cihaz test planı: `BUGS.md`, `REPORT.md`, `TEST_PLAN.md`.
+- Bilinen hatalar, karar bekleyen konular ve cihaz test planı: `BUGS.md`, `REPORT.md`, `TEST_PLAN.md`, `DECISIONS.md`, `BLOCKERS.md`, `PLAN_NEXT.md`.
 
 ## Çalışma kuralları
 
