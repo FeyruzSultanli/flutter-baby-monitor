@@ -117,7 +117,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Bağlantı koptuğunda (Wi-Fi değişimi, uygulamanın yeniden açılması) ebeveynin yeniden bağlanabilmesi için bebek tarafında oda yeniden oluşturulmalı.
 - **Öneri:** Bebek, `isPaired` false olduğunda ya da peer bağlantısı `failed/disconnected` durumuna geçtiğinde aynı odada yeni bir offer üretsin (ICE restart veya yeni peer connection). Eski answer ve adaylar temizlensin. Bu sinyal protokolünü değiştiren orta büyüklükte bir iş olduğu için bu turda yapılmadı.
 - **Risk:** Orta.
-- **Durum:** Düzeltildi (`dd72f41`): oturum protokolü. Her katılımda yeni bir `viewerSession` yazılıyor; bebek kamerayı kapatmadan yeni peer ve offer üretiyor; offer, answer ve adaylar oturuma göre filtreleniyor; ebeveyn bağlantı düşünce otomatik olarak yeniden katılıyor (2/4/8/16/30 sn). **Eski ve yeni sürüm birbiriyle eşleşemez.** Cihazda doğrulanmalı.
+- **Durum:** Düzeltildi (`dd72f41` + `854e0a3`): oturum protokolü. Bağımsız incelemenin bulduğu 7 sorun `854e0a3` ile giderildi: bekleme peer'ında ağlama algılama, manuel katılım ile otomatik katılımın yarışması, 20 sn offer zaman aşımı, ebeveyn tarafında nesil koruması. Her katılımda yeni bir `viewerSession` yazılıyor; bebek kamerayı kapatmadan yeni peer ve offer üretiyor; offer, answer ve adaylar oturuma göre filtreleniyor; ebeveyn bağlantı düşünce otomatik olarak yeniden katılıyor (2/4/8/16/30 sn). **Eski ve yeni sürüm birbiriyle eşleşemez.** Cihazda doğrulanmalı.
 
 ### B09 — ~~Nearby BYTES payload sınırı (32 KB) HIGH kalitede aşılabilir~~ → **geçersiz**
 - **Dosya:** `home_screen.dart` `_processAndSendImage`.
