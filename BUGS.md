@@ -478,6 +478,18 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Nasıl bulundu:** iOS simülatörü E2E testi.
 - **Durum:** Düzeltildi (`0f50f77`): adaylar uzak açıklama ayarlanana kadar kuyrukta bekliyor, ardından ekleniyor.
 
+### B65 — iOS: rol değişiminde Nearby'ye dokunuluyor (Orta, iOS)
+- **Dosya:** `home_screen.dart` (`_resetPairing`, `dispose`).
+- **Sorun:** Eşleşme sıfırlanırken (ör. ebeveyn moduna geçiş) `Nearby().stop*` her platformda çağrılıyordu. `Nearby()` nesnesi oluşturulunca eklenti `nearby_connections/events` kanalını dinliyor; iOS'ta bu kanal yok, `MissingPluginException` oluşuyordu. Android'de de bir Nearby hatası kamera akışının ve sesin durdurulmasını atlatıyordu.
+- **Nasıl bulundu:** iOS simülatörü E2E testi (koşu 5).
+- **Durum:** Düzeltildi (`f080481`): Nearby yalnızca Android'de ve ayrı bir try içinde durduruluyor.
+
+### B66 — Bildirim izni yokken yerel bildirim hatası yakalanmıyor (Orta)
+- **Dosya:** `notification_service.dart` (`showLocalNotification`).
+- **Sorun:** Kullanıcı bildirim iznini reddettiyse iOS her ağlama alarmında "Source is not authorized" hatası fırlatıyor; bu hata yakalanmıyordu.
+- **Nasıl bulundu:** iOS simülatörü E2E testi (koşu 5).
+- **Durum:** Düzeltildi (`609f427`): hata loglanıyor; uygulama içi alarm etkilenmiyor.
+
 ---
 
 ## Hiç çalışmayan veya yarım kalmış özellikler
