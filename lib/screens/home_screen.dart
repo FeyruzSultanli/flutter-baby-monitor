@@ -24,6 +24,7 @@ import '../core/enums/connection_status.dart';
 import '../core/enums/device_role.dart';
 import '../core/feature_flags.dart';
 import '../core/audio/audio_level.dart';
+import '../core/audio/cry_detector.dart';
 import '../core/offline/offline_payload.dart';
 import '../core/pairing/pairing_service.dart';
 import '../core/pairing/pairing_state.dart';
@@ -108,7 +109,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   double _noiseThreshold = 60.0;
   bool _noiseAlert = false;
-  DateTime? _noiseAboveSince;
+  // Alarm only after >= 2 s above the threshold (D5 / B27).
+  final CryDetector _cryDetector = CryDetector(threshold: 60.0);
 
   bool _isFullscreen = false;
   bool _fullscreenCryOverlay = false;
@@ -676,6 +678,7 @@ class _HomeScreenState extends State<HomeScreen>
     _lastCryAlertSent = false;
     _lastCrySentAt = null;
     _lastCryNotificationAt = null;
+    _cryDetector.reset();
     _refreshBottomSheet();
   }
 
@@ -1024,11 +1027,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _calculateAndSendDb(List<int> data) {
-    // PCM16 chunk -> positive dB (20*log10(rms), ~0..90 for full scale).
+    // PCM16 chunk -> shared noise scale (same as online, see audio_level.dart)
     final db = pcm16ChunkToDb(data);
-    
+
     final now = DateTime.now();
-    final bool alert = db >= _noiseThreshold;
+    final bool alert = _cryDetector.update(db, now);
 
     // Publish (local UI + parent) on alert changes or every 200 ms. Audio
     // chunks arrive many times per second; rebuilding the whole HomeScreen
@@ -1622,13 +1625,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _processNoiseLevel(double db) {
     final now = DateTime.now();
-    final bool alert = db >= _noiseThreshold;
-    DateTime? aboveSince = alert ? ( _noiseAboveSince ?? now ) : null;
+    final bool alert = _cryDetector.update(db, now);
 
     if (_role == DeviceRole.BABY) {
       setState(() {
         _currentDecibel = db;
-        _noiseAboveSince = aboveSince;
         _noiseAlert = false;
       });
       final roomCode = _pairingState?.roomCode;
@@ -1666,13 +1667,12 @@ class _HomeScreenState extends State<HomeScreen>
 
     setState(() {
       _currentDecibel = db;
-      _noiseAboveSince = aboveSince;
       _noiseAlert = alert;
     });
 
     if (_role == DeviceRole.PARENT &&
         _isFullscreen &&
-        db >= _noiseThreshold &&
+        alert &&
         !_fullscreenCryOverlay) {
       setState(() {
         _fullscreenCryOverlay = true;
@@ -2414,6 +2414,7 @@ class _HomeScreenState extends State<HomeScreen>
                       onNoiseThresholdChanged: (v) {
                         setState(() {
                           _noiseThreshold = v;
+                          _cryDetector.threshold = v;
                         });
                       },
                       onKeepScreenOnChanged: _setKeepScreenOn,
