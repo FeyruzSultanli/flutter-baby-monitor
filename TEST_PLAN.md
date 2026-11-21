@@ -240,3 +240,9 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 12.10 | D1-a | Ayarlar → "Bağlanınca gece moduna geç" açık; online ve offline'da E bağlansın. | Bağlantı kurulunca B otomatik gece moduna geçer. | Online ✅/❌ Offline ✅/❌ |
 | 12.11 | D1-a | Gece modunda 30 dk bırakın (B şarjda değil). | Ekran kapanmaz, yayın kesilmez; pil düşüşü ve ısı notu. | Pil ___→___% / ısı: |
 | 12.12 | D1-a | Gece modundayken "Bağlantıyı kes" (önce çıkıp) veya E'den bağlantı kesilsin; sonra ekranı kendi haline bırakın. | Yayın bitince parlaklık normal, ekran normal sürede kapanır ("Ekranı açık tut" kapalıysa). | ✅/❌ |
+| 12.13 | D5 tek dB ölçeği (`9a0c363`) | Online ve offline'da aynı ağlama sesini aynı mesafeden çalın; E'deki dB'yi okuyun. | İki modda değerler birbirine yakın (±3 dB). Önceden offline ~10 dB düşüktü. | Online ___ / Offline ___ dB |
+| 12.14 | D5 2 sn şartı (`bfc5f26`) | B'nin yanında tek bir el çırpma / kapı çarpması. | Alarm **çalmaz** (ses çubuğu zıplar ama overlay/bildirim yok). | ✅/❌ |
+| 12.15 | D5 | Ağlama sesini 1 sn çalıp durdurun; sonra 3 sn çalın. | 1 sn'lik ses alarm vermez; 3 sn'lik ses ~2. saniyede alarm verir. | ✅/❌ + gecikme: |
+| 12.16 | D5 eşik senkronu (`04ce566`) | Online bağlıyken E'de Ayarlar → eşiği 60'tan 75'e çekin. 2 sn bekleyin. B'de Ayarlar'ı açın. | B'nin eşiği de 75 görünür; ses çubuğundaki "Eşik" yazısı iki cihazda 75. | ✅/❌ |
+| 12.17 | D5 | 12.16'dan sonra 60–70 dB civarı bir sesle test edin. | 75 eşiğinde alarm çalmaz; eşiği 60'a indirince çalar. Kalibrasyon için uygun eşiği not edin. | Uygun eşik: ___ dB |
+| 12.18 | D5 | Aynı testleri offline'da yapın (E'de eşik değişimi → B). | Offline'da da eşik B'ye geçer. | ✅/❌ |

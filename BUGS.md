@@ -261,7 +261,7 @@ Kullanıcı yokken alınan kararlar:
 - **Dosya:** `home_screen.dart:1488-1500` (`_processNoiseLevel`), `_calculateAndSendDb`. `_noiseAboveSince` hesaplanıyor ama hiç kullanılmıyor.
 - **Nasıl ortaya çıkar:** Kapı çarpması, öksürük ya da tek bir gürültü yanlış alarm üretir.
 - **Öneri:** Bkz. D5.
-- **Durum:** Karar bekliyor
+- **Durum:** Düzeltildi (`bfc5f26` + `04ce566`, karar D5). Alarm için en az 2 sn eşik üstü gerekiyor; 0,6 sn'den kısa düşüşler sayacı sıfırlamıyor. Eşik iki cihaz arasında senkron (online: oda alanı, offline: THRESHOLD mesajı), böylece ebeveyn kalibre edebiliyor. Cihazda kalibre edilmeli.
 
 ### B28 — Online ve offline dB ölçekleri yaklaşık 10 dB farklı
 - **Dosya:** `audio_level.dart`.
@@ -270,7 +270,7 @@ Kullanıcı yokken alınan kararlar:
   - Offline: `20·log10(rms)`.
   - Aynı eşik (varsayılan 60) offline modda daha az hassas.
 - **Öneri:** Bkz. D5. Ölçeklerin cihazda kalibre edilmesi gerekiyor.
-- **Durum:** Karar bekliyor
+- **Durum:** Düzeltildi (`9a0c363`, karar D5). Tek ölçek: 20·log10(seviye)+100; tam ölçek 100, konuşma kabaca 55–75. Offline değerler yaklaşık 9,7 dB yükseldi; aynı eşik iki modda aynı hassasiyette. Cihazda doğrulanmalı.
 
 ### B29 — Alarm geçmişi: sınırsız büyüme, atomik olmayan yazım, tek bozuk kayıt tüm geçmişi siliyor
 - **Dosya:** `alert_history_service.dart:24-58`, `home_screen.dart:1472` (`_recordAlertIfNeeded` ağlama sürdükçe her 5 sn'de bir kayıt ekliyor).
