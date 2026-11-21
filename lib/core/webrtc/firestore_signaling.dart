@@ -46,6 +46,9 @@ class FirestoreSignaling implements SignalingInterface {
   }
 
   bool _isCaller = true; // Default
+  // True once this side has sent an offer. The caller also receives its own
+  // offer back from the room snapshot and must not flip to callee (B06).
+  bool _sentOffer = false;
 
   @override
   Future<void> connect(String roomId) async {
@@ -59,8 +62,8 @@ class FirestoreSignaling implements SignalingInterface {
       if (data.containsKey('offer')) {
         final offerMap = data['offer'];
         final offer = RTCSessionDescription(offerMap['sdp'], offerMap['type']);
-        // If we receive an offer, we are the callee
-        _isCaller = false;
+        // If we receive an offer we did not send ourselves, we are the callee
+        if (!_sentOffer) _isCaller = false;
         _onOfferController.add(offer);
       }
 
@@ -119,12 +122,15 @@ class FirestoreSignaling implements SignalingInterface {
     await _candidatesSub?.cancel();
     await _alertsSub?.cancel();
     _currentRoomId = null;
+    _sentOffer = false;
+    _isCaller = true;
   }
 
   @override
   Future<void> sendOffer(RTCSessionDescription offer) async {
     if (_currentRoomId == null) return;
     _isCaller = true;
+    _sentOffer = true;
     await _rooms.doc(_currentRoomId).set(
       {
         'offer': {'sdp': offer.sdp, 'type': offer.type},
