@@ -140,12 +140,15 @@ class EmulatorDb {
     if (v.containsKey('nullValue')) return null;
     if (v.containsKey('stringValue')) return v['stringValue'];
     if (v.containsKey('booleanValue')) return v['booleanValue'];
-    if (v.containsKey('integerValue'))
+    if (v.containsKey('integerValue')) {
       return int.parse(v['integerValue'] as String);
-    if (v.containsKey('doubleValue'))
+    }
+    if (v.containsKey('doubleValue')) {
       return (v['doubleValue'] as num).toDouble();
-    if (v.containsKey('timestampValue'))
+    }
+    if (v.containsKey('timestampValue')) {
       return DateTime.parse(v['timestampValue'] as String);
+    }
     if (v.containsKey('mapValue')) {
       final fields =
           (v['mapValue']['fields'] as Map<String, dynamic>?) ?? const {};

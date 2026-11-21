@@ -65,7 +65,9 @@ void main() {
       for (final r in await db.rooms()) {
         if (r['ownerUid'] != uid &&
             r['viewerUid'] == null &&
-            r['id'] != 'EXPD2345') return r;
+            r['id'] != 'EXPD2345') {
+          return r;
+        }
       }
       return null;
     },

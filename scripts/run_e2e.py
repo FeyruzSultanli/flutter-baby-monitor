@@ -68,8 +68,16 @@ def port_open(port: int) -> bool:
 
 
 def http_delete(url: str) -> None:
-    req = urllib.request.Request(url, method="DELETE", headers={"Authorization": "Bearer owner"})
-    urllib.request.urlopen(req, timeout=10).read()
+    """DELETE with retries (the emulators answer 499 while reloading functions)."""
+    for attempt in range(6):
+        try:
+            req = urllib.request.Request(url, method="DELETE", headers={"Authorization": "Bearer owner"})
+            urllib.request.urlopen(req, timeout=10).read()
+            return
+        except Exception as e:  # noqa: BLE001
+            log(f"DELETE {url} failed ({e}), retry {attempt + 1}")
+            time.sleep(3)
+    raise SystemExit(f"Could not wipe emulator data: {url}")
 
 
 def ensure_firebase_emulators(out: Path) -> subprocess.Popen | None:
@@ -189,6 +197,8 @@ class Device:
             self.done.set()
 
     def watch_logcat(self) -> None:
+        """Records logcat. Markers are NOT read here: in integration tests the
+        Dart print() output goes to the flutter test output, not logcat."""
         run([ADB, "-s", self.serial, "logcat", "-c"])
         logf = open(self.out / f"logcat_{self.role}.txt", "w")
         proc = subprocess.Popen([ADB, "-s", self.serial, "logcat", "-v", "time"],
@@ -196,7 +206,6 @@ class Device:
         assert proc.stdout
         for line in proc.stdout:
             logf.write(line)
-            self.handle_line(line)
 
 
 def keep_granting(serial: str, seconds: int) -> None:
@@ -211,12 +220,11 @@ def run_flutter_test(dev: Device, target: str) -> subprocess.Popen:
     log(f"{dev.role}: flutter test {target}")
     cmd = ["flutter", "test", target, "-d", dev.serial, DEFINE, "-r", "expanded"]
     if dev.platform == "android":
-        logf = open(dev.out / f"flutter_{dev.role}.txt", "w")
         threading.Thread(target=keep_granting, args=(dev.serial, 300), daemon=True).start()
-        return subprocess.Popen(cmd, cwd=ROOT, stdout=logf, stderr=subprocess.STDOUT)
+    else:
+        cmd.append("--dart-define=E2E_SKIP_NETWORK_DROP=true")
 
-    # iOS simulator: markers come from the flutter test output (app stdout).
-    cmd.append("--dart-define=E2E_SKIP_NETWORK_DROP=true")
+    # Markers come from the flutter test output (the test's print()).
     proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, errors="replace")
 

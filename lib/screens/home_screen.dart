@@ -145,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _autoNightMode = false;
 
   void Function(void Function())? _bottomSheetSetState;
+  BuildContext? _bottomSheetContext;
   StreamSubscription<PairingState>? _roomSub;
   bool _lastCryAlertSent = false;
   // Cry notifications (Firestore alert docs / local notifications) are rate
@@ -2140,9 +2141,15 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _refreshBottomSheet() {
     final fn = _bottomSheetSetState;
-    if (fn != null) {
-      fn(() {});
+    // The closing sheet can rebuild during its exit animation and register
+    // its setState again after whenComplete cleared it; once it is disposed
+    // that setState must not be called (B61).
+    if (fn == null || !(_bottomSheetContext?.mounted ?? false)) {
+      _bottomSheetSetState = null;
+      _bottomSheetContext = null;
+      return;
     }
+    fn(() {});
   }
 
   Widget _buildConnectionBadge(ColorScheme scheme) {
@@ -2441,6 +2448,7 @@ class _HomeScreenState extends State<HomeScreen>
         return StatefulBuilder(
           builder: (ctx, modalSetState) {
             _bottomSheetSetState = modalSetState;
+            _bottomSheetContext = ctx;
             return Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding + 20),
               child: SingleChildScrollView(
@@ -2454,6 +2462,7 @@ class _HomeScreenState extends State<HomeScreen>
       },
     ).whenComplete(() {
       _bottomSheetSetState = null;
+      _bottomSheetContext = null;
     });
   }
 
