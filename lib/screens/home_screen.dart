@@ -89,6 +89,9 @@ class _HomeScreenState extends State<HomeScreen>
   Uint8List? get _currentImageBytes => _currentImageBytesNotifier.value;
   DateTime _lastFrameTime = DateTime.now();
   bool _isStreaming = false;
+  // Only one camera frame is converted/sent at a time; frames arriving while
+  // one is in flight are dropped instead of piling up isolates (B10).
+  bool _frameInFlight = false;
   final List<Map<String, String>> _discoveredEndpoints = []; // {id, name}
   final StreamController<List<Map<String, String>>> _discoveryStreamController = StreamController.broadcast();
 
@@ -964,6 +967,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _processAndSendImage(CameraImage image) async {
     if (_connectedEndpointId == null) return;
+    if (_frameInFlight) return;
+    _frameInFlight = true;
 
     try {
       // 1. Prepare data (Main Thread - Fast)
@@ -1006,6 +1011,8 @@ class _HomeScreenState extends State<HomeScreen>
       );
     } catch (e) {
       debugPrint("Error sending frame: $e");
+    } finally {
+      _frameInFlight = false;
     }
   }
 
