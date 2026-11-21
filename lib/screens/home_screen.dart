@@ -2057,6 +2057,7 @@ class _HomeScreenState extends State<HomeScreen>
     final l10n = AppLocalizations.of(context);
     if (e is RoomUnavailableException) return l10n.roomUnavailable;
     if (e is AnonymousAuthDisabledException) return l10n.anonymousAuthDisabled;
+    if (e is PairingTimeoutException) return l10n.noServerResponse;
     return '${l10n.error}: $e';
   }
 

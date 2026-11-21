@@ -172,6 +172,7 @@ class AppLocalizations {
       'roomUnavailable': 'Code is wrong, expired, or already paired with another device',
       'anonymousAuthDisabled': 'Sign-in is not enabled for this app (Firebase: Anonymous sign-in)',
       'roomCodeValidHint': 'Enter this code on the parent device within 10 minutes',
+      'noServerResponse': 'No response from the server. Check the internet connection and try again',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -331,6 +332,7 @@ class AppLocalizations {
       'roomUnavailable': 'Kod hatalı, süresi dolmuş veya başka bir cihazla eşleşmiş',
       'anonymousAuthDisabled': 'Bu uygulama için giriş açık değil (Firebase: Anonim giriş)',
       'roomCodeValidHint': 'Bu kodu ebeveyn cihazına 10 dakika içinde girin',
+      'noServerResponse': 'Sunucudan yanıt yok. İnternet bağlantısını kontrol edip tekrar deneyin',
     },
   };
 
@@ -491,6 +493,7 @@ class AppLocalizations {
   String get roomUnavailable => _localizedValues[locale.languageCode]!['roomUnavailable']!;
   String get anonymousAuthDisabled => _localizedValues[locale.languageCode]!['anonymousAuthDisabled']!;
   String get roomCodeValidHint => _localizedValues[locale.languageCode]!['roomCodeValidHint']!;
+  String get noServerResponse => _localizedValues[locale.languageCode]!['noServerResponse']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -18,6 +18,16 @@ class RoomUnavailableException implements Exception {
   String toString() => 'Room $roomCode is not available';
 }
 
+/// Thrown when creating or joining a room got no answer from the server in
+/// time (usually no internet). Firestore queues writes while offline and only
+/// completes them once the server confirms, so without a timeout the UI
+/// would wait forever (B55).
+class PairingTimeoutException implements Exception {
+  const PairingTimeoutException();
+  @override
+  String toString() => 'No response from the server (check the internet connection)';
+}
+
 /// Handles room lifecycle in Firestore (rooms/{roomCode}).
 ///
 /// Security model (D3, see firestore.rules): the baby that creates a room is
@@ -32,8 +42,13 @@ class PairingService {
   final AuthService _auth;
 
   /// A room lives for at most this long unless the baby extends it
-  /// ([extendExpiry]); Firestore TTL deletes it afterwards (D8).
-  static const Duration roomLifetime = Duration(hours: 24);
+  /// ([extendExpiry], hourly); Firestore TTL deletes it afterwards (D8).
+  /// The rules allow up to 25 h ahead of *server* time; 12 h leaves room for
+  /// a phone clock that runs up to 13 h fast (B58).
+  static const Duration roomLifetime = Duration(hours: 12);
+
+  /// How long create/join waits for the server before giving up (B55).
+  static const Duration serverTimeout = Duration(seconds: 15);
 
   /// A new room must be claimed by a parent within this time (enforced by the
   /// rules with server time).
@@ -79,7 +94,7 @@ class PairingService {
           'videoSettings': const VideoSettings().toJson(),
           'noiseThreshold': noiseThreshold,
           'viewerSession': null,
-        });
+        }).timeout(serverTimeout, onTimeout: () => throw const PairingTimeoutException());
         return code;
       } on FirebaseException catch (e) {
         if (e.code != 'permission-denied') rethrow;
@@ -125,8 +140,14 @@ class PairingService {
   }
 
   /// The parent leaves the room; the baby closes the peer and waits (B08).
+  /// The push token is removed too, so a parent that left gets no more cry
+  /// pushes from this room (B56). It is stored again on the next join.
   Future<void> leaveRoom(String roomCode) async {
-    await _rooms.doc(roomCode).update({'viewerSession': null, 'isPaired': false});
+    await _rooms.doc(roomCode).update({
+      'viewerSession': null,
+      'isPaired': false,
+      'viewerFcmToken': FieldValue.delete(),
+    });
   }
 
   // Updates use update() rather than set(merge): on a deleted room they fail
@@ -179,7 +200,7 @@ class PairingService {
         'viewerSession': session,
         'viewerJoinedAt': FieldValue.serverTimestamp(),
         'isPaired': false,
-      });
+      }).timeout(serverTimeout, onTimeout: () => throw const PairingTimeoutException());
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied' || e.code == 'not-found') {
         throw RoomUnavailableException(code);

@@ -27,9 +27,10 @@ class FirestoreSignaling implements SignalingInterface {
   CollectionReference<Map<String, dynamic>> get _rooms =>
       _firestore.collection('rooms');
 
-  /// TTL field for candidate/alert documents (D8); the rules cap it at 25 h.
+  /// TTL field for candidate/alert documents (D8). The rules cap it at 25 h
+  /// after server time; 12 h tolerates a phone clock up to 13 h fast (B58).
   static Timestamp _childExpiry() =>
-      Timestamp.fromDate(DateTime.now().add(const Duration(hours: 24)));
+      Timestamp.fromDate(DateTime.now().add(const Duration(hours: 12)));
 
   @override
   Stream<RTCSessionDescription> get onOffer => _onOfferController.stream;
