@@ -14,7 +14,9 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VideoPlayerController _videoPlayerController;
+  // Nullable: stays null if the file is missing/empty, so dispose() must not
+  // touch an uninitialized late field (B30).
+  VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isGif = false;
   String? _errorMessage;
@@ -49,24 +51,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         throw Exception(l10n.videoFileEmpty);
       }
 
-      _videoPlayerController = VideoPlayerController.file(
+      final controller = VideoPlayerController.file(
         file,
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
+      _videoPlayerController = controller;
       
       // Initialize with a timeout to prevent hanging
-      await _videoPlayerController.initialize().timeout(
+      await controller.initialize().timeout(
         const Duration(seconds: 5),
         onTimeout: () {
           throw Exception(l10n.videoInitTimeout);
         },
       );
       
+      // The screen may have been closed while the player was initializing.
+      if (!mounted) return;
       _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController,
+        videoPlayerController: controller,
         autoPlay: true,
         looping: false,
-        aspectRatio: _videoPlayerController.value.aspectRatio,
+        aspectRatio: controller.value.aspectRatio,
         errorBuilder: (context, errorMessage) {
           return Center(
             child: Padding(
@@ -94,8 +99,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void dispose() {
     if (!_isGif) {
-      _videoPlayerController.dispose();
       _chewieController?.dispose();
+      _videoPlayerController?.dispose();
     }
     super.dispose();
   }
