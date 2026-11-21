@@ -49,7 +49,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Bebek telefonunda güç tuşuna basılırsa, Home'a dönülürse ya da arama gelirse ebeveyn tarafında görüntü donar veya kararır, ses kesilir. Ağlama algılama da durur. Kullanıcıya hiçbir uyarı gösterilmez.
 - **Öneri:** Bkz. "Karar bekleyen konular – D1".
 - **Risk:** Yüksek (yaşam döngüsü ve kamera sahipliği değişiyor).
-- **Durum:** Karar bekliyor
+- **Durum:** Karar verildi (D1, iki aşama). **1. aşama tamam** (`cb3b3e8`): gece modu ile ekran açık ve siyah kalıyor, parlaklık en düşükte, wakelock açık, bağlanınca otomatik gece modu seçeneği var. **Sınırı:** Home tuşu, ekran kilidi ve gelen arama yayını hâlâ durduruyor. 2. aşama (foreground service) PLAN_NEXT adım 7'de; başlamadan önce kullanıcıya sorulacak. Cihazda doğrulanmalı.
 
 ### B02 — FCM hiç gönderilmiyor; uygulama kapalı ya da dondurulmuşken ebeveyne bildirim gelmiyor
 - **Dosya:**

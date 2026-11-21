@@ -9,7 +9,7 @@
 | # | İş | Durum |
 |---|---|---|
 | 1 | D11 + D6 + D7 | ✅ `a982754` (D11), `fe862a2` (D6), `0de98f1` (D7) |
-| 2 | D1-a gece modu | ⏳ |
+| 2 | D1-a gece modu | ✅ `cb3b3e8` (paket: `screen_brightness ^2.1.11`) |
 | 3 | D5 alarm eşiği (≥2 sn + tek dB formülü + ayarlanabilir eşik) | ⏳ |
 | 4 | B08 yeniden katılma | ⏳ |
 | 5 | D3 + D8 (auth, kurallar, süreli kod, TTL) | ⏳ |

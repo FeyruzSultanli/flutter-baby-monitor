@@ -234,3 +234,9 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 12.4 | D7 | 12.3'teki GIF'i galeride oynatın, kronometreyle süresini ölçün. | Oynatma süresi ≈ kayıt süresi (≈20 sn; önceden hızlı/yavaş oynuyordu). | ___ sn |
 | 12.5 | D7 | Offline kaydı 5 sn sonra elle durdurun. | ~5 sn'lik GIF kaydedilir. | ✅/❌ |
 | 12.6 | D11 (`a982754`) | İlk kurulumdan sonra bebek modunda online ve offline yayın başlatın. | Mikrofon izni hâlâ isteniyor ve ses geliyor (noise_meter kaldırıldı, izinler değişmemeli). | ✅/❌ |
+| 12.7 | D1-a gece modu (`cb3b3e8`) | B bebek modunda yayındayken video kartının sol üstündeki ay simgesine dokunun. | Ekran tamamen siyah olur, parlaklık en düşüğe iner, "Çıkmak için iki kez dokunun" yazısı birkaç sn görünüp kaybolur, sağ üstte sönük bir bağlantı noktası var. Yayın E'de sürüyor. | ✅/❌ |
+| 12.8 | D1-a | Gece modunda tek dokunun; sonra iki kez dokunun. | Tek dokunuş ipucunu tekrar gösterir; çift dokunuş gece modundan çıkar, parlaklık eski haline döner. | ✅/❌ |
+| 12.9 | D1-a | Gece modunda geri tuşuna basın. | Uygulama kapanmaz, gece modundan çıkılır. | ✅/❌ |
+| 12.10 | D1-a | Ayarlar → "Bağlanınca gece moduna geç" açık; online ve offline'da E bağlansın. | Bağlantı kurulunca B otomatik gece moduna geçer. | Online ✅/❌ Offline ✅/❌ |
+| 12.11 | D1-a | Gece modunda 30 dk bırakın (B şarjda değil). | Ekran kapanmaz, yayın kesilmez; pil düşüşü ve ısı notu. | Pil ___→___% / ısı: |
+| 12.12 | D1-a | Gece modundayken "Bağlantıyı kes" (önce çıkıp) veya E'den bağlantı kesilsin; sonra ekranı kendi haline bırakın. | Yayın bitince parlaklık normal, ekran normal sürede kapanır ("Ekranı açık tut" kapalıysa). | ✅/❌ |
