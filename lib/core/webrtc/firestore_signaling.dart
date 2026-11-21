@@ -76,6 +76,9 @@ class FirestoreSignaling implements SignalingInterface {
     _alertsSub = _rooms.doc(roomId).collection('alerts').snapshots().listen((snapshot) {
       for (final change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
+          // Skip alerts written by this device (B04): the sender's own write
+          // is reported immediately as a local, pending "added" change.
+          if (change.doc.metadata.hasPendingWrites) continue;
           final data = change.doc.data();
           if (data != null) {
              _onAlertController.add(data);
