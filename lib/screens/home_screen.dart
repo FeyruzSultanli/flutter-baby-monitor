@@ -148,6 +148,9 @@ class _HomeScreenState extends State<HomeScreen>
       upperBound: 1.1,
     )..repeat(reverse: true);
     
+    _recorderService.onOfflineLimitReached = () {
+      unawaited(_stopOfflineRecordingAtLimit());
+    };
     _initCoreServices();
     _initBatteryMonitoring();
     // Camera setup (CAMERA permission prompt) first, then audio services
@@ -2150,6 +2153,13 @@ class _HomeScreenState extends State<HomeScreen>
         
         if (_isOfflineMode) {
           await _recorderService.startOfflineRecording();
+          if (mounted) {
+            final l10n = AppLocalizations.of(context);
+            final seconds = VideoRecorderService.offlineMaxDuration.inSeconds;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${l10n.offlineRecordingInfo}: $seconds s')),
+            );
+          }
         } else {
           final stream = _webrtcService?.remoteRenderer.srcObject;
           if (stream != null) {
@@ -2173,6 +2183,21 @@ class _HomeScreenState extends State<HomeScreen>
         );
       }
     }
+  }
+
+  /// Offline recordings end automatically at their length limit (D7).
+  Future<void> _stopOfflineRecordingAtLimit() async {
+    if (!_recorderService.isRecording) return;
+    try {
+      await _recorderService.stopAny();
+    } catch (e) {
+      debugPrint('Stopping offline recording at limit failed: $e');
+    }
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context).offlineRecordingLimitReached)),
+    );
   }
 
   @override

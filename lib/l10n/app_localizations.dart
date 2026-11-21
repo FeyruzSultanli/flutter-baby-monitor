@@ -162,6 +162,8 @@ class AppLocalizations {
       'unknownDevice': 'Unknown device',
       'addFirstCameraHint': 'Tap the + button to add your first camera',
       'offlineAndroidOnly': 'Offline mode is only available on Android',
+      'offlineRecordingInfo': 'Offline recordings are silent, low-resolution GIFs. Maximum length',
+      'offlineRecordingLimitReached': 'Offline recording reached its time limit and was saved',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -311,6 +313,8 @@ class AppLocalizations {
       'unknownDevice': 'Bilinmeyen cihaz',
       'addFirstCameraHint': 'İlk kameranızı eklemek için + düğmesine dokunun',
       'offlineAndroidOnly': 'Offline mod yalnızca Android\'de kullanılabilir',
+      'offlineRecordingInfo': 'Offline kayıtlar sessiz ve düşük çözünürlüklü GIF olur. En fazla süre',
+      'offlineRecordingLimitReached': 'Offline kayıt süre sınırına ulaştı ve kaydedildi',
     },
   };
 
@@ -461,6 +465,8 @@ class AppLocalizations {
   String get unknownDevice => _localizedValues[locale.languageCode]!['unknownDevice']!;
   String get addFirstCameraHint => _localizedValues[locale.languageCode]!['addFirstCameraHint']!;
   String get offlineAndroidOnly => _localizedValues[locale.languageCode]!['offlineAndroidOnly']!;
+  String get offlineRecordingInfo => _localizedValues[locale.languageCode]!['offlineRecordingInfo']!;
+  String get offlineRecordingLimitReached => _localizedValues[locale.languageCode]!['offlineRecordingLimitReached']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

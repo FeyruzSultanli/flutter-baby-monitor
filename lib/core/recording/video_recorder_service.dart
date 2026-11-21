@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
 import 'package:image/image.dart' as img;
 
+import 'offline_frame_gate.dart';
+
 class VideoRecorderService {
   // WebRTC Recorder
   MediaRecorder? _mediaRecorder;
@@ -14,6 +16,16 @@ class VideoRecorderService {
   bool _isOfflineRecording = false;
   String? _offlineTempDir;
   int _frameCount = 0;
+  // Samples frames at the GIF rate and enforces the length limit (D7).
+  final OfflineFrameGate _frameGate = OfflineFrameGate();
+  bool _limitCallbackFired = false;
+
+  /// Longest offline recording (it is a silent, low-resolution GIF).
+  static Duration get offlineMaxDuration => OfflineFrameGate.defaultMaxDuration;
+
+  /// Called once when an offline recording reaches [offlineMaxDuration]; the
+  /// owner should then stop the recording.
+  void Function()? onOfflineLimitReached;
   // Frame writes are chained so stop() can wait for them, and each frame gets
   // its index before the async write starts (B33).
   Future<void> _pendingFrameWrites = Future.value();
@@ -127,6 +139,8 @@ class VideoRecorderService {
     await Directory(_offlineTempDir!).create();
     
     _frameCount = 0;
+    _frameGate.start(DateTime.now());
+    _limitCallbackFired = false;
     _isOfflineRecording = true;
   }
 
@@ -134,8 +148,14 @@ class VideoRecorderService {
   Future<void> addOfflineFrame(Uint8List bytes) async {
     if (!_isOfflineRecording || _offlineTempDir == null) return;
 
-    // Save every 3rd frame to reduce load and GIF size, or just save all.
-    // Saving all for now.
+    // Keep frames at the GIF playback rate and stop at the length limit.
+    if (!_frameGate.accept(DateTime.now())) {
+      if (_frameGate.limitReached && !_limitCallbackFired) {
+        _limitCallbackFired = true;
+        onOfflineLimitReached?.call();
+      }
+      return;
+    }
     final index = _frameCount++;
     final framePath = '$_offlineTempDir/frame_${index.toString().padLeft(5, '0')}.jpg';
     _pendingFrameWrites = _pendingFrameWrites.then((_) async {
@@ -233,10 +253,12 @@ Future<String?> _createGifInIsolate(Map<String, String> params) async {
       if (image != null) {
         // Force resize for reasonable GIF size and speed
         final resized = img.copyResize(image, width: 320); 
+        // 10 centiseconds = the 100 ms sampling interval of OfflineFrameGate
         encoder.addFrame(resized, duration: 10);
         count++;
       }
-      if (count > 200) break; // Limit to 200 frames (approx 20 sec video)
+      // Safety net; OfflineFrameGate already limits the stored frames.
+      if (count >= OfflineFrameGate().maxFrames) break;
     }
 
     final gifBytes = encoder.finish();
