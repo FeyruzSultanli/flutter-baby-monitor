@@ -1287,6 +1287,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _onPayloadReceived(Uint8List bytes) {
+    // Payloads already queued by Nearby can still arrive after dispose (B25).
+    if (!mounted) return;
     final message = OfflinePayload.decode(bytes);
     if (message == null) return;
 
