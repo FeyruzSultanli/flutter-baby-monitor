@@ -21,6 +21,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 const String projectId = 'bebekmonitor-282fd';
 
+/// Set by the runner where it cannot toggle airplane mode (iOS simulator).
+const bool skipNetworkDrop = bool.fromEnvironment('E2E_SKIP_NETWORK_DROP');
+
 /// Turkish UI text (the app starts in Turkish).
 String tr(String key) => AppLocalizations.debugLocalizedValues['tr']![key]!;
 String en(String key) => AppLocalizations.debugLocalizedValues['en']![key]!;
@@ -41,7 +44,8 @@ void log(String message) {
 }
 
 /// Asks the host runner to do something to this device and gives it time.
-Future<void> hostAction(String action, {Duration wait = const Duration(seconds: 4)}) async {
+Future<void> hostAction(String action,
+    {Duration wait = const Duration(seconds: 4)}) async {
   // ignore: avoid_print
   print('E2E_HOST:$action');
   await Future<void>.delayed(wait);
@@ -76,12 +80,15 @@ Future<void> pumpFor(WidgetTester tester, Duration duration) async {
 
 /// Minimal Firestore emulator REST client with admin access.
 class EmulatorDb {
-  EmulatorDb() : _base = 'http://$firebaseEmulatorHost:$firestoreEmulatorPort/v1/projects/$projectId/databases/(default)/documents';
+  EmulatorDb()
+      : _base =
+            'http://$firebaseEmulatorHost:$firestoreEmulatorPort/v1/projects/$projectId/databases/(default)/documents';
 
   final String _base;
   final HttpClient _http = HttpClient();
 
-  Future<dynamic> _request(String method, String path, [Map<String, dynamic>? body]) async {
+  Future<dynamic> _request(String method, String path,
+      [Map<String, dynamic>? body]) async {
     final request = await _http.openUrl(method, Uri.parse('$_base/$path'));
     request.headers.set('Authorization', 'Bearer owner');
     if (body != null) {
@@ -113,7 +120,9 @@ class EmulatorDb {
 
   /// Creates/overwrites a document (admin, rules bypassed).
   Future<void> put(String docPath, Map<String, dynamic> data) async {
-    await _request('PATCH', docPath, {'fields': {for (final e in data.entries) e.key: _encode(e.value)}});
+    await _request('PATCH', docPath, {
+      'fields': {for (final e in data.entries) e.key: _encode(e.value)}
+    });
   }
 
   static Map<String, dynamic> _decodeDoc(Map<String, dynamic> doc) {
@@ -122,7 +131,8 @@ class EmulatorDb {
     return {
       'id': name.split('/').last,
       '_createTime': doc['createTime'],
-      for (final e in fields.entries) e.key: _decode(e.value as Map<String, dynamic>),
+      for (final e in fields.entries)
+        e.key: _decode(e.value as Map<String, dynamic>),
     };
   }
 
@@ -130,12 +140,19 @@ class EmulatorDb {
     if (v.containsKey('nullValue')) return null;
     if (v.containsKey('stringValue')) return v['stringValue'];
     if (v.containsKey('booleanValue')) return v['booleanValue'];
-    if (v.containsKey('integerValue')) return int.parse(v['integerValue'] as String);
-    if (v.containsKey('doubleValue')) return (v['doubleValue'] as num).toDouble();
-    if (v.containsKey('timestampValue')) return DateTime.parse(v['timestampValue'] as String);
+    if (v.containsKey('integerValue'))
+      return int.parse(v['integerValue'] as String);
+    if (v.containsKey('doubleValue'))
+      return (v['doubleValue'] as num).toDouble();
+    if (v.containsKey('timestampValue'))
+      return DateTime.parse(v['timestampValue'] as String);
     if (v.containsKey('mapValue')) {
-      final fields = (v['mapValue']['fields'] as Map<String, dynamic>?) ?? const {};
-      return {for (final e in fields.entries) e.key: _decode(e.value as Map<String, dynamic>)};
+      final fields =
+          (v['mapValue']['fields'] as Map<String, dynamic>?) ?? const {};
+      return {
+        for (final e in fields.entries)
+          e.key: _decode(e.value as Map<String, dynamic>)
+      };
     }
     if (v.containsKey('arrayValue')) {
       final values = (v['arrayValue']['values'] as List?) ?? const [];
@@ -153,7 +170,11 @@ class EmulatorDb {
     if (v is DateTime) return {'timestampValue': v.toUtc().toIso8601String()};
     if (v is Map) {
       return {
-        'mapValue': {'fields': {for (final e in v.entries) e.key as String: _encode(e.value)}}
+        'mapValue': {
+          'fields': {
+            for (final e in v.entries) e.key as String: _encode(e.value)
+          }
+        }
       };
     }
     throw ArgumentError('Unsupported value $v');

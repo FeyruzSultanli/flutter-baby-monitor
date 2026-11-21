@@ -47,8 +47,8 @@ void main() {
       await tester.tap(find.byKey(const Key('mainMenuButton')));
       await pumpFor(tester, const Duration(milliseconds: 800));
       await tester.tap(find.text(tr('enterRoomCode')).last);
-      final sheet = await pumpUntil(
-          tester, () => find.byKey(const Key('roomCodeField')).evaluate().isNotEmpty,
+      final sheet = await pumpUntil(tester,
+          () => find.byKey(const Key('roomCodeField')).evaluate().isNotEmpty,
           timeout: const Duration(seconds: 10));
       expect(sheet, isTrue, reason: 'join sheet open');
       await tester.enterText(find.byKey(const Key('roomCodeField')), code);
@@ -56,17 +56,22 @@ void main() {
       await tester.tap(find.byKey(const Key('joinRoomButton')));
     }
 
-    Future<bool> snackbarShows(String text) => pumpUntil(
-        tester, () => find.text(text).evaluate().isNotEmpty,
-        timeout: const Duration(seconds: 25));
+    Future<bool> snackbarShows(String text) =>
+        pumpUntil(tester, () => find.text(text).evaluate().isNotEmpty,
+            timeout: const Duration(seconds: 25));
 
     // --- Find the baby's room -------------------------------------------------
     final babyRoom = await waitFor(() async {
       for (final r in await db.rooms()) {
-        if (r['ownerUid'] != uid && r['viewerUid'] == null && r['id'] != 'EXPD2345') return r;
+        if (r['ownerUid'] != uid &&
+            r['viewerUid'] == null &&
+            r['id'] != 'EXPD2345') return r;
       }
       return null;
-    }, tester: tester, timeout: const Duration(minutes: 10), step: const Duration(seconds: 2));
+    },
+        tester: tester,
+        timeout: const Duration(minutes: 10),
+        step: const Duration(seconds: 2));
     expect(babyRoom, isNotNull, reason: 'baby created a room');
     final code = babyRoom!['id'] as String;
 
@@ -95,11 +100,13 @@ void main() {
 
     // --- Join the baby's room (lower case, no dash) -----------------------------
     await submitCode(code.toLowerCase());
-    final claimed = await pumpUntil(tester, () async => (await db.get('rooms/$code'))?['viewerUid'] == uid,
+    final claimed = await pumpUntil(
+        tester, () async => (await db.get('rooms/$code'))?['viewerUid'] == uid,
         timeout: const Duration(seconds: 30));
     result('parent_claimed_room', claimed);
     expect(claimed, isTrue);
-    final connected = await pumpUntil(tester, () async => (await db.get('rooms/$code'))?['isPaired'] == true,
+    final connected = await pumpUntil(
+        tester, () async => (await db.get('rooms/$code'))?['isPaired'] == true,
         timeout: const Duration(seconds: 75));
     result('parent_webrtc_connected', connected);
     await pumpFor(tester, const Duration(seconds: 3));
@@ -111,7 +118,8 @@ void main() {
     final intruderAuth = FirebaseAuth.instanceFor(app: intruderApp);
     await intruderAuth.useAuthEmulator(firebaseEmulatorHost, authEmulatorPort);
     final intruderDb = FirebaseFirestore.instanceFor(app: intruderApp);
-    intruderDb.useFirestoreEmulator(firebaseEmulatorHost, firestoreEmulatorPort);
+    intruderDb.useFirestoreEmulator(
+        firebaseEmulatorHost, firestoreEmulatorPort);
     await intruderAuth.signInAnonymously();
     var claimDenied = false;
     var readDenied = false;
@@ -125,7 +133,11 @@ void main() {
       claimDenied = e.code == 'permission-denied';
     }
     try {
-      await intruderDb.collection('rooms').doc(code).get().timeout(const Duration(seconds: 15));
+      await intruderDb
+          .collection('rooms')
+          .doc(code)
+          .get()
+          .timeout(const Duration(seconds: 15));
     } on FirebaseException catch (e) {
       readDenied = e.code == 'permission-denied';
     }
@@ -136,19 +148,23 @@ void main() {
     expect(claimDenied && readDenied && stillOurs, isTrue);
 
     // --- Push token (D2) -----------------------------------------------------------
-    final token = await pumpUntil(tester, () async => (await db.get('rooms/$code'))?['viewerFcmToken'] is String,
+    final token = await pumpUntil(tester,
+        () async => (await db.get('rooms/$code'))?['viewerFcmToken'] is String,
         timeout: const Duration(seconds: 30));
     result('fcm_token_stored_in_room', token);
 
     // --- Cry alarm from the baby: alert history, function -------------------------
-    final twoAlerts = await pumpUntil(tester, () async => (await db.list('rooms/$code/alerts')).length >= 2,
+    final twoAlerts = await pumpUntil(
+        tester, () async => (await db.list('rooms/$code/alerts')).length >= 2,
         timeout: const Duration(minutes: 5), step: const Duration(seconds: 2));
     result('parent_saw_two_alerts', twoAlerts);
     await pumpFor(tester, const Duration(seconds: 5));
     final history = await AlertHistoryService().getAlerts();
     result('alert_history_entries', history.length);
-    expect(history.length, inInclusiveRange(1, 3), reason: 'one history entry per 60 s cry window');
-    result('alert_history_text_localized', history.isNotEmpty && history.first.message == tr('babyCryAlert'));
+    expect(history.length, inInclusiveRange(1, 3),
+        reason: 'one history entry per 60 s cry window');
+    result('alert_history_text_localized',
+        history.isNotEmpty && history.first.message == tr('babyCryAlert'));
     screenshot('parent_04_after_cry');
 
     await tester.tap(find.byIcon(Icons.history));
@@ -190,27 +206,34 @@ void main() {
       return s != null && s != sessionBefore;
     }, timeout: const Duration(seconds: 30));
     result('rejoin_same_code', rejoined);
-    final reconnected = await pumpUntil(tester, () async => (await db.get('rooms/$code'))?['isPaired'] == true,
+    final reconnected = await pumpUntil(
+        tester, () async => (await db.get('rooms/$code'))?['isPaired'] == true,
         timeout: const Duration(seconds: 75));
     result('rejoin_webrtc_connected', reconnected);
     screenshot('parent_07_rejoined');
 
     // --- Connection drop -> automatic rejoin (B08/B36) -----------------------------
-    final sessionBeforeDrop = (await db.get('rooms/$code'))?['viewerSession'];
-    await hostAction('airplane_on', wait: const Duration(seconds: 3));
-    await pumpFor(tester, const Duration(seconds: 25));
-    screenshot('parent_08_offline');
-    await hostAction('airplane_off', wait: const Duration(seconds: 3));
-    final autoRejoined = await pumpUntil(tester, () async {
-      try {
-        final s = (await db.get('rooms/$code'))?['viewerSession'];
-        return s != null && s != sessionBeforeDrop;
-      } catch (_) {
-        return false; // host emulator not reachable yet
-      }
-    }, timeout: const Duration(minutes: 4), step: const Duration(seconds: 2));
-    result('auto_rejoin_after_drop', autoRejoined);
-    screenshot('parent_09_after_drop');
+    // (Skipped where the runner cannot cut the network, e.g. iOS simulator.)
+    if (skipNetworkDrop) {
+      result('auto_rejoin_after_drop',
+          'skipped (no airplane mode on this platform)');
+    } else {
+      final sessionBeforeDrop = (await db.get('rooms/$code'))?['viewerSession'];
+      await hostAction('airplane_on', wait: const Duration(seconds: 3));
+      await pumpFor(tester, const Duration(seconds: 25));
+      screenshot('parent_08_offline');
+      await hostAction('airplane_off', wait: const Duration(seconds: 3));
+      final autoRejoined = await pumpUntil(tester, () async {
+        try {
+          final s = (await db.get('rooms/$code'))?['viewerSession'];
+          return s != null && s != sessionBeforeDrop;
+        } catch (_) {
+          return false; // host emulator not reachable yet
+        }
+      }, timeout: const Duration(minutes: 4), step: const Duration(seconds: 2));
+      result('auto_rejoin_after_drop', autoRejoined);
+      screenshot('parent_09_after_drop');
+    }
 
     // --- Settings: language and theme ------------------------------------------------
     await tester.tap(find.byKey(const Key('settingsButton')));
@@ -219,7 +242,8 @@ void main() {
     await pumpFor(tester, const Duration(milliseconds: 800));
     await tester.tap(find.text('English').last);
     await pumpFor(tester, const Duration(seconds: 1));
-    result('language_switch_to_english', find.text(en('settings')).evaluate().isNotEmpty);
+    result('language_switch_to_english',
+        find.text(en('settings')).evaluate().isNotEmpty);
     await tester.tap(find.text(en('systemDefault')));
     await pumpFor(tester, const Duration(milliseconds: 800));
     await tester.tap(find.text(en('darkMode')).last);
@@ -231,7 +255,8 @@ void main() {
     await pumpFor(tester, const Duration(milliseconds: 800));
     await tester.tap(find.text('Türkçe').last);
     await pumpFor(tester, const Duration(seconds: 1));
-    result('language_switch_back_to_turkish', find.text(tr('settings')).evaluate().isNotEmpty);
+    result('language_switch_back_to_turkish',
+        find.text(tr('settings')).evaluate().isNotEmpty);
     await tester.tapAt(const Offset(20, 60));
     await pumpFor(tester, const Duration(seconds: 1));
 
@@ -258,7 +283,8 @@ void main() {
     // --- Leave for good --------------------------------------------------------------------
     await tester.ensureVisible(find.byKey(const Key('disconnectButton')));
     await tester.tap(find.byKey(const Key('disconnectButton')));
-    final finalLeave = await pumpUntil(tester, () async => (await db.get('rooms/$code'))?['viewerSession'] == null,
+    final finalLeave = await pumpUntil(tester,
+        () async => (await db.get('rooms/$code'))?['viewerSession'] == null,
         timeout: const Duration(seconds: 20));
     result('parent_final_leave', finalLeave);
     screenshot('parent_13_end');

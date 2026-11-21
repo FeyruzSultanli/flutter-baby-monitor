@@ -142,8 +142,8 @@ def grant(serial: str) -> None:
 
 
 class Device:
-    def __init__(self, role: str, serial: str, out: Path):
-        self.role, self.serial, self.out = role, serial, out
+    def __init__(self, role: str, serial: str, out: Path, platform: str = "android"):
+        self.role, self.serial, self.out, self.platform = role, serial, out, platform
         self.results: dict[str, str] = {}
         self.ready = threading.Event()
         self.done = threading.Event()
@@ -152,16 +152,41 @@ class Device:
     def screenshot(self, name: str) -> None:
         path = self.out / "screenshots" / f"{name}.png"
         path.parent.mkdir(exist_ok=True)
-        with open(path, "wb") as f:
-            subprocess.run([ADB, "-s", self.serial, "exec-out", "screencap", "-p"], stdout=f)
+        if self.platform == "ios":
+            run(["xcrun", "simctl", "io", self.serial, "screenshot", str(path)])
+        else:
+            with open(path, "wb") as f:
+                subprocess.run([ADB, "-s", self.serial, "exec-out", "screencap", "-p"], stdout=f)
         self.shots += 1
 
     def host_action(self, action: str) -> None:
         log(f"{self.role}: host action {action}")
-        if action == "airplane_on":
+        if self.platform == "ios":
+            log(f"{self.role}: host actions are not supported on the iOS simulator")
+        elif action == "airplane_on":
             run([ADB, "-s", self.serial, "shell", "cmd", "connectivity", "airplane-mode", "enable"])
         elif action == "airplane_off":
             run([ADB, "-s", self.serial, "shell", "cmd", "connectivity", "airplane-mode", "disable"])
+
+    def handle_line(self, line: str) -> None:
+        m = MARKER.search(line)
+        if not m:
+            return
+        kind, arg = m.group(1), (m.group(2) or "").strip()
+        if kind == "SCREENSHOT":
+            threading.Thread(target=self.screenshot, args=(arg,), daemon=True).start()
+        elif kind == "HOST":
+            threading.Thread(target=self.host_action, args=(arg,), daemon=True).start()
+        elif kind == "RESULT" and "=" in arg:
+            k, v = arg.split("=", 1)
+            self.results[k] = v
+            log(f"{self.role}: {k} = {v}")
+        elif kind == "LOG":
+            log(f"{self.role}: {arg}")
+        elif kind == "BABY_READY":
+            self.ready.set()
+        elif kind == "DONE":
+            self.done.set()
 
     def watch_logcat(self) -> None:
         run([ADB, "-s", self.serial, "logcat", "-c"])
@@ -171,24 +196,7 @@ class Device:
         assert proc.stdout
         for line in proc.stdout:
             logf.write(line)
-            m = MARKER.search(line)
-            if not m:
-                continue
-            kind, arg = m.group(1), (m.group(2) or "").strip()
-            if kind == "SCREENSHOT":
-                threading.Thread(target=self.screenshot, args=(arg,), daemon=True).start()
-            elif kind == "HOST":
-                threading.Thread(target=self.host_action, args=(arg,), daemon=True).start()
-            elif kind == "RESULT" and "=" in arg:
-                k, v = arg.split("=", 1)
-                self.results[k] = v
-                log(f"{self.role}: {k} = {v}")
-            elif kind == "LOG":
-                log(f"{self.role}: {arg}")
-            elif kind == "BABY_READY":
-                self.ready.set()
-            elif kind == "DONE":
-                self.done.set()
+            self.handle_line(line)
 
 
 def keep_granting(serial: str, seconds: int) -> None:
@@ -200,20 +208,74 @@ def keep_granting(serial: str, seconds: int) -> None:
 
 
 def run_flutter_test(dev: Device, target: str) -> subprocess.Popen:
-    logf = open(dev.out / f"flutter_{dev.role}.txt", "w")
     log(f"{dev.role}: flutter test {target}")
-    threading.Thread(target=keep_granting, args=(dev.serial, 300), daemon=True).start()
-    return subprocess.Popen(["flutter", "test", target, "-d", dev.serial, DEFINE, "-r", "expanded"],
-                            cwd=ROOT, stdout=logf, stderr=subprocess.STDOUT)
+    cmd = ["flutter", "test", target, "-d", dev.serial, DEFINE, "-r", "expanded"]
+    if dev.platform == "android":
+        logf = open(dev.out / f"flutter_{dev.role}.txt", "w")
+        threading.Thread(target=keep_granting, args=(dev.serial, 300), daemon=True).start()
+        return subprocess.Popen(cmd, cwd=ROOT, stdout=logf, stderr=subprocess.STDOUT)
+
+    # iOS simulator: markers come from the flutter test output (app stdout).
+    cmd.append("--dart-define=E2E_SKIP_NETWORK_DROP=true")
+    proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, errors="replace")
+
+    def pump() -> None:
+        with open(dev.out / f"flutter_{dev.role}.txt", "w") as logf:
+            assert proc.stdout
+            for line in proc.stdout:
+                logf.write(line)
+                logf.flush()
+                dev.handle_line(line)
+
+    threading.Thread(target=pump, daemon=True).start()
+    return proc
+
+
+IOS_BUNDLE = "com.feyruz.bebekmonitorclean"
+IOS_DEVICE_TYPE = "iPhone 17"
+
+
+def ios_simulator(name: str) -> str:
+    """Returns the UDID of simulator `name`, creating and booting it if needed."""
+    data = json.loads(run(["xcrun", "simctl", "list", "devices", "available", "-j"]).stdout)
+    udid = None
+    for runtime, devices in data["devices"].items():
+        for d in devices:
+            if d["name"] == name:
+                udid = d["udid"]
+    if udid is None:
+        runtimes = json.loads(run(["xcrun", "simctl", "list", "runtimes", "available", "-j"]).stdout)["runtimes"]
+        ios = sorted([r for r in runtimes if r["platform"] == "iOS"], key=lambda r: r["version"])
+        runtime_id = ios[0]["identifier"] if len(ios) == 1 else ios[-2]["identifier"]  # newest stable
+        udid = run(["xcrun", "simctl", "create", name, IOS_DEVICE_TYPE, runtime_id]).stdout.strip()
+        log(f"Created simulator {name} ({udid}) on {runtime_id}")
+    run(["xcrun", "simctl", "boot", udid])
+    run(["xcrun", "simctl", "bootstatus", udid, "-b"])
+    return udid
+
+
+def prepare_ios(udid: str) -> None:
+    run(["xcrun", "simctl", "uninstall", udid, IOS_BUNDLE])  # fresh app data
+
+
+def grant_ios(udid: str, seconds: int) -> None:
+    """Grant privacy permissions once the app is installed by flutter test."""
+    end = time.time() + seconds
+    while time.time() < end:
+        for service in ("camera", "microphone", "photos", "photos-add"):
+            run(["xcrun", "simctl", "privacy", udid, "grant", service, IOS_BUNDLE])
+        time.sleep(3)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--platform", choices=["android", "ios"], default="android")
     ap.add_argument("--no-build", action="store_true")
     ap.add_argument("--keep-data", action="store_true")
     args = ap.parse_args()
 
-    out = ROOT / "test-results" / dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    out = ROOT / "test-results" / (dt.datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{args.platform}")
     out.mkdir(parents=True)
     log(f"Results: {out}")
 
@@ -221,19 +283,26 @@ def main() -> None:
     if not args.keep_data:
         wipe_emulator_data()
 
-    baby = Device("baby", boot_avd("baby", out), out)
-    parent = Device("parent", boot_avd("parent", out), out)
+    if args.platform == "ios":
+        baby = Device("baby", ios_simulator("baby-ios"), out, "ios")
+        parent = Device("parent", ios_simulator("parent-ios"), out, "ios")
+        for d in (baby, parent):
+            prepare_ios(d.serial)
+            threading.Thread(target=grant_ios, args=(d.serial, 900), daemon=True).start()
+    else:
+        baby = Device("baby", boot_avd("baby", out), out)
+        parent = Device("parent", boot_avd("parent", out), out)
 
-    apk = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
-    if not args.no_build:
-        log("Building debug APK (emulator mode)")
-        r = run(["flutter", "build", "apk", "--debug", DEFINE], cwd=ROOT)
-        (out / "build.txt").write_text(r.stdout + r.stderr)
-        if r.returncode != 0:
-            raise SystemExit("APK build failed (see build.txt)")
-    for d in (baby, parent):
-        prepare_device(d.serial, apk)
-        threading.Thread(target=d.watch_logcat, daemon=True).start()
+        apk = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
+        if not args.no_build:
+            log("Building debug APK (emulator mode)")
+            r = run(["flutter", "build", "apk", "--debug", DEFINE], cwd=ROOT)
+            (out / "build.txt").write_text(r.stdout + r.stderr)
+            if r.returncode != 0:
+                raise SystemExit("APK build failed (see build.txt)")
+        for d in (baby, parent):
+            prepare_device(d.serial, apk)
+            threading.Thread(target=d.watch_logcat, daemon=True).start()
     time.sleep(2)
 
     started = time.time()
