@@ -17,6 +17,7 @@ import 'dart:io';
 
 import 'package:bebek_monitor_clean/core/firebase/emulator_config.dart';
 import 'package:bebek_monitor_clean/l10n/app_localizations.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const String projectId = 'bebekmonitor-282fd';
@@ -67,6 +68,22 @@ Future<bool> pumpUntil(
   }
   await tester.pump();
   return await condition();
+}
+
+/// The WebRTC connection state shown on the home screen equals "connected".
+/// (The room's isPaired flag is not enough: the parent sets it when answering.)
+bool showsConnected() {
+  final finder = find.byKey(const Key('connectionStatusText'));
+  if (finder.evaluate().isEmpty) return false;
+  final text = (finder.evaluate().first.widget as Text).data;
+  return text == tr('connected') || text == en('connected');
+}
+
+/// Leaves the current route (screens without a standard back button).
+Future<void> goBack(WidgetTester tester) async {
+  final navigator = tester.state<NavigatorState>(find.byType(Navigator).first);
+  navigator.pop();
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 /// Pumps for [duration] of real time.

@@ -87,8 +87,8 @@ void main() {
         reason: 'baby sends an offer for the parent session (B08)');
     result('offer_for_session_1', true);
 
-    final connected1 = await pumpUntil(
-        tester, () async => (await roomNow())?['isPaired'] == true,
+    // Real WebRTC state (UI), not the room's isPaired flag.
+    final connected1 = await pumpUntil(tester, showsConnected,
         timeout: const Duration(seconds: 60));
     result('webrtc_connected_first_join', connected1);
     screenshot('baby_03_after_join');
@@ -213,8 +213,7 @@ void main() {
       final offered2 = await pumpUntil(tester, () => offerFor(session2),
           timeout: const Duration(seconds: 40));
       result('rejoin_offer_renewed', offered2);
-      final connected2 = await pumpUntil(
-          tester, () async => (await roomNow())?['isPaired'] == true,
+      final connected2 = await pumpUntil(tester, showsConnected,
           timeout: const Duration(seconds: 60));
       result('webrtc_connected_after_rejoin', connected2);
     }

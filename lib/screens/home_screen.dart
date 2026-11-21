@@ -3022,6 +3022,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     Text(
                       _connectionStatusLabel(),
+                      key: const Key('connectionStatusText'),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: _connectionStatusColor(scheme),

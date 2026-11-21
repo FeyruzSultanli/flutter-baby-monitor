@@ -107,8 +107,8 @@ void main() {
         timeout: const Duration(seconds: 30));
     result('parent_claimed_room', claimed);
     expect(claimed, isTrue);
-    final connected = await pumpUntil(
-        tester, () async => (await db.get('rooms/$code'))?['isPaired'] == true,
+    // Real WebRTC state (UI), not the room's isPaired flag.
+    final connected = await pumpUntil(tester, showsConnected,
         timeout: const Duration(seconds: 75));
     result('parent_webrtc_connected', connected);
     await pumpFor(tester, const Duration(seconds: 3));
@@ -172,7 +172,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.history));
     await pumpFor(tester, const Duration(seconds: 2));
     screenshot('parent_05_alert_history');
-    await tester.pageBack();
+    await goBack(tester);
     await pumpFor(tester, const Duration(seconds: 1));
 
     // --- Threshold calibration from the parent (D5) -------------------------------
@@ -208,8 +208,7 @@ void main() {
       return s != null && s != sessionBefore;
     }, timeout: const Duration(seconds: 30));
     result('rejoin_same_code', rejoined);
-    final reconnected = await pumpUntil(
-        tester, () async => (await db.get('rooms/$code'))?['isPaired'] == true,
+    final reconnected = await pumpUntil(tester, showsConnected,
         timeout: const Duration(seconds: 75));
     result('rejoin_webrtc_connected', reconnected);
     screenshot('parent_07_rejoined');
@@ -279,7 +278,7 @@ void main() {
     await pumpFor(tester, const Duration(seconds: 3));
     screenshot('parent_12_gallery');
     result('gallery_opens', true);
-    await tester.pageBack();
+    await goBack(tester);
     await pumpFor(tester, const Duration(seconds: 1));
 
     // --- Leave for good --------------------------------------------------------------------
