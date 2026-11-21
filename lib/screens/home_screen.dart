@@ -150,9 +150,11 @@ class _HomeScreenState extends State<HomeScreen>
     )..repeat(reverse: true);
     
     _initCoreServices();
-    _initAudioServices();
     _initBatteryMonitoring();
-    _setup();
+    // Camera setup (CAMERA permission prompt) first, then audio services
+    // (sound_stream asks for RECORD_AUDIO in initialize). Running both at once
+    // can make Android drop one of the concurrent permission requests (B12).
+    unawaited(_setup().whenComplete(_initAudioServices));
   }
 
   Future<void> _initBatteryMonitoring() async {
@@ -800,9 +802,11 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    // 3. Camera (Only for Baby)
+    // 3. Camera + microphone (Only for Baby): offline audio streaming and cry
+    // detection need RECORD_AUDIO (B12).
     if (_role == DeviceRole.BABY) {
       perms.add(Permission.camera);
+      perms.add(Permission.microphone);
     }
 
     Map<Permission, PermissionStatus> statuses = await perms.request();
