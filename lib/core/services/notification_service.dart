@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -108,8 +109,16 @@ class NotificationService {
       debugPrint('Notification permission: ${settings.authorizationStatus}');
       return granted;
     } catch (e) {
-      debugPrint('Notification permission request failed: $e');
-      return false;
+      // Firebase unavailable (e.g. failed to start): still ask the OS, local
+      // cry notifications need the permission too (B59).
+      debugPrint('FCM permission request failed ($e); using permission_handler');
+      try {
+        final status = await Permission.notification.request();
+        return status.isGranted || status.isProvisional;
+      } catch (e) {
+        debugPrint('Notification permission request failed: $e');
+        return false;
+      }
     }
   }
 
