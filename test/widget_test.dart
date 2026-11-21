@@ -1,20 +1,109 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Smoke tests for UI pieces that do not need platform plugins
+// (HomeScreen itself needs camera/Firebase/battery plugins and real devices).
 
+import 'package:bebek_monitor_clean/l10n/app_localizations.dart';
+import 'package:bebek_monitor_clean/providers/language_provider.dart';
+import 'package:bebek_monitor_clean/providers/theme_provider.dart';
+import 'package:bebek_monitor_clean/widgets/noise_level_bar.dart';
+import 'package:bebek_monitor_clean/widgets/settings_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
-import 'package:bebek_monitor_clean/app.dart';
+/// Same localization/provider setup as BebekMonitorApp, around [child].
+Widget _host(Widget child, {LanguageProvider? language, ThemeProvider? theme}) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => theme ?? ThemeProvider()),
+      ChangeNotifierProvider(create: (_) => language ?? LanguageProvider()),
+    ],
+    child: Builder(
+      builder: (context) => MaterialApp(
+        locale: context.watch<LanguageProvider>().locale,
+        themeMode: context.watch<ThemeProvider>().mode,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('en'), Locale('tr')],
+        home: Scaffold(body: child),
+      ),
+    ),
+  );
+}
+
+String _tr(String key) => AppLocalizations.debugLocalizedValues['tr']![key]!;
+String _en(String key) => AppLocalizations.debugLocalizedValues['en']![key]!;
 
 void main() {
-  testWidgets('App builds with Bebek Monitor home', (WidgetTester tester) async {
-    await tester.pumpWidget(const BebekMonitorApp());
+  testWidgets('SettingsSheet renders in Turkish by default and switches to English',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
-    expect(find.text('Bebek Monitor'), findsOneWidget);
-    expect(find.byType(AppBar), findsOneWidget);
+    final language = LanguageProvider();
+    await tester.pumpWidget(_host(
+      SettingsSheet(
+        noiseThreshold: 60,
+        keepScreenOn: false,
+        onNoiseThresholdChanged: (_) {},
+        onKeepScreenOnChanged: (_) {},
+        onOfflineModeChanged: (_) {},
+        onVideoSettingsChanged: (_) {},
+      ),
+      language: language,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text(_tr('settings')), findsOneWidget);
+    expect(find.text(_tr('keepScreenOn')), findsOneWidget);
+    expect(find.byType(Slider), findsOneWidget);
+
+    language.setLocale(const Locale('en'));
+    await tester.pumpAndSettle();
+    expect(find.text(_en('settings')), findsOneWidget);
+    expect(find.text(_en('keepScreenOn')), findsOneWidget);
+  });
+
+  testWidgets('SettingsSheet keep-screen-on switch reports the new value', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    bool? reported;
+    await tester.pumpWidget(_host(
+      SettingsSheet(
+        noiseThreshold: 60,
+        keepScreenOn: false,
+        onNoiseThresholdChanged: (_) {},
+        onKeepScreenOnChanged: (v) => reported = v,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final tile = find.widgetWithText(SwitchListTile, _tr('keepScreenOn'));
+    await tester.ensureVisible(tile);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(reported, isTrue);
+  });
+
+  testWidgets('NoiseLevelBar shows dB while listening and "passive" otherwise',
+      (tester) async {
+    await tester.pumpWidget(_host(
+      const NoiseLevelBar(currentDb: 42.25, thresholdDb: 60, listening: true),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('42.3 dB'), findsOneWidget);
+
+    await tester.pumpWidget(_host(
+      const NoiseLevelBar(currentDb: 42.25, thresholdDb: 60, listening: false),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text(_tr('passive')), findsOneWidget);
   });
 }

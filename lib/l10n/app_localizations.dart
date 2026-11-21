@@ -11,6 +11,10 @@ class AppLocalizations {
 
   static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
+  /// Raw translation tables, exposed only so tests can check TR/EN key parity.
+  @visibleForTesting
+  static Map<String, Map<String, String>> get debugLocalizedValues => _localizedValues;
+
   static final Map<String, Map<String, String>> _localizedValues = {
     'en': {
       'settings': 'Settings',
