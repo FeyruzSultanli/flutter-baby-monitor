@@ -157,25 +157,37 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _initBatteryMonitoring() async {
-    _battery.onBatteryStateChanged.listen((BatteryState state) {
-      setState(() {
-        _batteryState = state;
-      });
-      _sendBatteryUpdate();
-    });
+    // Keep the subscription so dispose() can cancel it, and never call
+    // setState after dispose (B19).
+    _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
+      (BatteryState state) {
+        if (!mounted) return;
+        setState(() {
+          _batteryState = state;
+        });
+        _sendBatteryUpdate();
+      },
+      onError: (Object e) => debugPrint('Battery state stream error: $e'),
+    );
 
     _batterySyncTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
-      final level = await _battery.batteryLevel;
-      setState(() {
-        _batteryLevel = level;
-      });
-      _sendBatteryUpdate();
+      try {
+        final level = await _battery.batteryLevel;
+        if (!mounted) return;
+        setState(() {
+          _batteryLevel = level;
+        });
+        _sendBatteryUpdate();
+      } catch (e) {
+        debugPrint('Battery level read error: $e');
+      }
     });
     
     // Initial fetch
     try {
       final level = await _battery.batteryLevel;
       final state = await _battery.batteryState;
+      if (!mounted) return;
       setState(() {
         _batteryLevel = level;
         _batteryState = state;
@@ -198,7 +210,11 @@ class _HomeScreenState extends State<HomeScreen>
         OfflinePayload.encodeJson(OfflinePayloadType.battery, payloadMap);
 
     if (_isOfflineMode && _connectedEndpointId != null) {
-      await Nearby().sendBytesPayload(_connectedEndpointId!, payload);
+      try {
+        await Nearby().sendBytesPayload(_connectedEndpointId!, payload);
+      } catch (e) {
+        debugPrint('Battery payload send error: $e');
+      }
     } else if (!_isOfflineMode && _pairingState?.roomCode != null) {
       // For online mode, we could use signaling or data channel. 
       // Since we don't have a dedicated data channel set up in this snippet for generic data,
