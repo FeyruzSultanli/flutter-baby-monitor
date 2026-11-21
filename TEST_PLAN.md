@@ -270,3 +270,16 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 12.33 | D3 | Üçüncü bir telefonla (veya E'de uygulama verisini silip) aynı kodla katılmayı deneyin. | Reddedilir; B ile E'nin bağlantısı etkilenmez. | ✅/❌ |
 | 12.34 | D3 + B08 | E çıkıp aynı kodla tekrar katılsın (12.19). | Kurallar varken de çalışır (aynı uid). | ✅/❌ |
 | 12.35 | D3 | Uygulama logunda `PERMISSION_DENIED` / `permission-denied` arayın (normal akışta). | Yok (yalnızca 12.28/12.32/12.33'te beklenir). | ✅/❌ |
+
+### 12C. D2 (FCM) — uygulama tarafı şimdi, push deploy sonrası
+
+| # | Değişiklik | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| 12.36 | B42 (`1f5a398`) | Temiz kurulum: uygulamayı açın (bebek modu). | Açılışta bildirim izni **sorulmaz**. Ebeveyn moduna geçince sorulur; reddedilirse "Bildirim izni gerekli" + Ayarlar uyarısı. | ✅/❌ |
+| 12.37 | B47 | Ebeveynde bir ağlama bildirimi alın. | Durum çubuğunda beyaz kare değil, zil ikonu görünür. | ✅/❌ |
+| 12.38 | D2 token | E bağlandıktan sonra Firebase konsolunda odaya bakın. | `viewerFcmToken` (uzun metin) ve `viewerLocale` (`tr`/`en`) dolu. | ✅/❌ |
+| 12.39 | D2 (Function **deploy edildikten sonra**) | E bağlı; E'de uygulamayı arka plana alın (Home), B'de 3 sn ağlama sesi. | E'ye birkaç saniye içinde "Bebek ağlıyor — Ses seviyesi: XX dB" bildirimi gelir. | ✅/❌ + gecikme: |
+| 12.40 | D2 | E ekranı kilitli, 10 dk bekleyin, sonra 12.39. | Bildirim gelir (Doze'a rağmen). | ✅/❌ + gecikme: |
+| 12.41 | D2 | E uygulamasını son uygulamalardan kapatın (zorla durdurmayın), 12.39. | Bildirim gelir. | ✅/❌ |
+| 12.42 | D2 | E ön planda, 12.39. | **Tek** bildirim görünür (Firestore + FCM aynı etiketle birleşir); iki kez ses çalarsa not edin. | ✅/❌ + not: |
+| 12.43 | D2 | 2 dk sürekli ağlama. | En fazla ~2–3 push (60 sn bekleme). | Push sayısı: ___ |

@@ -13,8 +13,8 @@
 | 3 | D5 alarm eşiği (≥2 sn + tek dB formülü + ayarlanabilir eşik) | ✅ `9a0c363` (tek ölçek), `bfc5f26` (2 sn), `04ce566` (eşik senkronu) |
 | 4 | B08 yeniden katılma | ✅ `dd72f41` (B36 dahil) + inceleme düzeltmeleri `854e0a3` |
 | 5 | D3 + D8 (auth, kurallar, süreli kod, TTL) | ✅ Kod hazır: `d65bc86` (kurallar + 27 emülatör testi), `0d37d40` (uygulama). **Konsol adımları sizde, aşağıda.** |
-| 6 | D2 FCM (uygulama tarafı + Function kodu; deploy Blaze kararından sonra) | ⏳ |
-| 7 | D1-b foreground service | ⏸ Başlamadan önce kullanıcıya sorulacak (yarım günlük cihaz denemesi) |
+| 6 | D2 FCM (uygulama tarafı + Function kodu; deploy Blaze kararından sonra) | ✅ Kod hazır: `1f5a398` (uygulama), `53930a4` (Function; emülatörde tetiklendiği doğrulandı). **Deploy edilmedi.** |
+| 7 | D1-b foreground service | ⏸ **Kullanıcı onayı bekleniyor** (önce yarım günlük cihaz denemesi; bkz. bölüm 5) |
 
 ### D3 + D8 için konsol adımları (bu sırayla)
 
@@ -42,6 +42,31 @@
 5. TEST_PLAN 12.32–12.35.
 
 Kural testlerini yerelde tekrar çalıştırmak için `firestore-tests/README.md`'ye bakın. Testler emülatörde çalışır; Android Studio JDK'sı kullanılır ve gerçek projeye dokunulmaz.
+
+### D2 deploy adımları (Blaze kararından sonra)
+
+1. Firebase konsolu → **Upgrade → Blaze**. Ardından Google Cloud Console → Billing → **Budgets & alerts** altında bir bütçe uyarısı kurulmasını öneririm (ör. 1 $).
+2. Firebase konsolu → Firestore → veritabanı **konumuna** bakın. `functions/src/index.ts` içindeki `REGION` değerini buna göre ayarlayın (ör. `eur3` → `europe-west1`, `nam5` → `us-central1`). İsterseniz konumu bana söyleyin, ben ayarlarım.
+3. İlk seferde Firebase'e giriş yapın:
+
+   ```bash
+   cd functions && npm install && npx firebase-tools login
+   ```
+
+4. Deploy edin:
+
+   ```bash
+   cd functions && npm run deploy
+   ```
+
+   İlk deploy'da Cloud Functions, Cloud Build, Artifact Registry ve Eventarc API'lerinin açılması için onay istenebilir.
+5. TEST_PLAN 12.39–12.43.
+
+Geri almak için:
+
+```bash
+npx firebase-tools functions:delete onCryAlertCreated --project bebekmonitor-282fd
+```
 
 Kararlar (kullanıcı):
 - D4 bekliyor: önce farklı ağ testi, sonra Blaze kararıyla birlikte değerlendirilecek.

@@ -62,7 +62,7 @@ Kullanıcı yokken alınan kararlar:
   - Ekran kilitliyse bildirimler yalnızca Android süreci dondurana kadar gelir (Doze). Bunun ne kadar sürdüğü cihazda doğrulanmalı.
 - **Öneri:** Bkz. D2.
 - **Risk:** Orta (Blaze planı ve backend deploy gerektiriyor).
-- **Durum:** Karar bekliyor
+- **Durum:** Kod hazır, **deploy edilmedi** (karar D2). Uygulama tarafı `1f5a398`: token ve dil odaya yazılıyor, kanal ve ikon tanımlı, yerel bildirim ile push aynı etiketi kullanıyor. Function `53930a4`: `onCryAlertCreated`, 60 sn sunucu bekleme süresi; emülatörde tetiklendiği doğrulandı. Deploy için Blaze planı ve REGION ayarı gerekiyor (PLAN_NEXT). Cihazda doğrulanmalı.
 
 ### B03 — Kimlik doğrulama yok, 6 haneli oda kodu tahmin edilebilir, Firestore kuralları repoda yok
 - **Dosya:** `pairing_service.dart:31` (kod 100000–999999 arasında). `firebase_auth` bağımlılığı yok. Repoda `firestore.rules` dosyası yok.
@@ -362,12 +362,12 @@ Kullanıcı yokken alınan kararlar:
 
 ### B42 — Bildirim izni açılışta açıklamasız isteniyor; reddedilirse uyarı yok
 - **Dosya:** `main.dart:19`, `notification_service.dart:50-60`.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`1f5a398`): bildirim izni ebeveyn rolüne geçince isteniyor; reddedilirse 'Ayarlar' kısayoluyla uyarı gösteriliyor.
 
 ### B43 — Firebase başlatılamazsa yerel bildirimler de çalışmıyor
 - **Dosya:** `main.dart:15-22`, `notification_service.dart:18`.
 - **Sorun:** `FirebaseMessaging.instance` alan başlatıcısında çağrılıyor.
-- **Durum:** Açık (pratikte olası değil)
+- **Durum:** Düzeltildi (`1f5a398`): yerel bildirimler Firebase'den bağımsız başlatılıyor; `FirebaseMessaging` tembel (lazy) erişiliyor.
 
 ### B44 — Kayıt izni akışı anlamsız
 - **Dosya:** `home_screen.dart:2022-2026`.
@@ -388,7 +388,7 @@ Kullanıcı yokken alınan kararlar:
 
 ### B47 — Bildirim küçük ikonu `@mipmap/ic_launcher`
 - **Sorun:** Android'de beyaz kare olarak görünür.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`1f5a398`): tek renkli `ic_stat_notification` ikonu; FCM için manifest meta-data'sı eklendi.
 
 ### B48 — Alarm geçmişinde gece aralığı filtresi çalışmıyor
 - **Dosya:** `alert_history_screen.dart:112-120`.
