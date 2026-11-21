@@ -4,8 +4,16 @@ import 'dart:typed_data';
 /// Converts a chunk of 16-bit PCM audio (host byte order) to a positive
 /// dB value: `20 * log10(rms)`, roughly 0..90 for full-scale input.
 /// Used for offline-mode cry detection.
+///
+/// Always returns a finite value >= 0 (B11): silence or an empty chunk gives
+/// 0 instead of -Infinity/NaN (which jsonEncode cannot encode), and a
+/// trailing odd byte is ignored instead of throwing.
 double pcm16ChunkToDb(List<int> bytes) {
-  final int16Data = Int16List.view(Uint8List.fromList(bytes).buffer);
+  final evenLength = bytes.length - bytes.length % 2;
+  if (evenLength == 0) return 0;
+  final int16Data = Int16List.view(
+    Uint8List.fromList(bytes.sublist(0, evenLength)).buffer,
+  );
 
   double sumSquare = 0;
   for (final sample in int16Data) {
@@ -13,6 +21,7 @@ double pcm16ChunkToDb(List<int> bytes) {
   }
 
   final rms = sqrt(sumSquare / int16Data.length);
+  if (rms < 1) return 0;
   return 20 * log(rms) / ln10;
 }
 

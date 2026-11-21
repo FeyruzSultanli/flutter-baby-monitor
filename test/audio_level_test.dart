@@ -38,6 +38,32 @@ void main() {
     });
   });
 
+  group('pcm16ChunkToDb edge cases (B11)', () {
+    test('digital silence gives 0, not -Infinity', () {
+      final db = pcm16ChunkToDb(pcm(List.filled(256, 0)));
+      expect(db, 0);
+      expect(db.isFinite, isTrue);
+    });
+
+    test('empty chunk gives 0, not NaN', () {
+      expect(pcm16ChunkToDb(const []), 0);
+    });
+
+    test('single byte gives 0 instead of throwing', () {
+      expect(pcm16ChunkToDb(const [7]), 0);
+    });
+
+    test('a trailing odd byte is ignored', () {
+      final chunk = pcm(List.filled(64, 1000))..add(255);
+      expect(pcm16ChunkToDb(chunk), closeTo(60, 1e-9));
+    });
+
+    test('rms below one sample step gives 0 (never negative)', () {
+      final samples = List<int>.filled(100, 0)..[0] = 1; // rms = 0.1
+      expect(pcm16ChunkToDb(pcm(samples)), 0);
+    });
+  });
+
   group('webrtcAudioLevelToDb (online)', () {
     test('maps linear level to 20*log10(level)+100', () {
       expect(webrtcAudioLevelToDb(1.0), closeTo(100, 1e-9));
