@@ -415,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen>
         debugPrint('Audio stream stop on dispose failed: $e');
       }
     }));
-    if (_isOfflineMode) {
+    if (_isOfflineMode && defaultTargetPlatform == TargetPlatform.android) {
       unawaited(Future(() async {
         try {
           await Nearby().stopAdvertising();
@@ -726,11 +726,18 @@ class _HomeScreenState extends State<HomeScreen>
 
     await _webrtcService?.hangUp();
     
-    // Dispose P2P
+    // Dispose P2P. Nearby exists only on Android; creating the Nearby()
+    // singleton elsewhere listens on a missing event channel (B65).
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await Nearby().stopAdvertising();
+        await Nearby().stopDiscovery();
+        await Nearby().stopAllEndpoints();
+      } catch (e) {
+        debugPrint('Nearby stop failed: $e');
+      }
+    }
     try {
-      await Nearby().stopAdvertising();
-      await Nearby().stopDiscovery();
-      await Nearby().stopAllEndpoints();
       _connectedEndpointId = null;
       _currentImageBytesNotifier.value = null;
       if (_isStreaming) {
