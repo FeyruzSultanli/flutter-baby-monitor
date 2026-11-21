@@ -57,6 +57,35 @@ void main() {
     expect(reloaded.single.message, 'm5');
   });
 
+  test('an I/O error while loading is retried on the next call', () async {
+    var fail = true;
+    final s = AlertHistoryService.withDirectory(() async {
+      if (fail) throw const FileSystemException('documents dir unavailable');
+      return dir;
+    });
+    await file.writeAsString(jsonEncode([alert(7).toJson()]));
+
+    expect(await s.getAlerts(), isEmpty);
+    fail = false;
+    expect((await s.getAlerts()).single.message, 'm7');
+    expect(File('${file.path}.corrupt').existsSync(), isFalse);
+  });
+
+  test('a failed load never overwrites the file on disk', () async {
+    var fail = true;
+    final s = AlertHistoryService.withDirectory(() async {
+      if (fail) throw const FileSystemException('documents dir unavailable');
+      return dir;
+    });
+    await file.writeAsString(jsonEncode([alert(7).toJson()]));
+
+    await s.addAlert(alert(8)); // load fails -> not written
+    fail = false;
+    final onDisk = await service().getAlerts();
+    expect(onDisk.single.message, 'm7');
+    expect(File('${file.path}.corrupt').existsSync(), isFalse);
+  });
+
   test('history is capped at maxEntries', () async {
     final s = service();
     for (var i = 0; i < AlertHistoryService.maxEntries + 5; i++) {

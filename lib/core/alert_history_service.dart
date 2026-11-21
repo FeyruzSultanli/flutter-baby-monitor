@@ -25,6 +25,9 @@ class AlertHistoryService {
 
   List<AlertModel> _alerts = [];
   Future<void>? _loading;
+  // False while the file could not be read because of an I/O error; saving
+  // then would overwrite the history on disk with only the new entries.
+  bool _loadedOk = false;
   Future<void> _pendingWrite = Future.value();
 
   Future<File> get _localFile async {
@@ -36,9 +39,13 @@ class AlertHistoryService {
   Future<void> loadAlerts() => _loading ??= _load();
 
   Future<void> _load() async {
-    final file = await _localFile;
+    File? file;
     try {
-      if (!await file.exists()) return;
+      file = await _localFile;
+      if (!await file.exists()) {
+        _loadedOk = true;
+        return;
+      }
       final contents = await file.readAsString();
       final decoded = jsonDecode(contents);
       if (decoded is! List) throw const FormatException('alert history is not a list');
@@ -55,16 +62,29 @@ class AlertHistoryService {
       // Sort by timestamp descending (newest first)
       alerts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       _alerts = alerts.take(maxEntries).toList();
+      _loadedOk = true;
+    } on FormatException catch (e) {
+      // Unreadable content: keep the file aside instead of overwriting it on
+      // the next save.
+      debugPrint('Alert history is corrupt: $e');
+      await _backUpCorrupt(file);
+      _loadedOk = true;
     } catch (e) {
+      // I/O errors (e.g. documents dir unavailable) are not corruption: keep
+      // the file as is and allow a later call to retry the load.
       debugPrint('Error loading alerts: $e');
-      // Keep the unreadable file aside instead of overwriting it on next save.
-      try {
-        if (await file.exists()) {
-          await file.rename('${file.path}.corrupt');
-        }
-      } catch (e) {
-        debugPrint('Could not back up corrupt alert history: $e');
+      _loading = null;
+    }
+  }
+
+  Future<void> _backUpCorrupt(File? file) async {
+    if (file == null) return;
+    try {
+      if (await file.exists()) {
+        await file.rename('${file.path}.corrupt');
       }
+    } catch (e) {
+      debugPrint('Could not back up corrupt alert history: $e');
     }
   }
 
@@ -86,6 +106,10 @@ class AlertHistoryService {
   /// temporary file that then replaces the real one, so an app kill
   /// mid-write cannot leave a truncated history (B29).
   Future<void> _saveAlerts() {
+    if (!_loadedOk) {
+      debugPrint('Alert history not loaded; keeping new entries in memory only');
+      return _pendingWrite;
+    }
     final snapshot = jsonEncode(_alerts.map((e) => e.toJson()).toList());
     _pendingWrite = _pendingWrite.then((_) async {
       try {
