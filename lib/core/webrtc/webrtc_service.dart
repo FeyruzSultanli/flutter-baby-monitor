@@ -59,6 +59,9 @@ class WebRTCService {
   // Incremented by startAsBaby/startAsParent/hangUp; an in-flight negotiation
   // of an older generation abandons its peer instead of installing it.
   int _generation = 0;
+  // Remote candidates received before the remote description (B64).
+  final List<RTCIceCandidate> _pendingRemoteCandidates = [];
+  bool _remoteDescriptionApplied = false;
 
   Future<void> initRenderers() async {
     await localRenderer.initialize();
@@ -89,6 +92,8 @@ class WebRTCService {
     _disconnectTimer = null;
     _offerTimer?.cancel();
     _offerTimer = null;
+    _pendingRemoteCandidates.clear();
+    _remoteDescriptionApplied = false;
     await _remoteCandidateSub?.cancel();
     await _answerSub?.cancel();
     await _offerSub?.cancel();
@@ -327,17 +332,49 @@ class WebRTCService {
         final existingRemote = await pc.getRemoteDescription();
         if (existingRemote != null) return;
         await pc.setRemoteDescription(answer);
+        await _flushPendingCandidates(pc);
       },
       onError: (e) => _reportError('Yanıta ulaşılamadı: $e'),
     );
 
     _remoteCandidateSub = _signalingService.onCandidate.listen(
-      (candidate) {
-        if (!identical(_peerConnection, pc)) return;
-        pc.addCandidate(candidate);
-      },
+      (candidate) => unawaited(_addRemoteCandidate(pc, candidate)),
       onError: (e) => _reportError('ICE candidate okunamadı: $e'),
     );
+  }
+
+  /// Remote ICE candidates can arrive before the remote description is set
+  /// (the parent's candidates reach the baby before its answer is applied).
+  /// addCandidate then fails ("remote description was null"; an uncaught
+  /// error on iOS), so such candidates are queued and added afterwards (B64).
+  Future<void> _addRemoteCandidate(RTCPeerConnection pc, RTCIceCandidate candidate) async {
+    if (!identical(_peerConnection, pc)) return;
+    // Synchronous flag (no await between the check and queuing), set right
+    // after setRemoteDescription and before the queue is flushed.
+    if (!_remoteDescriptionApplied) {
+      _pendingRemoteCandidates.add(candidate);
+      return;
+    }
+    try {
+      await pc.addCandidate(candidate);
+    } catch (e) {
+      debugPrint('addCandidate failed: $e');
+    }
+  }
+
+  Future<void> _flushPendingCandidates(RTCPeerConnection pc) async {
+    if (!identical(_peerConnection, pc)) return;
+    _remoteDescriptionApplied = true;
+    final pending = List<RTCIceCandidate>.of(_pendingRemoteCandidates);
+    _pendingRemoteCandidates.clear();
+    for (final candidate in pending) {
+      if (!identical(_peerConnection, pc)) return;
+      try {
+        await pc.addCandidate(candidate);
+      } catch (e) {
+        debugPrint('addCandidate (queued) failed: $e');
+      }
+    }
   }
 
   /// Parent side: joins [roomCode] as viewer [session] and answers the baby's
@@ -388,6 +425,7 @@ class WebRTCService {
          if (await pc.getRemoteDescription() != null) return;
 
          await pc.setRemoteDescription(offer);
+         await _flushPendingCandidates(pc);
 
          // Explicitly request video/audio
          const constraints = {
@@ -404,10 +442,7 @@ class WebRTCService {
       }, onError: (e) => _reportError('Teklif alınamadı: $e'));
 
       _remoteCandidateSub = _signalingService.onCandidate.listen(
-        (candidate) {
-          if (!identical(_peerConnection, pc)) return;
-          pc.addCandidate(candidate);
-        },
+        (candidate) => unawaited(_addRemoteCandidate(pc, candidate)),
         onError: (e) => _reportError('ICE candidate okunamadı: $e'),
       );
 
