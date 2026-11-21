@@ -23,7 +23,7 @@ class AppLocalizations {
       'lightMode': 'Light Mode',
       'darkMode': 'Dark Mode',
       'language': 'Language',
-      'offlineMode': 'Offline Mode (Wi-Fi Direct)',
+      'offlineMode': 'Offline Mode (Nearby)',
       'offlineModeSubtitle': 'Use local connection without internet',
       'noiseThreshold': 'Noise Threshold',
       'moreSensitive': 'More sensitive',
@@ -95,7 +95,7 @@ class AppLocalizations {
       'microphonePermissionRequired': 'Microphone permission is required',
       'cameraPermissionRequired': 'Camera permission is required',
       'storagePermissionRequired': 'Storage permission is required',
-      'locationPermissionRequired': 'Location permission is required for Wi-Fi Direct',
+      'locationPermissionRequired': 'Location permission is required for offline mode',
       'nearbyDevicesPermissionRequired': 'Nearby devices permission is required',
       'notificationsPermissionRequired': 'Notifications permission is required',
       'batteryOptimization': 'Battery Optimization',
@@ -158,6 +158,9 @@ class AppLocalizations {
       'audioMonitoringOn': 'Audio Monitoring On',
       'audioMonitoringOff': 'Audio Monitoring Off',
       'connectionStatus': 'Connection Status',
+      'videoSettingsUpdated': 'Video settings updated',
+      'unknownDevice': 'Unknown device',
+      'addFirstCameraHint': 'Tap the + button to add your first camera',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -166,7 +169,7 @@ class AppLocalizations {
       'lightMode': 'Açık Mod',
       'darkMode': 'Koyu Mod',
       'language': 'Dil',
-      'offlineMode': 'Offline Mod (Wi-Fi Direct)',
+      'offlineMode': 'Offline Mod (Nearby)',
       'offlineModeSubtitle': 'İnternet olmadan yerel bağlantı kullan',
       'noiseThreshold': 'Gürültü Eşiği',
       'moreSensitive': 'Daha hassas',
@@ -238,7 +241,7 @@ class AppLocalizations {
       'microphonePermissionRequired': 'Mikrofon izni gerekli',
       'cameraPermissionRequired': 'Kamera izni gerekli',
       'storagePermissionRequired': 'Depolama izni gerekli',
-      'locationPermissionRequired': 'Wi-Fi Direct için konum izni gerekli',
+      'locationPermissionRequired': 'Offline mod için konum izni gerekli',
       'nearbyDevicesPermissionRequired': 'Yakındaki cihazlar izni gerekli',
       'notificationsPermissionRequired': 'Bildirim izni gerekli',
       'batteryOptimization': 'Pil Optimizasyonu',
@@ -303,6 +306,9 @@ class AppLocalizations {
       'audioMonitoringOn': 'Ses İzleme Açık',
       'audioMonitoringOff': 'Ses İzleme Kapalı',
       'connectionStatus': 'Bağlantı Durumu',
+      'videoSettingsUpdated': 'Video ayarları güncellendi',
+      'unknownDevice': 'Bilinmeyen cihaz',
+      'addFirstCameraHint': 'İlk kameranızı eklemek için + düğmesine dokunun',
     },
   };
 
@@ -449,6 +455,9 @@ class AppLocalizations {
   String get audioMonitoringOn => _localizedValues[locale.languageCode]!['audioMonitoringOn']!;
   String get audioMonitoringOff => _localizedValues[locale.languageCode]!['audioMonitoringOff']!;
   String get connectionStatus => _localizedValues[locale.languageCode]!['connectionStatus']!;
+  String get videoSettingsUpdated => _localizedValues[locale.languageCode]!['videoSettingsUpdated']!;
+  String get unknownDevice => _localizedValues[locale.languageCode]!['unknownDevice']!;
+  String get addFirstCameraHint => _localizedValues[locale.languageCode]!['addFirstCameraHint']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

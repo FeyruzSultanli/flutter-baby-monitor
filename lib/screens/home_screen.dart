@@ -1162,7 +1162,7 @@ class _HomeScreenState extends State<HomeScreen>
                     final device = devices[index];
                     return ListTile(
                       leading: const Icon(Icons.phone_android),
-                      title: Text(device['name'] ?? "Unknown Device"),
+                      title: Text(device['name'] ?? l10n.unknownDevice),
                       subtitle: Text(device['id'] ?? ""),
                       onTap: () {
                         Navigator.of(context).pop();
@@ -1417,7 +1417,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (_role == DeviceRole.BABY) {
       _restartStreamWithNewSettings();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Video settings updated: ${settings.fps} FPS, ${settings.quality}')),
+        SnackBar(content: Text('${AppLocalizations.of(context).videoSettingsUpdated}: ${settings.fps} FPS, ${settings.quality}')),
       );
     }
   }
@@ -1582,9 +1582,11 @@ class _HomeScreenState extends State<HomeScreen>
     if (_lastRecordedAlertTime == null || 
         now.difference(_lastRecordedAlertTime!) > _cryNotificationCooldown) {
       _lastRecordedAlertTime = now;
+      if (!mounted) return;
+      final message = AppLocalizations.of(context).babyCryAlert;
       await AlertHistoryService().addAlert(AlertModel(
         timestamp: now,
-        message: 'Baby crying / Noise detected',
+        message: message,
         decibel: db,
       ));
     }
@@ -1829,7 +1831,7 @@ class _HomeScreenState extends State<HomeScreen>
           Icon(Icons.wifi_tethering, size: 16, color: color),
           const SizedBox(width: 6),
           Text(
-            'Bağlantı: ${_connectionStatusLabel()}',
+            '${AppLocalizations.of(context).connectionStatus}: ${_connectionStatusLabel()}',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -2479,7 +2481,9 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      isBaby ? 'Kamera Kapalı' : 'Bağlantı Bekleniyor',
+                      isBaby
+                          ? AppLocalizations.of(context).cameraOff
+                          : AppLocalizations.of(context).waitingForConnection,
                       style: TextStyle(color: scheme.outline),
                     ),
                   ],
@@ -2572,7 +2576,7 @@ class _HomeScreenState extends State<HomeScreen>
                         Icon(Icons.warning_amber_rounded, color: scheme.onError),
                         const SizedBox(width: 8),
                         Text(
-                          'BEBEK AĞLIYOR!',
+                          AppLocalizations.of(context).babyCrying.toUpperCase(),
                           style: TextStyle(
                             color: scheme.onError,
                             fontWeight: FontWeight.bold,

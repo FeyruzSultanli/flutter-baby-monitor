@@ -109,7 +109,7 @@ class _MultiCameraScreenState extends State<MultiCameraScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Tap the + button to add your first camera',
+                      l10n.addFirstCameraHint,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -118,7 +118,7 @@ class _MultiCameraScreenState extends State<MultiCameraScreen> {
                     const SizedBox(height: 32),
                     FilledButton.icon(
                       icon: const Icon(Icons.add_a_photo),
-                      label: const Text('Add Camera'),
+                      label: Text(l10n.addCamera),
                       onPressed: _addCamera,
                     ),
                   ],
