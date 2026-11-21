@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -124,17 +125,35 @@ class WebRTCService {
     return createPeerConnection(config, constraints);
   }
 
-  Future<MediaStream> _createLocalStream({String facingMode = 'environment'}) {
-    return navigator.mediaDevices.getUserMedia({
-      'audio': true,
-      'video': {
-        'facingMode': facingMode,
-        'width': {'ideal': 640},
-        'height': {'ideal': 480},
-        'frameRate': {'ideal': 30},
-      },
-    });
+  Future<MediaStream> _createLocalStream({String facingMode = 'environment'}) async {
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        'audio': true,
+        'video': {
+          'facingMode': facingMode,
+          'width': {'ideal': 640},
+          'height': {'ideal': 480},
+          'frameRate': {'ideal': 30},
+        },
+      });
+    } catch (e) {
+      // The iOS simulator has no camera. In debug builds on the simulator only,
+      // fall back to an audio-only stream so signaling, the peer connection
+      // and the audio path can still be tested (flutter_webrtc has no
+      // synthetic video source on iOS). Real devices are unaffected.
+      if (_isDebugIosSimulator) {
+        debugPrint('No camera on the iOS simulator, using audio only (debug): $e');
+        return navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+      }
+      rethrow;
+    }
   }
+
+  static bool get _isDebugIosSimulator =>
+      kDebugMode &&
+      !kIsWeb &&
+      Platform.isIOS &&
+      Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
 
   Future<double?> getAudioLevel() async {
     if (_peerConnection == null) return null;
