@@ -9,7 +9,7 @@
 - [x] ADIM 2: Derin kod incelemesi (bu dosya)
 - [x] ADIM 3: Otomatik testler. Commit'ler: `451e421`, `cd3af29`. 36 test ✅
 - [x] ADIM 4: Güvenli düzeltmeler. Kalan maddeler ya "Karar bekliyor" durumunda ya da güvenli yerel düzeltme değil; her birinin gerekçesi kendi maddesinde.
-- [ ] ADIM 5: TEST_PLAN.md (devam ediyor)
+- [x] ADIM 5: TEST_PLAN.md
 - [ ] ADIM 6: REPORT.md
 
 ## Karar günlüğü
