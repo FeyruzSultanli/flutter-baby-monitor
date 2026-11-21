@@ -29,6 +29,8 @@ lib/
     pairing/                 PairingService (Firestore oda oluşturma/katılma/silme), PairingState
     services/                NotificationService (FCM + flutter_local_notifications), HybridNotificationManager (singleton)
     recording/               VideoRecorderService (camera kayıt → gal ile galeriye)
+    offline/offline_payload.dart  Nearby byte payload kodlama/çözme (OfflinePayload, OfflinePayloadType)
+    audio/audio_level.dart        PCM16→dB (offline) ve WebRTC audioLevel→dB (online)
     alert_history_service.dart
     enums/                   DeviceRole { BABY, PARENT }, ConnectionStatus
   models/                    AlertModel, VideoSettings, AppRole (= DeviceRole typedef)
@@ -37,7 +39,7 @@ lib/
   widgets/                   camera_preview_card, fullscreen_view, noise_level_bar, settings_sheet, status_chips_row
 ```
 
-Offline Nearby payload formatı: ilk byte tip, kalanı veri — `1` JPEG kare, `2` ayarlar/durum JSON, `3` PCM ses, `4` pil JSON.
+Offline Nearby payload formatı (`OfflinePayload`): ilk byte tip, kalanı veri — `1` JPEG kare, `2` ayarlar/durum JSON, `3` PCM ses, `4` pil JSON.
 
 ## Önemli dosyalar
 
@@ -57,16 +59,16 @@ flutter build apk --debug
 ```
 
 - **Fiziksel cihaz gerekir.** Gerçek test için **2 cihaz**: biri bebek rolünde (yayın), diğeri ebeveyn rolünde (izleme). Online modda ikisi de internette olmalı; offline modda yakın mesafede, Bluetooth + Wi-Fi + konum açık olmalı.
-- `flutter test`: `test/widget_test.dart` tek bir duman testi içerir; Firebase/kamera eklentileri test ortamında olmadığı için kırılgandır.
+- `flutter test`: saf mantık unit testleri (payload, dB, modeller, l10n TR/EN eşitliği, alarm geçmişi) + SettingsSheet/NoiseLevelBar smoke testleri. HomeScreen eklenti gerektirdiği için widget testinde yok. l10n'a yeni anahtar eklerken iki dile de ekleyin (test kontrol eder).
 - Android derlemesi Android Studio'nun JBR'ını (JDK 21) kullanır; sistemde ayrı `java` PATH'te yok, gerek de yok.
 
 ## Bilinen kısıtlar
 
 - Offline mod (Nearby Connections: Bluetooth + Wi-Fi) **sadece Android**'de çalışır. Offline modda `WebRTCService` oluşturulmaz.
 - Kamera, mikrofon, WebRTC ve P2P **emülatörde/simülatörde güvenilir çalışmaz**; gerçek cihazda test et.
-- `pubspec.lock` repoda yoktu (`.gitignore`'da `*.lock`), paket sürümleri zamanla kayabilir.
 - `home_screen.dart` çok büyük; değişiklik yaparken ilgili bölümü dikkatle bul, istenmeden büyük refactor yapma.
-- `flutter analyze` 0 hata verir, ancak ~23 warning (kullanılmayan alan/metot/değişken, gereksiz `!`/null kontrolü) ve ~41 info (`withOpacity`, `surfaceVariant`, `Share` deprecations; `use_build_context_synchronously`; enum isimlendirme) vardır.
+- `flutter analyze`: 0 error / 0 warning; kalan info'lar enum isimlendirme (`BABY`, `CONNECTED`…; Firestore'daki durum metinleriyle ilişkili) ve `use_build_context_synchronously` — bilinçli olarak bırakıldı.
+- Bilinen hatalar, karar bekleyen konular ve cihaz test planı: `BUGS.md`, `REPORT.md`, `TEST_PLAN.md`.
 
 ## Çalışma kuralları
 

@@ -10,7 +10,7 @@
 - [x] ADIM 3: Otomatik testler. Commit'ler: `451e421`, `cd3af29`. 36 test ✅
 - [x] ADIM 4: Güvenli düzeltmeler. Kalan maddeler ya "Karar bekliyor" durumunda ya da güvenli yerel düzeltme değil; her birinin gerekçesi kendi maddesinde.
 - [x] ADIM 5: TEST_PLAN.md
-- [ ] ADIM 6: REPORT.md
+- [x] ADIM 6: REPORT.md
 
 ## Karar günlüğü
 
@@ -21,6 +21,11 @@ Kullanıcı yokken alınan kararlar:
 - **K3:** Mod değişiminde eski `WebRTCService`, UI artık onu kullanmıyorken çizilen bir kareden sonra (`endOfFrame`) dispose ediliyor. Amaç, dispose edilmiş renderer'ın ekranda kalmasını önlemek.
 - **K4:** WifiDirect kaldırıldıktan sonra derlenmiş manifest karşılaştırıldı. İzin ve bileşen listesi **birebir aynı**: flutter_p2p_connection manifest'e hiç izin eklemiyormuş; Nearby/Wi-Fi/Bluetooth izinleri uygulamanın kendi manifest'inde. APK içinde p2p sınıfı kalmadı.
 - **K5:** Test için saf fonksiyonlar ayrıldı: `lib/core/offline/offline_payload.dart` ve `lib/core/audio/audio_level.dart`. Davranış değişmedi. l10n tablosu testlerde `@visibleForTesting debugLocalizedValues` ile okunuyor.
+- **K7:** Düzeltmeler bitince `9cc1419..HEAD` diff'ini bağımsız bir inceleme ajanına okuttum. Bulduğu 5 sorunun hepsi benim düzeltmelerimden çıkmıştı; hepsi ayrı follow-up commit'leriyle giderildi:
+  - B22: yerel saat filtresi ve kurallara bağlı silme → `0de6bb6`
+  - B29: G/Ç hatası bozulma sanılıyordu → `718049c`
+  - B25: dispose sonrası payload → `0e44646`
+  - B14: başlama sırasında `stopAny` → `c99e4ed`
 - **K6:** Eski şablon `test/widget_test.dart` zaten kırıktı (provider ve Firebase'siz HomeScreen kuruyordu). Yerine SettingsSheet ve NoiseLevelBar smoke testleri yazıldı. HomeScreen, kamera/pil/Firebase eklentileri gerektirdiği için widget testine alınmadı.
 
 ## Önem ve durum anahtarı
@@ -162,7 +167,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** mp4 düzgün kapanmaz ve oynatılamaz, kaydedici takılı kalır.
 - **Öneri:** Kayıt türünü servis içinde saklamak (`stopAny()`), `_resetPairing` ve dispose içinde çağırmak.
 - **Risk:** Düşük.
-- **Durum:** Düzeltildi (`afba4ad`). `stopAny()` artık kayıt butonundan, `_resetPairing`'den ve `dispose`'dan çağrılıyor. Cihazda doğrulanmalı: kayıt sürerken bağlantıyı kes, sonra dosyanın oynatılabildiğini kontrol et.
+- **Durum:** Düzeltildi (`afba4ad` + `c99e4ed`): `stopAny()` hâlâ başlamakta olan bir kaydı da durduruyor. Cihazda doğrulanmalı: kayıt sürerken bağlantıyı kes, sonra dosyanın oynatılabildiğini kontrol et.
 
 ### B15 — Çoklu kamera (multi-camera) normal eşleşme akışıyla uyumsuz; yeniden anlaşma döngüsü
 - **Dosya:** `multi_peer_service.dart:71-88`, `firestore_signaling.dart:54-65`, `webrtc_service.dart` `_answerSub`.
@@ -222,7 +227,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Ebeveyn odaya bağlandığı ya da yeniden bağlandığı anda "bebek ağlıyor" bildirimleri gelir.
 - **Öneri:** İlk snapshot'ı atlamak. `closeRoom` içinde `alerts` alt koleksiyonunu da silmek.
 - **Risk:** Düşük.
-- **Durum:** Düzeltildi (`199bb77`) — ilk snapshot + bağlantıdan 30 sn önceki alarmlar atlanıyor; `closeRoom` alerts'i de siliyor. Cihazda doğrulanmalı.
+- **Durum:** Düzeltildi (`199bb77` + `0de6bb6`). Sunucudan gelen ilk snapshot'a kadar gelen her şey geçmiş sayılıyor. Saat karşılaştırması yapılmıyor; ilk sürümdeki yerel saat filtresi kaldırıldı. `closeRoom` içinde alarm silme best-effort. Cihazda doğrulanmalı.
 
 ### B23 — `FirestoreSignaling.connect` eski abonelikleri iptal etmiyor; dinleyicilerde `onError` yok
 - **Dosya:** `firestore_signaling.dart:54, 76`, `pairing_service.dart` `watchRoom`, `home_screen.dart:1602`.
@@ -243,7 +248,7 @@ Kullanıcı yokken alınan kararlar:
 - **Sorun:** `_noisePollTimer`, `_audioSub`, recorder/player, `_currentImageBytesNotifier` kapatılmıyor; Nearby durdurulmuyor.
 - **Öneri:** Hepsini dispose içinde kapatmak.
 - **Risk:** Düşük.
-- **Durum:** Düzeltildi (`9af8135`).
+- **Durum:** Düzeltildi (`9af8135` + `0e44646`). Dispose'dan sonra gelen Nearby payload'ları yok sayılıyor.
 
 ### B26 — `_onDisconnected` içinde `stopImageStream` await edilmiyor ve try/catch yok
 - **Dosya:** `home_screen.dart:1164`.
@@ -280,7 +285,7 @@ Kullanıcı yokken alınan kararlar:
   - Yazımları sıraya koymak.
   - Geçmişe kayıt aralığını alarm bekleme süresiyle aynı yapmak (60 sn).
 - **Risk:** Düşük.
-- **Durum:** Düzeltildi (`bbb5562`), unit testleriyle birlikte. Geçmişe kayıt artık 60 sn'de bir yapılıyor.
+- **Durum:** Düzeltildi (`bbb5562` + `718049c`), unit testleriyle birlikte. G/Ç hatası artık bozulma sayılmıyor; yükleme tekrar deneniyor ve başarısız yüklemeden sonra diske yazılmıyor. Geçmişe kayıt 60 sn'de bir.
 
 ### B30 — `VideoPlayerScreen`: `late` controller dispose'da çöküyor; `mounted` kontrolü yok
 - **Dosya:** `video_player_screen.dart:17, 43-52, 83, 97`.
