@@ -216,12 +216,12 @@ def keep_granting(serial: str, seconds: int) -> None:
         time.sleep(2)
 
 
-def run_flutter_test(dev: Device, target: str) -> subprocess.Popen:
+def run_flutter_test(dev: Device, target: str, skip_network_drop: bool = False) -> subprocess.Popen:
     log(f"{dev.role}: flutter test {target}")
     cmd = ["flutter", "test", target, "-d", dev.serial, DEFINE, "-r", "expanded"]
     if dev.platform == "android":
         threading.Thread(target=keep_granting, args=(dev.serial, 300), daemon=True).start()
-    else:
+    if dev.platform == "ios" or skip_network_drop:
         cmd.append("--dart-define=E2E_SKIP_NETWORK_DROP=true")
 
     # Markers come from the flutter test output (the test's print()).
@@ -290,7 +290,8 @@ def prepare_ios(udid: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--platform", choices=["android", "ios"], default="android")
+    # mixed: baby on the Android emulator "baby", parent on the iOS simulator.
+    ap.add_argument("--platform", choices=["android", "ios", "mixed"], default="android")
     ap.add_argument("--no-build", action="store_true")
     ap.add_argument("--keep-data", action="store_true")
     args = ap.parse_args()
@@ -312,7 +313,10 @@ def main() -> None:
             prepare_ios(d.serial)
     else:
         baby = Device("baby", boot_avd("baby", out), out)
-        parent = Device("parent", boot_avd("parent", out), out)
+        if args.platform == "mixed":
+            parent = Device("parent", ios_simulator("parent-ios27"), out, "ios")
+        else:
+            parent = Device("parent", boot_avd("parent", out), out)
 
         apk = ROOT / "build/app/outputs/flutter-apk/app-debug.apk"
         if not args.no_build:
@@ -322,15 +326,19 @@ def main() -> None:
             if r.returncode != 0:
                 raise SystemExit("APK build failed (see build.txt)")
         for d in (baby, parent):
+            if d.platform == "ios":
+                prepare_ios(d.serial)
+                continue
             prepare_device(d.serial, apk)
             threading.Thread(target=d.watch_logcat, daemon=True).start()
     time.sleep(2)
 
+    skip_drop = args.platform != "android"
     started = time.time()
-    baby_proc = run_flutter_test(baby, "integration_test/baby_test.dart")
+    baby_proc = run_flutter_test(baby, "integration_test/baby_test.dart", skip_drop)
     if not baby.ready.wait(timeout=15 * 60):
         log("baby never became ready")
-    parent_proc = run_flutter_test(parent, "integration_test/parent_test.dart")
+    parent_proc = run_flutter_test(parent, "integration_test/parent_test.dart", skip_drop)
 
     codes = {}
     for name, proc in (("parent", parent_proc), ("baby", baby_proc)):
