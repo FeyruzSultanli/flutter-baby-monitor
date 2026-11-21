@@ -17,7 +17,8 @@ class NoiseLevelBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final normalized = (currentDb / 90.0).clamp(0.0, 1.0);
+    // Shared noise scale: full scale = 100 (see audio_level.dart).
+    final normalized = (currentDb / 100.0).clamp(0.0, 1.0);
     final isHigh = currentDb >= thresholdDb;
 
     return Column(

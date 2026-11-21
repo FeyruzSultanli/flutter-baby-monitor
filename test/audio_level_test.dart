@@ -9,18 +9,22 @@ List<int> pcm(List<int> samples) =>
     Int16List.fromList(samples).buffer.asUint8List().toList();
 
 void main() {
+  // Offline values are on the same scale as online: 20*log10(rms/32768)+100.
+  double expectedDb(double rms) => 20 * log(rms / 32768) / ln10 + 100;
+
   group('pcm16ChunkToDb (offline)', () {
-    test('constant amplitude 1000 -> 60 dB', () {
-      expect(pcm16ChunkToDb(pcm(List.filled(256, 1000))), closeTo(60, 1e-9));
+    test('constant amplitude 1000 -> ~69.7 on the shared scale', () {
+      expect(pcm16ChunkToDb(pcm(List.filled(256, 1000))), closeTo(expectedDb(1000), 1e-9));
+      expect(pcm16ChunkToDb(pcm(List.filled(256, 1000))), closeTo(69.69, 0.01));
     });
 
     test('sign does not matter (RMS)', () {
       final alternating = List<int>.generate(256, (i) => i.isEven ? 1000 : -1000);
-      expect(pcm16ChunkToDb(pcm(alternating)), closeTo(60, 1e-9));
+      expect(pcm16ChunkToDb(pcm(alternating)), closeTo(expectedDb(1000), 1e-9));
     });
 
-    test('full scale is about 90 dB', () {
-      expect(pcm16ChunkToDb(pcm(List.filled(128, 32767))), closeTo(90.3, 0.05));
+    test('full scale is ~100, same as WebRTC level 1.0', () {
+      expect(pcm16ChunkToDb(pcm(List.filled(128, 32767))), closeTo(100, 0.01));
     });
 
     test('10x amplitude adds 20 dB', () {
@@ -33,8 +37,17 @@ void main() {
       const amplitude = 10000;
       final samples = List<int>.generate(
           4800, (i) => (amplitude * sin(2 * pi * 440 * i / 48000)).round());
-      final expected = 20 * log(amplitude / sqrt2) / ln10;
-      expect(pcm16ChunkToDb(pcm(samples)), closeTo(expected, 0.05));
+      expect(pcm16ChunkToDb(pcm(samples)), closeTo(expectedDb(amplitude / sqrt2), 0.05));
+    });
+  });
+
+  group('one scale for online and offline (B28)', () {
+    test('same loudness gives the same dB in both modes', () {
+      for (final rms in [10.0, 100.0, 1000.0, 10000.0]) {
+        final offline = pcm16ChunkToDb(pcm(List.filled(256, rms.round())));
+        final online = webrtcAudioLevelToDb(rms / 32768);
+        expect(offline, closeTo(online, 1e-6), reason: 'rms=$rms');
+      }
     });
   });
 
@@ -55,7 +68,7 @@ void main() {
 
     test('a trailing odd byte is ignored', () {
       final chunk = pcm(List.filled(64, 1000))..add(255);
-      expect(pcm16ChunkToDb(chunk), closeTo(60, 1e-9));
+      expect(pcm16ChunkToDb(chunk), closeTo(expectedDb(1000), 1e-9));
     });
 
     test('rms below one sample step gives 0 (never negative)', () {
