@@ -8,8 +8,8 @@
 - [x] ADIM 1: Onaylanan temizlik. Commit'ler: 3A `474ef31`, 3B `6f72d30`, WifiDirect kaldırma `9cc1419`, ölü kod `a4b75e3`. Analyze 0 error, 0 warning; build ✅
 - [x] ADIM 2: Derin kod incelemesi (bu dosya)
 - [x] ADIM 3: Otomatik testler. Commit'ler: `451e421`, `cd3af29`. 36 test ✅
-- [ ] ADIM 4: Güvenli düzeltmeler (devam ediyor; sıradaki: B12, B13, B14, sonra Orta maddeler)
-- [ ] ADIM 5: TEST_PLAN.md
+- [x] ADIM 4: Güvenli düzeltmeler. Kalan maddeler ya "Karar bekliyor" durumunda ya da güvenli yerel düzeltme değil; her birinin gerekçesi kendi maddesinde.
+- [ ] ADIM 5: TEST_PLAN.md (devam ediyor)
 - [ ] ADIM 6: REPORT.md
 
 ## Karar günlüğü
@@ -147,7 +147,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** İlk açılışta kamera hata verebilir, ya da offline bebek sessiz yayın yapar ve ağlama algılama çalışmaz. Hata gösterilmez.
 - **Öneri:** Offline listeye mikrofon eklemek. Kamera kurulumu bitince ses servislerini başlatmak (sıralı).
 - **Risk:** Düşük.
-- **Durum:** Açık. Cihazda doğrulanmalı.
+- **Durum:** Düzeltildi (`bd5bda7`). Offline bebek modunda mikrofon izni isteniyor; açılışta ses servisleri kamera kurulumundan sonra başlıyor. Cihazda doğrulanmalı (ilk kurulumda izin diyalogları).
 
 ### B13 — Kayıt başlatılırken ya da durdurulurken hata olursa uygulama "kayıtta" durumunda takılıyor
 - **Dosya:** `video_recorder_service.dart:35-44, 53-54`.
@@ -155,14 +155,14 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Kayıt butonu uygulama yeniden başlatılana kadar kilitlenir.
 - **Öneri:** Hata olursa `_mediaRecorder = null`, stop için `finally`.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`404525a`). Bu commit ayrıca B14 için `stopAny()` metodunu ekledi.
 
 ### B14 — Kayıt; bağlantı kesilince, mod değişince ya da dispose'da durdurulmuyor
 - **Dosya:** `home_screen.dart` `_toggleRecording` (durdurma yalnızca burada) ve `_resetPairing`. Durdurma dalı, kayıt başladığı andaki modu değil o anki `_isOfflineMode` değerini kullanıyor.
 - **Nasıl ortaya çıkar:** mp4 düzgün kapanmaz ve oynatılamaz, kaydedici takılı kalır.
 - **Öneri:** Kayıt türünü servis içinde saklamak (`stopAny()`), `_resetPairing` ve dispose içinde çağırmak.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`afba4ad`). `stopAny()` artık kayıt butonundan, `_resetPairing`'den ve `dispose`'dan çağrılıyor. Cihazda doğrulanmalı: kayıt sürerken bağlantıyı kes, sonra dosyanın oynatılabildiğini kontrol et.
 
 ### B15 — Çoklu kamera (multi-camera) normal eşleşme akışıyla uyumsuz; yeniden anlaşma döngüsü
 - **Dosya:** `multi_peer_service.dart:71-88`, `firestore_signaling.dart:54-65`, `webrtc_service.dart` `_answerSub`.
@@ -173,7 +173,7 @@ Kullanıcı yokken alınan kararlar:
   - Tüm kameraların sesi aynı anda çalıyor.
   - Alarm desteği yok.
 - **Öneri:** Bkz. D6. En az düzeltme olarak MultiPeer'e remote description guard'ı eklenebilir.
-- **Durum:** Karar bekliyor
+- **Durum:** Kısmen düzeltildi (`ac1e136`): her offer'a artık yalnızca bir kez cevap veriliyor, yeniden anlaşma döngüsü bitti. Normal eşleşmeyle çakışma ve aynı anda çalan sesler hâlâ **Karar bekliyor** (D6).
 
 ### B16 — WebRTC kayıtlarında ses yok
 - **Dosya:** `video_recorder_service.dart:38-44`: `_mediaRecorder!.start(filePath, videoTrack: ...)` çağrısında `audioChannel` verilmiyor.
@@ -200,7 +200,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Ekran dispose olduktan sonra "setState() called after dispose" hatası; abonelik sızıntısı. `batteryLevel` platform hatasında yakalanmamış istisna atıyor.
 - **Öneri:** Aboneliği saklamak, `mounted` kontrolü, try/catch.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`0e880a1`).
 
 ### B20 — Offline bebek modunda her ses parçasında `setState` çağrılıyor
 - **Dosya:** `home_screen.dart:915-935` (`_calculateAndSendDb`).
@@ -208,7 +208,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Bebek cihazında gereksiz CPU kullanımı, pil tüketimi ve ısınma.
 - **Öneri:** UI güncellemesini mesaj gönderimiyle aynı 200 ms aralığına bağlamak; alarm durumu değişince hemen güncellemek.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`0bae805`). Cihazda doğrulanmalı: ses çubuğu hâlâ akıcı mı?
 
 ### B21 — Firestore dinleyicisi `offer: null`/`answer: null` yüzünden her snapshot'ta hata atıyor
 - **Dosya:** `pairing_service.dart:44-45` (`'offer': null, 'answer': null` yazılıyor), `firestore_signaling.dart:59, 68` (`containsKey` kontrolü true döndükten sonra `offerMap['sdp']` null üzerinde çağrılıyor).
@@ -236,21 +236,21 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Bağlantı kesildikten sonra da ekran kapanmaz ve pil tükenir.
 - **Öneri:** `_resetPairing` içinde, "Ekranı açık tut" ayarı kapalıysa wakelock'u kapatmak.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`13b506f`). Cihazda doğrulanmalı: bağlantı kesildikten sonra ekran kendi kapanıyor mu?
 
 ### B25 — `HomeScreen.dispose` bazı kaynakları kapatmıyor
 - **Dosya:** `home_screen.dart:320`.
 - **Sorun:** `_noisePollTimer`, `_audioSub`, recorder/player, `_currentImageBytesNotifier` kapatılmıyor; Nearby durdurulmuyor.
 - **Öneri:** Hepsini dispose içinde kapatmak.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`9af8135`).
 
 ### B26 — `_onDisconnected` içinde `stopImageStream` await edilmiyor ve try/catch yok
 - **Dosya:** `home_screen.dart:1164`.
 - **Sorun:** Stream çalışmıyorsa CameraException fırlatıyor ve bu yakalanmıyor.
 - **Öneri:** Yalnızca stream çalışıyorsa durdurmak, try/catch eklemek.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`5a244dc`).
 
 ### B27 — Alarm, eşiği tek bir ölçümün aşmasıyla tetikleniyor (süre şartı yok)
 - **Dosya:** `home_screen.dart:1488-1500` (`_processNoiseLevel`), `_calculateAndSendDb`. `_noiseAboveSince` hesaplanıyor ama hiç kullanılmıyor.
@@ -280,21 +280,21 @@ Kullanıcı yokken alınan kararlar:
   - Yazımları sıraya koymak.
   - Geçmişe kayıt aralığını alarm bekleme süresiyle aynı yapmak (60 sn).
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`bbb5562`), unit testleriyle birlikte. Geçmişe kayıt artık 60 sn'de bir yapılıyor.
 
 ### B30 — `VideoPlayerScreen`: `late` controller dispose'da çöküyor; `mounted` kontrolü yok
 - **Dosya:** `video_player_screen.dart:17, 43-52, 83, 97`.
 - **Nasıl ortaya çıkar:** Galerideki boş ya da eksik bir dosya açılınca LateInitializationError oluşur. 5 sn içinde geri çıkılırsa dispose sonrası `setState` çağrılır.
 - **Öneri:** Nullable controller, `mounted` kontrolü.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`d9d238c`).
 
 ### B31 — Galeri: thumbnail future'ları her build'de yeniden oluşturuluyor
 - **Dosya:** `video_gallery_screen.dart:201-202, 253-254`.
 - **Nasıl ortaya çıkar:** Her `setState` ya da kaydırmada tüm thumbnail'lar yeniden çıkarılır. Galeri yavaşlar ve temp klasör dolar.
 - **Öneri:** Future'ları dosya yoluna göre önbelleğe almak.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`865f0d6`).
 
 ### B32 — Offline "kayıt" aslında yaklaşık 15 sn'lik 320 px bir GIF
 - **Dosya:** `video_recorder_service.dart:161-197`.
@@ -309,7 +309,7 @@ Kullanıcı yokken alınan kararlar:
 - **Sorun:** Paralel yazımlar aynı kare indeksini kullanabiliyor. Stop sırasında yazım sürüyorsa PathNotFoundException fırlıyor.
 - **Öneri:** Sayacı await'ten önce artırmak, bekleyen yazımları stop'ta beklemek.
 - **Risk:** Düşük.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`da8efa9`).
 
 ### B34 — Kayıt hataları yutuluyor ve kullanıcıya "başarılı" mesajı gösteriliyor
 - **Dosya:** `video_recorder_service.dart:64-69, 133-135, 154-156`, `home_screen.dart` `_toggleRecording`. Başarı mesajı `videoGallery + recordings` metinlerinin birleştirilmesinden oluşuyor ve anlamsız.
@@ -348,12 +348,12 @@ Kullanıcı yokken alınan kararlar:
   - `home_screen.dart`: 'Video settings updated…' (1314), 'Baby crying / Noise detected' (1480), 'Bağlantı: ', 'Kamera Kapalı', 'Bağlantı Bekleniyor', 'BEBEK AĞLIYOR!'.
   - `multi_camera_screen.dart`: 'Tap the + button…', 'Add Camera'.
   - `webrtc_service.dart` ve `pairing_service.dart`: Türkçe hata mesajları (servislerde context yok).
-- **Durum:** Açık
+- **Durum:** Büyük kısmı düzeltildi (`e94e406`): home_screen ve multi_camera metinleri. Açık kalanlar: `webrtc_service.dart` ve `pairing_service.dart` içindeki Türkçe hata mesajları (servislerde context yok; hata kodu dönüp UI'da çevirmek gerekir) ve multi-camera'da `peer.status.name`.
 
 ### B41 — UI'da "Offline Mode (Wi-Fi Direct)" yazıyor
 - **Dosya:** `app_localizations.dart` (`offlineMode`, `locationPermissionRequired`).
 - **Sorun:** Wi-Fi Direct kaldırıldı, bu metinler artık yanlış.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`e94e406`). Yeni metinler: "Offline Mod (Nearby)" ve "Offline mod için konum izni gerekli".
 
 ### B42 — Bildirim izni açılışta açıklamasız isteniyor; reddedilirse uyarı yok
 - **Dosya:** `main.dart:19`, `notification_service.dart:50-60`.
@@ -379,7 +379,7 @@ Kullanıcı yokken alınan kararlar:
 - **Dosya:** `home_screen.dart:764, 822, 1026, 1116`.
 - **Sorun:** `DeviceInfoPlugin().androidInfo` çağrısının önünde platform kontrolü yok. nearby_connections da yalnızca Android'i destekliyor.
 - **Öneri:** iOS'ta offline başlatmayı engelleyip mesaj göstermek.
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`1ddeeb1`).
 
 ### B47 — Bildirim küçük ikonu `@mipmap/ic_launcher`
 - **Sorun:** Android'de beyaz kare olarak görünür.
