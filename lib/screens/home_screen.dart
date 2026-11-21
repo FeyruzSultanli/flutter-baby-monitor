@@ -1220,13 +1220,19 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _onDisconnected(String id) {
+    if (!mounted) return;
     setState(() {
       _connectedEndpointId = null;
       _currentImageBytesNotifier.value = null;
       _connectionStatus = ConnectionStatus.DISCONNECTED;
     });
     if (_role == DeviceRole.BABY) {
-      _controller?.stopImageStream();
+      // stopImageStream throws if no stream is running; never leave the
+      // future unhandled (B26).
+      if (_isStreaming) {
+        unawaited(_controller?.stopImageStream().catchError(
+            (Object e) => debugPrint('stopImageStream on disconnect failed: $e')));
+      }
       _isStreaming = false;
       _stopAudioStream();
     } else if (_role == DeviceRole.PARENT) {
