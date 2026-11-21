@@ -118,6 +118,12 @@ class PairingService {
     await roomRef.delete();
   }
 
+  /// Parent: FCM token and UI language for the Cloud Function that sends
+  /// push notifications for new cry alerts (D2).
+  Future<void> setViewerPushToken(String roomCode, String token, String locale) async {
+    await _rooms.doc(roomCode).update({'viewerFcmToken': token, 'viewerLocale': locale});
+  }
+
   /// The parent leaves the room; the baby closes the peer and waits (B08).
   Future<void> leaveRoom(String roomCode) async {
     await _rooms.doc(roomCode).update({'viewerSession': null, 'isPaired': false});

@@ -19,7 +19,6 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform, // <-- Bu satır kritik: Platform ayarlarını otomatik seçer
     );
-    await HybridNotificationManager().initialize();
     // Sign in early (anonymous, D3) so the first room create/join is fast.
     // Failures are retried when a room is created or joined.
     unawaited(AuthService.instance.ensureSignedIn().then<void>((_) {}, onError: (Object e) {
@@ -27,6 +26,13 @@ Future<void> main() async {
     }));
   } catch (e, st) {
     debugPrint('Firebase init failed: $e\n$st');
+  }
+
+  // Local notifications work even if Firebase failed to start (B43).
+  try {
+    await HybridNotificationManager().initialize();
+  } catch (e) {
+    debugPrint('Notification init failed: $e');
   }
 
   runApp(

@@ -34,8 +34,8 @@ abstract class SignalingInterface {
   /// Stream of incoming ICE Candidates.
   Stream<RTCIceCandidate> get onCandidate;
 
-  /// Sends an alert message.
-  Future<void> sendAlert(String title, String body);
+  /// Sends an alert message ([db]: noise level, used for push texts).
+  Future<void> sendAlert(String title, String body, {double? db});
 
   /// Stream of incoming alert messages.
   Stream<Map<String, dynamic>> get onAlert;

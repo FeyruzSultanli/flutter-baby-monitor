@@ -198,13 +198,14 @@ class FirestoreSignaling implements SignalingInterface {
   }
 
   @override
-  Future<void> sendAlert(String title, String body) async {
+  Future<void> sendAlert(String title, String body, {double? db}) async {
     if (_currentRoomId == null) return;
     await _rooms.doc(_currentRoomId).collection('alerts').add({
       'title': title,
       'body': body,
       'timestamp': FieldValue.serverTimestamp(),
       'expiresAt': _childExpiry(),
+      if (db != null && db.isFinite) 'db': db,
     });
   }
 }

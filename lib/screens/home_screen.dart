@@ -131,6 +131,10 @@ class _HomeScreenState extends State<HomeScreen>
   // Baby: keeps the active room's expiresAt in the future (TTL, D8).
   Timer? _roomHeartbeat;
 
+  // Parent: FCM token updates for the joined room (D2).
+  StreamSubscription<String>? _pushTokenSub;
+  bool _notificationPermissionWarned = false;
+
   bool _isFullscreen = false;
   bool _fullscreenCryOverlay = false;
 
@@ -177,6 +181,12 @@ class _HomeScreenState extends State<HomeScreen>
       upperBound: 1.1,
     )..repeat(reverse: true);
     
+    _pushTokenSub = HybridNotificationManager().onPushTokenRefresh.listen((token) {
+      final roomCode = _pairingState?.roomCode;
+      if (_role == DeviceRole.PARENT && _viewerSession != null && roomCode != null) {
+        unawaited(_registerPushToken(roomCode, token: token));
+      }
+    }, onError: (Object e) => debugPrint('Push token refresh error: $e'));
     _recorderService.onOfflineLimitReached = () {
       unawaited(_stopOfflineRecordingAtLimit());
     };
@@ -382,6 +392,7 @@ class _HomeScreenState extends State<HomeScreen>
     _thresholdSyncTimer?.cancel();
     _rejoinTimer?.cancel();
     _roomHeartbeat?.cancel();
+    _pushTokenSub?.cancel();
     _batteryStateSubscription?.cancel();
     // Resources that were not released before (B25).
     _noisePollTimer?.cancel();
@@ -505,6 +516,7 @@ class _HomeScreenState extends State<HomeScreen>
       _role = role;
     });
     if (role == DeviceRole.PARENT) {
+      unawaited(_ensureNotificationPermission());
       await _disposeCameraController();
     } else {
       unawaited(_restoreCameraIfIdle());
@@ -563,6 +575,7 @@ class _HomeScreenState extends State<HomeScreen>
       await pairing.joinRoom(roomCode, session: session);
       if (!mounted || token != _joinToken) return;
       await webrtc.startAsParent(roomCode, session: session);
+      unawaited(_registerPushToken(roomCode));
     } on RoomUnavailableException {
       // The room is gone (closed by the baby or expired): stop retrying.
       _viewerSession = null;
@@ -926,6 +939,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (token != _joinToken) return;
       _listenRoomUpdates(roomCode);
       await _webrtcService!.startAsParent(roomCode, session: session);
+      unawaited(_registerPushToken(roomCode));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppLocalizations.of(context).waitingForConnection}: $roomCode')),
@@ -1796,7 +1810,8 @@ class _HomeScreenState extends State<HomeScreen>
         if (alert && _takeCryNotificationSlot(now)) {
           HybridNotificationManager().sendAlert(
             AppLocalizations.of(context).babyCryAlert,
-            '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB'
+            '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB',
+            db: db,
           );
         }
       }
@@ -2036,6 +2051,36 @@ class _HomeScreenState extends State<HomeScreen>
     if (e is RoomUnavailableException) return l10n.roomUnavailable;
     if (e is AnonymousAuthDisabledException) return l10n.anonymousAuthDisabled;
     return '${l10n.error}: $e';
+  }
+
+  /// Parent: stores this device's FCM token and UI language in the room so
+  /// the Cloud Function can push cry alerts while the app is closed (D2).
+  Future<void> _registerPushToken(String roomCode, {String? token}) async {
+    final pairing = _pairingService;
+    if (pairing == null || _isOfflineMode) return;
+    final pushToken = token ?? await HybridNotificationManager().getPushToken();
+    if (pushToken == null || !mounted) return;
+    final locale = Localizations.localeOf(context).languageCode;
+    try {
+      await pairing.setViewerPushToken(roomCode, pushToken, locale);
+    } catch (e) {
+      debugPrint('Storing push token failed: $e');
+    }
+  }
+
+  /// Parent: notification permission is needed for cry alerts. Asked when
+  /// the parent role is used (not at app start), with a hint if denied (B42).
+  Future<void> _ensureNotificationPermission() async {
+    final granted = await HybridNotificationManager().requestPermission();
+    if (granted || !mounted || _notificationPermissionWarned) return;
+    _notificationPermissionWarned = true;
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.notificationsPermissionRequired),
+        action: SnackBarAction(label: l10n.settings, onPressed: () => openAppSettings()),
+      ),
+    );
   }
 
   void _startRoomHeartbeat(String roomCode) {

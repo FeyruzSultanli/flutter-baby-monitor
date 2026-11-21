@@ -34,13 +34,19 @@ class HybridNotificationManager {
     _signalingService = null;
   }
 
-  Future<void> sendAlert(String title, String body) async {
+  Future<void> sendAlert(String title, String body, {double? db}) async {
     if (_signalingService != null) {
-      await _signalingService!.sendAlert(title, body);
+      await _signalingService!.sendAlert(title, body, db: db);
     } else {
       debugPrint("Cannot send alert: No signaling service set");
     }
   }
+
+  Future<bool> requestPermission() => _notificationService.requestPermission();
+
+  Future<String?> getPushToken() => _notificationService.getFCMToken();
+
+  Stream<String> get onPushTokenRefresh => _notificationService.onTokenRefresh;
 
   Future<void> showLocalNotification({required String title, required String body}) async {
     await _notificationService.showLocalNotification(title: title, body: body);
