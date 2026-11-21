@@ -10,7 +10,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:noise_meter/noise_meter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:nearby_connections/nearby_connections.dart';
@@ -70,7 +69,6 @@ class _HomeScreenState extends State<HomeScreen>
   DeviceRole _role = DeviceRole.BABY;
 
   PairingService? _pairingService;
-  SignalingInterface? _signalingService;
   WebRTCService? _webrtcService;
   PairingState? _pairingState;
   ConnectionStatus _connectionStatus = ConnectionStatus.DISCONNECTED;
@@ -101,8 +99,6 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isAudioStreaming = false;
   bool _isPlayerRunning = false; // Track player state
 
-  NoiseMeter? _noiseMeter;
-  StreamSubscription<NoiseReading>? _noiseSub;
   bool _listeningNoise = false;
   double _currentDecibel = 0.0;
 
@@ -328,7 +324,6 @@ class _HomeScreenState extends State<HomeScreen>
     _batterySyncTimer?.cancel();
     _batteryStateSubscription?.cancel();
     _discoveryStreamController.close();
-    _noiseSub?.cancel();
     _controller?.dispose();
     _alertController.dispose();
     if (_role == DeviceRole.BABY && _pairingState?.roomCode != null) {
@@ -477,14 +472,12 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _webrtcService = null;
         _pairingService = null;
-        _signalingService = null;
       });
       // Let the frame without the old renderers be drawn before disposing them.
       await WidgetsBinding.instance.endOfFrame;
     } else {
       _webrtcService = null;
       _pairingService = null;
-      _signalingService = null;
     }
     HybridNotificationManager().clearSignalingService();
     try {
@@ -534,7 +527,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
       setState(() {
         _pairingService = pairing;
-        _signalingService = signaling;
         _webrtcService = webrtc;
         _firebaseReady = true;
         _pairingError = null;
@@ -663,44 +655,6 @@ class _HomeScreenState extends State<HomeScreen>
       await _restoreCameraIfIdle();
     }
     _refreshBottomSheet();
-  }
-
-  Future<void> _showJoinRoomDialog() async {
-    String enteredCode = '';
-    final l10n = AppLocalizations.of(context);
-
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(l10n.enterRoomCodeTitle),
-          content: TextField(
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              hintText: '1234',
-            ),
-            onChanged: (value) {
-              enteredCode = value.trim();
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l10n.connect),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!mounted) return;
-    if (enteredCode.isEmpty) return;
-    _parentRoomController.text = enteredCode;
-    await _joinRoomWithCode(enteredCode);
   }
 
   Future<void> _joinRoomWithCode([String? code]) async {
@@ -1545,9 +1499,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (!_listeningNoise) return;
     _noisePollTimer?.cancel();
     _noisePollTimer = null;
-    
-    await _noiseSub?.cancel();
-    _noiseSub = null;
+
     if (mounted) {
       setState(() {
         _listeningNoise = false;
@@ -1555,10 +1507,6 @@ class _HomeScreenState extends State<HomeScreen>
         _currentDecibel = 0.0;
       });
     }
-  }
-
-  void _onNoiseData(NoiseReading reading) {
-    _processNoiseLevel(reading.meanDecibel);
   }
 
   Future<void> _recordAlertIfNeeded(double? db) async {
@@ -1646,23 +1594,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  String _buildPairingSubtitle() {
-    final l10n = AppLocalizations.of(context);
-    if (_role == DeviceRole.BABY) {
-      final code = _pairingState?.roomCode;
-      if (code == null) {
-        return '${l10n.babyMode}. ${l10n.createRoomCode}.';
-      }
-      return '${l10n.babyMode}. ${l10n.roomCode}: $code';
-    } else {
-      final code = _pairingState?.roomCode;
-      if (code == null) {
-        return '${l10n.parentMode}. ${l10n.enterRoomCode}.';
-      }
-      return '${l10n.parentMode}. ${l10n.roomCode}: $code';
-    }
-  }
-
   String _connectionStatusLabel() {
     final l10n = AppLocalizations.of(context);
     switch (_connectionStatus) {
@@ -1688,35 +1619,6 @@ class _HomeScreenState extends State<HomeScreen>
       case ConnectionStatus.DISCONNECTED:
         return scheme.outline;
     }
-  }
-
-  String _statusText(bool canShowPreview) {
-    final l10n = AppLocalizations.of(context);
-    if (!_firebaseReady) {
-      return l10n.firebaseConfigMissing;
-    }
-    if (_connectionStatus == ConnectionStatus.CONNECTING) {
-      return '${l10n.waitingForConnection}';
-    }
-    if (_connectionStatus == ConnectionStatus.CONNECTED) {
-      return '${l10n.connected}.';
-    }
-    if (_connectionStatus == ConnectionStatus.FAILED) {
-      return _pairingError ?? '${l10n.error}.';
-    }
-    if (_previewPaused) {
-      return '${l10n.cameraPreview} ${l10n.stop}.';
-    }
-    if (canShowPreview) {
-      if (_noiseAlert) {
-        return '${l10n.noiseDetected} (≈ ${_currentDecibel.toStringAsFixed(1)} dB).';
-      }
-      if (_listeningNoise) {
-        return '${l10n.noiseLevel} (≈ ${_currentDecibel.toStringAsFixed(1)} dB).';
-      }
-      return '${l10n.cameraPreview}.';
-    }
-    return _message ?? l10n.loading;
   }
 
   Future<void> _setKeepScreenOn(bool value) async {
