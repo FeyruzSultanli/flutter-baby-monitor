@@ -58,18 +58,19 @@ class FirestoreSignaling implements SignalingInterface {
       final data = doc.data();
       if (data == null) return;
 
-      // Check for Offer
-      if (data.containsKey('offer')) {
-        final offerMap = data['offer'];
+      // Check for Offer. New rooms store `offer: null` (B21), so only a map
+      // counts as an offer.
+      final offerMap = data['offer'];
+      if (offerMap is Map) {
         final offer = RTCSessionDescription(offerMap['sdp'], offerMap['type']);
         // If we receive an offer we did not send ourselves, we are the callee
         if (!_sentOffer) _isCaller = false;
         _onOfferController.add(offer);
       }
 
-      // Check for Answer
-      if (data.containsKey('answer')) {
-        final answerMap = data['answer'];
+      // Check for Answer (also `null` until the parent answers)
+      final answerMap = data['answer'];
+      if (answerMap is Map) {
         final answer = RTCSessionDescription(answerMap['sdp'], answerMap['type']);
         _onAnswerController.add(answer);
       }
