@@ -253,3 +253,20 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 12.23 | B36 | Bağlıyken B'nin Wi-Fi'ını 5 sn kapatıp açın. | E'de kısa süre "bağlanıyor", sonra görüntü geri gelir; hata mesajı çıkmaz. | ✅/❌ |
 | 12.24 | B08 | Bağlıyken B'de "Bağlantıyı kes" (oda silinir). | E bir süre yeniden dener, sonra "Bebek cihazı odayı kapattı" mesajıyla durur. | ✅/❌ |
 | 12.25 | B08 | B yayın yapıyor, E henüz bağlanmadı: B'nin yanında ağlama sesi. | B'nin ses çubuğu hareket eder (bekleme peer'ı ses seviyesini ölçüyor). | ✅/❌ |
+
+### 12B. D3 + D8 (güvenlik, yeni oda kodu)
+
+> **Sıra önemli:** (1) Firebase konsolunda Anonymous girişi açın, (2) iki telefona yeni sürümü kurun, (3) 12.26–12.31'i mevcut kurallarla test edin, (4) kuralları yayınlayın, (5) 12.32–12.35'i test edin.
+
+| # | Değişiklik | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| 12.26 | D3 kod (`0d37d40`) | B: "Oda kodu oluştur". | Kod `ABCD-EF23` biçiminde, 8 karakter; altında "10 dakika içinde girin" ipucu. | ✅/❌ |
+| 12.27 | D3 | E: kodu küçük harfle ve tiresiz girin (ör. `abcdef23`). | Bağlanır (büyük harfe çevrilir, tire yok sayılır). | ✅/❌ |
+| 12.28 | D3 | E: yanlış bir kod girin. | "Kod hatalı, süresi dolmuş veya başka bir cihazla eşleşmiş" mesajı; otomatik yeniden deneme yok. | ✅/❌ |
+| 12.29 | D3 | Anonymous giriş kapalıyken (ilk kurulumda, konsolda açmadan) kod oluşturmayı deneyin. | "Bu uygulama için giriş açık değil (Firebase: Anonim giriş)" mesajı. *(İsteğe bağlı)* | ✅/❌ |
+| 12.30 | D8 | Yayın sırasında Firebase konsolunda odayı açın. | `expiresAt` ≈ şimdi + 24 sa; adaylar ve alarmlarda da `expiresAt` var; `cryUpdated` ~5 sn'de bir değişiyor. | ✅/❌ |
+| 12.31 | D3 | Konsolda odanın `ownerUid` ve (E bağlanınca) `viewerUid` alanları dolu. | İki farklı uid. | ✅/❌ |
+| 12.32 | D3 kurallar yayınlandıktan sonra | 12.26 + 12.27'yi tekrarlayın, sonra 10 dk bekleyen bir kodla katılmayı deneyin. | Normal akış çalışır; 10 dk'dan eski, kullanılmamış kod "geçersiz/süresi dolmuş" verir. | ✅/❌ |
+| 12.33 | D3 | Üçüncü bir telefonla (veya E'de uygulama verisini silip) aynı kodla katılmayı deneyin. | Reddedilir; B ile E'nin bağlantısı etkilenmez. | ✅/❌ |
+| 12.34 | D3 + B08 | E çıkıp aynı kodla tekrar katılsın (12.19). | Kurallar varken de çalışır (aynı uid). | ✅/❌ |
+| 12.35 | D3 | Uygulama logunda `PERMISSION_DENIED` / `permission-denied` arayın (normal akışta). | Yok (yalnızca 12.28/12.32/12.33'te beklenir). | ✅/❌ |

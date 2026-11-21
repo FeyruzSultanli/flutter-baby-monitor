@@ -12,9 +12,36 @@
 | 2 | D1-a gece modu | ✅ `cb3b3e8` (paket: `screen_brightness ^2.1.11`) |
 | 3 | D5 alarm eşiği (≥2 sn + tek dB formülü + ayarlanabilir eşik) | ✅ `9a0c363` (tek ölçek), `bfc5f26` (2 sn), `04ce566` (eşik senkronu) |
 | 4 | B08 yeniden katılma | ✅ `dd72f41` (B36 dahil) + inceleme düzeltmeleri `854e0a3` |
-| 5 | D3 + D8 (auth, kurallar, süreli kod, TTL) | ⏳ |
+| 5 | D3 + D8 (auth, kurallar, süreli kod, TTL) | ✅ Kod hazır: `d65bc86` (kurallar + 27 emülatör testi), `0d37d40` (uygulama). **Konsol adımları sizde, aşağıda.** |
 | 6 | D2 FCM (uygulama tarafı + Function kodu; deploy Blaze kararından sonra) | ⏳ |
 | 7 | D1-b foreground service | ⏸ Başlamadan önce kullanıcıya sorulacak (yarım günlük cihaz denemesi) |
+
+### D3 + D8 için konsol adımları (bu sırayla)
+
+1. **Authentication → Sign-in method → Anonymous → Enable.**
+2. Yeni APK'yı iki telefona kurun. TEST_PLAN 12.26–12.31'i uygulayın; bu aşamada eski, açık kurallar geçerli.
+3. **Kuralları yayınlayın.** Bundan sonra eski sürüm uygulamalar çalışmaz. İki yoldan biri:
+   - Komut satırından (`login` yalnızca ilk seferde gerekir):
+
+     ```bash
+     cd firestore-tests && npx firebase login
+     ```
+
+     ```bash
+     npx firebase deploy --only firestore:rules --project bebekmonitor-282fd
+     ```
+
+   - Ya da `firestore.rules` içeriğini **Firestore → Rules** sekmesine yapıştırıp **Publish**'e basın.
+4. **Firestore → TTL policies → Create policy.** Dört politika gerekiyor:
+   - collection group `rooms`, alan `expiresAt`
+   - collection group `callerCandidates`, alan `expiresAt`
+   - collection group `calleeCandidates`, alan `expiresAt`
+   - collection group `alerts`, alan `expiresAt`
+
+   TTL silme işlemi, süre dolduktan sonra 24 saat içinde gerçekleşir.
+5. TEST_PLAN 12.32–12.35.
+
+Kural testlerini yerelde tekrar çalıştırmak için `firestore-tests/README.md`'ye bakın. Testler emülatörde çalışır; Android Studio JDK'sı kullanılır ve gerçek projeye dokunulmaz.
 
 Kararlar (kullanıcı):
 - D4 bekliyor: önce farklı ağ testi, sonra Blaze kararıyla birlikte değerlendirilecek.

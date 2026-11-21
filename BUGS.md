@@ -70,7 +70,7 @@ Kullanıcı yokken alınan kararlar:
 - **Nasıl ortaya çıkar:** Odalar toplu olarak listelenebilir ya da kaba kuvvetle denenebilir (900 bin olasılık).
 - **Öneri:** Bkz. D3.
 - **Risk:** Orta.
-- **Durum:** Karar bekliyor. Konsoldaki kurallar doğrulanmalı.
+- **Durum:** Kod hazır (`d65bc86` kurallar + 27 emülatör testi, `0d37d40` uygulama), karar D3. Anonim giriş, 8 karakterli kod, 10 dk talep süresi (sunucu saatiyle), yalnızca eşleşmiş iki cihaz erişebiliyor, oda listeleme kapalı. **Konsolda sizin yapmanız gerekenler:** (1) Anonymous sign-in'i açın, (2) yeni sürümü iki telefona kurun, (3) kuralları yayınlayın. Sırası PLAN_NEXT.md'de. Cihazda doğrulanmalı.
 
 ## Yüksek
 
@@ -339,7 +339,7 @@ Kullanıcı yokken alınan kararlar:
 ### B38 — Firestore'da terk edilmiş odalar ve adaylar silinmiyor
 - **Sorun:** Uygulama çökerse ya da öldürülürse `closeRoom` hiç çalışmıyor. TTL ve temizlik görevi yok. Oda dokümanı her 2 sn'de bir yazılıyor; bu da maliyet demek.
 - **Öneri:** Bkz. D8.
-- **Durum:** Karar bekliyor
+- **Durum:** Kod hazır (`0d37d40`, karar D8): oda, adaylar ve alarmlar `expiresAt` alanı taşıyor; bebek yayın sürerken süreyi saatte bir uzatıyor; ağlama durumu 2 sn yerine 5 sn'de bir yazılıyor. **Konsolda TTL politikası tanımlanmalı** (PLAN_NEXT).
 
 ### B39 — Offline bağlantı kopunca otomatik yeniden bağlanma yok
 - **Dosya:** `home_screen.dart:1157` (`_onDisconnected`).
