@@ -115,6 +115,10 @@ class _HomeScreenState extends State<HomeScreen>
   void Function(void Function())? _bottomSheetSetState;
   StreamSubscription<PairingState>? _roomSub;
   bool _lastCryAlertSent = false;
+  // Cry notifications (Firestore alert docs / local notifications) are rate
+  // limited so a long cry does not produce a notification every 2 s (B05).
+  static const Duration _cryNotificationCooldown = Duration(seconds: 60);
+  DateTime? _lastCryNotificationAt;
   DateTime? _lastCrySentAt;
   DateTime? _lastRecordedAlertTime;
 
@@ -589,7 +593,19 @@ class _HomeScreenState extends State<HomeScreen>
     });
     _lastCryAlertSent = false;
     _lastCrySentAt = null;
+    _lastCryNotificationAt = null;
     _refreshBottomSheet();
+  }
+
+  /// Returns true (and starts a new cooldown) if a cry notification may be
+  /// sent now; false while the previous one is still within the cooldown.
+  bool _takeCryNotificationSlot(DateTime now) {
+    final last = _lastCryNotificationAt;
+    if (last != null && now.difference(last) < _cryNotificationCooldown) {
+      return false;
+    }
+    _lastCryNotificationAt = now;
+    return true;
   }
 
   Future<void> _createRoomCode() async {
@@ -1216,10 +1232,12 @@ class _HomeScreenState extends State<HomeScreen>
            
            if (alert && !_fullscreenCryOverlay) {
               _recordAlertIfNeeded(db);
-              HybridNotificationManager().showLocalNotification(
-                title: AppLocalizations.of(context).babyCryAlert, 
-                body: '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB'
-              );
+              if (_takeCryNotificationSlot(DateTime.now())) {
+                HybridNotificationManager().showLocalNotification(
+                  title: AppLocalizations.of(context).babyCryAlert,
+                  body: '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB'
+                );
+              }
               setState(() {
                 _fullscreenCryOverlay = true;
               });
@@ -1517,7 +1535,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         );
 
-        if (alert) {
+        if (alert && _takeCryNotificationSlot(now)) {
           HybridNotificationManager().sendAlert(
             AppLocalizations.of(context).babyCryAlert,
             '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB'
