@@ -26,6 +26,14 @@ class HybridNotificationManager {
     });
   }
 
+  /// Stops forwarding alerts from the previous signaling service (e.g. when
+  /// switching to offline mode, where alerts arrive over Nearby instead).
+  void clearSignalingService() {
+    _alertSub?.cancel();
+    _alertSub = null;
+    _signalingService = null;
+  }
+
   Future<void> sendAlert(String title, String body) async {
     if (_signalingService != null) {
       await _signalingService!.sendAlert(title, body);

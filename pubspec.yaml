@@ -21,7 +21,6 @@ dependencies:
   firebase_core: ^3.6.0
   cloud_firestore: ^5.4.4
   flutter_webrtc: ^0.12.5
-  flutter_p2p_connection: ^3.0.3
   nearby_connections: ^4.3.0
   device_info_plus: 9.1.2
   image: ^4.7.2

@@ -23,7 +23,6 @@ lib/
     webrtc/
       signaling_interface.dart       Ortak arayüz (offer/answer/candidate/alert stream'leri)
       firestore_signaling.dart       Online signaling (rooms/{id}, callerCandidates/calleeCandidates, alerts)
-      wifi_direct_signaling_service.dart  flutter_p2p_connection tabanlı signaling (bkz. Bilinen kısıtlar)
       webrtc_service.dart            Tek peer bağlantı, renderer'lar, STUN: stun.l.google.com
       multi_peer_service.dart        Çoklu peer yönetimi
       signaling_service.dart         Eski/ek Firestore signaling yardımcıları
@@ -63,9 +62,8 @@ flutter build apk --debug
 
 ## Bilinen kısıtlar
 
-- Offline mod (Nearby Connections / Wi-Fi Direct) **sadece Android**'de çalışır.
+- Offline mod (Nearby Connections: Bluetooth + Wi-Fi) **sadece Android**'de çalışır. Offline modda `WebRTCService` oluşturulmaz.
 - Kamera, mikrofon, WebRTC ve P2P **emülatörde/simülatörde güvenilir çalışmaz**; gerçek cihazda test et.
-- `WifiDirectSignalingService` offline modda oluşturuluyor ama `setP2P(...)` hiçbir yerde çağrılmıyor; offline yayın fiilen Nearby byte payload'larıyla yapılıyor. `flutter_p2p_connection` bu yüzden pratikte kullanılmıyor.
 - `pubspec.lock` repoda yoktu (`.gitignore`'da `*.lock`), paket sürümleri zamanla kayabilir.
 - `home_screen.dart` çok büyük; değişiklik yaparken ilgili bölümü dikkatle bul, istenmeden büyük refactor yapma.
 - `flutter analyze` 0 hata verir, ancak ~23 warning (kullanılmayan alan/metot/değişken, gereksiz `!`/null kontrolü) ve ~41 info (`withOpacity`, `surfaceVariant`, `Share` deprecations; `use_build_context_synchronously`; enum isimlendirme) vardır.

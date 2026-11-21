@@ -29,7 +29,6 @@ import '../core/pairing/pairing_service.dart';
 import '../core/pairing/pairing_state.dart';
 import '../core/webrtc/signaling_interface.dart';
 import '../core/webrtc/firestore_signaling.dart';
-import '../core/webrtc/wifi_direct_signaling_service.dart';
 import '../models/alert_model.dart';
 import '../core/alert_history_service.dart';
 import 'alert_history_screen.dart';
@@ -469,28 +468,58 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  /// Disposes the current WebRTC service (if any) after the UI stopped
+  /// referencing its renderers. Called when switching online/offline mode.
+  Future<void> _disposeWebRtcService() async {
+    final previous = _webrtcService;
+    if (previous == null) return;
+    if (mounted) {
+      setState(() {
+        _webrtcService = null;
+        _pairingService = null;
+        _signalingService = null;
+      });
+      // Let the frame without the old renderers be drawn before disposing them.
+      await WidgetsBinding.instance.endOfFrame;
+    } else {
+      _webrtcService = null;
+      _pairingService = null;
+      _signalingService = null;
+    }
+    HybridNotificationManager().clearSignalingService();
+    try {
+      await previous.dispose();
+    } catch (e) {
+      debugPrint('WebRTC dispose failed: $e');
+    }
+  }
+
   Future<void> _initCoreServices() async {
     try {
-      SignalingInterface signaling;
-      PairingService? pairing;
+      await _disposeWebRtcService();
+      if (!mounted) return;
 
       if (_isOfflineMode) {
-        signaling = WifiDirectSignalingService();
-        pairing = null;
-      } else {
-        // Firebase is required for Firestore; if not initialized, pairing stays disabled.
-        if (Firebase.apps.isEmpty) {
-          setState(() {
-            _firebaseReady = false;
-            _pairingError =
-                AppLocalizations.of(context).firebaseConfigMissing;
-          });
-          return;
-        }
-
-        pairing = PairingService();
-        signaling = FirestoreSignaling();
+        // Offline mode streams over Nearby Connections directly; WebRTC is not used.
+        setState(() {
+          _firebaseReady = Firebase.apps.isNotEmpty;
+          _pairingError = null;
+        });
+        return;
       }
+
+      // Firebase is required for Firestore; if not initialized, pairing stays disabled.
+      if (Firebase.apps.isEmpty) {
+        setState(() {
+          _firebaseReady = false;
+          _pairingError =
+              AppLocalizations.of(context).firebaseConfigMissing;
+        });
+        return;
+      }
+
+      final PairingService pairing = PairingService();
+      final SignalingInterface signaling = FirestoreSignaling();
 
       final webrtc = WebRTCService(
         signalingService: signaling,
@@ -499,12 +528,15 @@ class _HomeScreenState extends State<HomeScreen>
         onError: _handlePairingError,
       );
       await webrtc.initRenderers();
-      if (!mounted) return;
+      if (!mounted) {
+        await webrtc.dispose();
+        return;
+      }
       setState(() {
         _pairingService = pairing;
         _signalingService = signaling;
         _webrtcService = webrtc;
-        _firebaseReady = !_isOfflineMode || Firebase.apps.isNotEmpty;
+        _firebaseReady = true;
         _pairingError = null;
       });
       
