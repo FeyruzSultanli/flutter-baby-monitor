@@ -80,9 +80,10 @@ bool showsConnected() {
 }
 
 /// Leaves the current route (screens without a standard back button).
+/// Never pops the home screen itself.
 Future<void> goBack(WidgetTester tester) async {
   final navigator = tester.state<NavigatorState>(find.byType(Navigator).first);
-  navigator.pop();
+  if (navigator.canPop()) navigator.pop();
   await tester.pump(const Duration(milliseconds: 500));
 }
 

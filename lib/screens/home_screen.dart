@@ -146,6 +146,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   void Function(void Function())? _bottomSheetSetState;
   BuildContext? _bottomSheetContext;
+  bool _disposing = false;
   StreamSubscription<PairingState>? _roomSub;
   bool _lastCryAlertSent = false;
   // Cry notifications (Firestore alert docs / local notifications) are rate
@@ -386,6 +387,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    // Services stopped below report status changes synchronously (e.g.
+    // WebRTCService.hangUp -> DISCONNECTED); `mounted` is still true during
+    // dispose, so the handlers check this flag instead (B62).
+    _disposing = true;
     if (_recorderService.isRecording) {
       unawaited(_recorderService.stopAny().catchError(
           (Object e) => debugPrint('Stopping recording on dispose failed: $e')));
@@ -528,7 +533,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _handleConnectionStatus(ConnectionStatus status) {
-    if (!mounted) return;
+    if (!mounted || _disposing) return;
     setState(() {
       _connectionStatus = status;
       if (status == ConnectionStatus.CONNECTED ||
@@ -594,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _handlePairingError(String message) {
-    if (!mounted) return;
+    if (!mounted || _disposing) return;
     setState(() {
       _pairingError = message;
       _connectionStatus = ConnectionStatus.FAILED;

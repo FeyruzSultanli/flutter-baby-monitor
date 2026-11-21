@@ -9,6 +9,7 @@ import 'package:bebek_monitor_clean/core/firebase/emulator_config.dart';
 import 'package:bebek_monitor_clean/core/pairing/room_code.dart';
 import 'package:bebek_monitor_clean/firebase_options.dart';
 import 'package:bebek_monitor_clean/main.dart' as app;
+import 'package:bebek_monitor_clean/screens/video_gallery_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -274,10 +275,13 @@ void main() {
     } else {
       result('recording_start_stop_no_crash', 'record button not shown');
     }
-    await tester.tap(find.byIcon(Icons.video_library_rounded));
-    await pumpFor(tester, const Duration(seconds: 3));
+    await tester.tap(find.byIcon(Icons.video_library_rounded).first);
+    final galleryOpen = await pumpUntil(
+        tester, () => find.byType(VideoGalleryScreen).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
+    await pumpFor(tester, const Duration(seconds: 2));
     screenshot('parent_12_gallery');
-    result('gallery_opens', true);
+    result('gallery_opens', galleryOpen);
     await goBack(tester);
     await pumpFor(tester, const Duration(seconds: 1));
 
