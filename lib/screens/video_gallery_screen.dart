@@ -102,7 +102,9 @@ class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
   Future<void> _shareVideo(String path) async {
     final l10n = AppLocalizations.of(context);
     try {
-      await Share.shareXFiles([XFile(path)], text: '${l10n.appTitle} ${l10n.recordings}');
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(path)], text: '${l10n.appTitle} ${l10n.recordings}'),
+      );
     } catch (e) {
       debugPrint('Error sharing video: $e');
       if (mounted) {
@@ -129,7 +131,7 @@ class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            color: Colors.amber.withOpacity(0.1),
+            color: Colors.amber.withValues(alpha: 0.1),
             child: Row(
               children: [
                 const Icon(Icons.info_outline, color: Colors.amber, size: 20),

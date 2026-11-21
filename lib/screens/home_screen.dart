@@ -1893,7 +1893,7 @@ class _HomeScreenState extends State<HomeScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: scheme.surfaceVariant.withValues(alpha: 0.2),
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
           ),
@@ -2016,7 +2016,7 @@ class _HomeScreenState extends State<HomeScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: scheme.surfaceVariant.withValues(alpha: 0.3),
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text('${l10n.roomCode}: ${_formatRoomCode(roomCode)}'),
@@ -2034,7 +2034,7 @@ class _HomeScreenState extends State<HomeScreen>
         Container(
           height: 220,
           decoration: BoxDecoration(
-            color: scheme.surfaceVariant.withValues(alpha: 0.25),
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
           ),
@@ -2234,7 +2234,7 @@ class _HomeScreenState extends State<HomeScreen>
               child: IgnorePointer(
                 ignoring: true, // Allows clicks to pass through to the buttons below
                 child: Container(
-                  color: Colors.black.withOpacity(0.8), // Simulates brightness dropping to ~20%
+                  color: Colors.black.withValues(alpha: 0.8), // Simulates brightness dropping to ~20%
                 ),
               ),
             ),
@@ -2367,7 +2367,7 @@ class _HomeScreenState extends State<HomeScreen>
                   boxShadow: _role == DeviceRole.BABY
                       ? [
                           BoxShadow(
-                            color: scheme.primary.withOpacity(0.3),
+                            color: scheme.primary.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           )
@@ -2398,7 +2398,7 @@ class _HomeScreenState extends State<HomeScreen>
                   boxShadow: _role == DeviceRole.PARENT
                       ? [
                           BoxShadow(
-                            color: scheme.primary.withOpacity(0.3),
+                            color: scheme.primary.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           )
@@ -2438,7 +2438,7 @@ class _HomeScreenState extends State<HomeScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -2528,7 +2528,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.8),
+                      color: Colors.red.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -2559,7 +2559,7 @@ class _HomeScreenState extends State<HomeScreen>
             // Cry Alert Overlay
             if (_noiseAlert)
               Container(
-                color: Colors.red.withOpacity(0.3),
+                color: Colors.red.withValues(alpha: 0.3),
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -2600,7 +2600,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.black.withOpacity(0.4),
+          color: active ? Colors.white : Colors.black.withValues(alpha: 0.4),
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -2651,7 +2651,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: scheme.primary.withOpacity(0.1),
+                    color: scheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -2813,10 +2813,10 @@ class _HomeScreenState extends State<HomeScreen>
     bool isOutlined = false,
   }) {
     return Material(
-      color: isOutlined ? Colors.transparent : color.withOpacity(0.1),
+      color: isOutlined ? Colors.transparent : color.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: isOutlined ? BorderSide(color: color.withOpacity(0.5)) : BorderSide.none,
+        side: isOutlined ? BorderSide(color: color.withValues(alpha: 0.5)) : BorderSide.none,
       ),
       child: InkWell(
         onTap: onTap,

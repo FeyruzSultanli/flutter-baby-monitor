@@ -99,7 +99,7 @@ class _MultiCameraScreenState extends State<MultiCameraScreen> {
                     Icon(
                       Icons.camera_alt_outlined,
                       size: 80,
-                      color: scheme.primary.withOpacity(0.5),
+                      color: scheme.primary.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 24),
                     Text(
