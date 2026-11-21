@@ -1,0 +1,6 @@
+/* İzin metinleri (Türkçe). Anahtarlar Info.plist'ten. */
+"NSCameraUsageDescription" = "Bebek Monitor, bebeğin görüntüsünü ebeveyn telefonunda göstermek için kamerayı kullanır.";
+"NSMicrophoneUsageDescription" = "Bebek Monitor, sesi iletmek ve ağlamayı algılamak için mikrofonu kullanır.";
+"NSPhotoLibraryAddUsageDescription" = "Bebek Monitor, kayıtlarınızı fotoğraf arşivine kaydeder.";
+"NSPhotoLibraryUsageDescription" = "Bebek Monitor, kayıtları kaydetmek için fotoğraf arşivine erişmek ister.";
+"NSLocalNetworkUsageDescription" = "Bebek Monitor, daha hızlı görüntü için yerel ağınızdaki diğer telefona doğrudan bağlanır.";
