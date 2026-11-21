@@ -6,6 +6,7 @@ import 'package:bebek_monitor_clean/providers/language_provider.dart';
 import 'package:bebek_monitor_clean/providers/theme_provider.dart';
 import 'package:bebek_monitor_clean/widgets/noise_level_bar.dart';
 import 'package:bebek_monitor_clean/widgets/settings_sheet.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,4 +107,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(_tr('passive')), findsOneWidget);
   });
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets('SettingsSheet offline option on $platform', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      await tester.pumpWidget(_host(
+        SettingsSheet(
+          noiseThreshold: 60,
+          keepScreenOn: false,
+          onNoiseThresholdChanged: (_) {},
+          onKeepScreenOnChanged: (_) {},
+          onOfflineModeChanged: (_) {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final isAndroid = platform == TargetPlatform.android;
+      // Android: a real switch. iOS: an explanation, no switch (Nearby is Android only).
+      expect(find.widgetWithText(SwitchListTile, _tr('offlineMode')),
+          isAndroid ? findsOneWidget : findsNothing);
+      expect(find.byKey(const Key('offlineUnavailableTile')),
+          isAndroid ? findsNothing : findsOneWidget);
+      expect(find.text(_tr('offlineAndroidOnly')), isAndroid ? findsNothing : findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
 }

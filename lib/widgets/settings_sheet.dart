@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
@@ -129,13 +130,25 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
             const SizedBox(height: 20),
             if (widget.onOfflineModeChanged != null) ...[
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(l10n.offlineMode),
-                subtitle: Text(l10n.offlineModeSubtitle),
-                value: widget.isOfflineMode,
-                onChanged: widget.onOfflineModeChanged,
-              ),
+              // Offline mode uses Nearby Connections, which exists only on
+              // Android: on other platforms explain instead of offering it.
+              if (defaultTargetPlatform == TargetPlatform.android)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.offlineMode),
+                  subtitle: Text(l10n.offlineModeSubtitle),
+                  value: widget.isOfflineMode,
+                  onChanged: widget.onOfflineModeChanged,
+                )
+              else
+                ListTile(
+                  key: const Key('offlineUnavailableTile'),
+                  contentPadding: EdgeInsets.zero,
+                  enabled: false,
+                  leading: const Icon(Icons.wifi_off_rounded),
+                  title: Text(l10n.offlineMode),
+                  subtitle: Text(l10n.offlineAndroidOnly),
+                ),
               const Divider(),
             ],
 

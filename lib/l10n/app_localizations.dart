@@ -165,6 +165,8 @@ class AppLocalizations {
       'offlineRecordingInfo': 'Offline recordings are silent, low-resolution GIFs. Maximum length',
       'offlineRecordingLimitReached': 'Offline recording reached its time limit and was saved',
       'nightModeExitHint': 'Night mode. Double-tap to exit',
+      'nightModeAction': 'Night mode',
+      'iosCameraForegroundHint': 'On iPhone the camera stops when the app is closed or the screen locks. Use night mode and keep the app open',
       'nightModeKeepAppOpen': 'Keep the app open and do not lock the screen, or the stream stops',
       'autoNightMode': 'Night mode when connected',
       'autoNightModeSubtitle': 'Baby device: screen turns black at minimum brightness once the parent connects',
@@ -325,6 +327,8 @@ class AppLocalizations {
       'offlineRecordingInfo': 'Offline kayıtlar sessiz ve düşük çözünürlüklü GIF olur. En fazla süre',
       'offlineRecordingLimitReached': 'Offline kayıt süre sınırına ulaştı ve kaydedildi',
       'nightModeExitHint': 'Gece modu. Çıkmak için iki kez dokunun',
+      'nightModeAction': 'Gece modu',
+      'iosCameraForegroundHint': 'iPhone\'da uygulama kapanınca veya ekran kilitlenince kamera durur. Gece modunu kullanın ve uygulamayı açık bırakın',
       'nightModeKeepAppOpen': 'Yayının sürmesi için uygulamayı açık bırakın ve ekranı kilitlemeyin',
       'autoNightMode': 'Bağlanınca gece moduna geç',
       'autoNightModeSubtitle': 'Bebek cihazı: ebeveyn bağlanınca ekran en düşük parlaklıkta kararır',
@@ -486,6 +490,8 @@ class AppLocalizations {
   String get offlineRecordingInfo => _localizedValues[locale.languageCode]!['offlineRecordingInfo']!;
   String get offlineRecordingLimitReached => _localizedValues[locale.languageCode]!['offlineRecordingLimitReached']!;
   String get nightModeExitHint => _localizedValues[locale.languageCode]!['nightModeExitHint']!;
+  String get nightModeAction => _localizedValues[locale.languageCode]!['nightModeAction']!;
+  String get iosCameraForegroundHint => _localizedValues[locale.languageCode]!['iosCameraForegroundHint']!;
   String get nightModeKeepAppOpen => _localizedValues[locale.languageCode]!['nightModeKeepAppOpen']!;
   String get autoNightMode => _localizedValues[locale.languageCode]!['autoNightMode']!;
   String get autoNightModeSubtitle => _localizedValues[locale.languageCode]!['autoNightModeSubtitle']!;

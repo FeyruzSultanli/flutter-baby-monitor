@@ -882,6 +882,21 @@ class _HomeScreenState extends State<HomeScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppLocalizations.of(context).roomCode}: ${RoomCode.format(newCode)}')),
       );
+      // iOS stops the camera as soon as the app leaves the foreground, so
+      // suggest night mode (screen stays on, black) for the baby phone.
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 8),
+            content: Text(l10n.iosCameraForegroundHint),
+            action: SnackBarAction(
+              label: l10n.nightModeAction,
+              onPressed: () => unawaited(_enterNightMode()),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       final message = _pairingErrorText(e);
@@ -3138,8 +3153,11 @@ class _HomeScreenState extends State<HomeScreen>
             color: Colors.redAccent,
           ),
         ],
+        // Online/offline switch: offline (Nearby Connections) is Android only.
+        if (defaultTargetPlatform == TargetPlatform.android)
         _buildControlCard(
           scheme,
+          key: const Key('modeToggleButton'),
           icon: _isOfflineMode ? Icons.wifi_off_rounded : Icons.wifi_rounded,
           label: _isOfflineMode ? l10n.offlineMode : l10n.onlineMode,
           onTap: () async {
