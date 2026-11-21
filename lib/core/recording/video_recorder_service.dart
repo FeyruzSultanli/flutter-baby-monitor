@@ -15,8 +15,28 @@ class VideoRecorderService {
   String? _offlineTempDir;
   int _frameCount = 0;
 
+  String? _webrtcFilePath;
+
   // Common
   bool get isRecording => _mediaRecorder != null || _isOfflineRecording;
+
+  /// Stops whichever recording is active (WebRTC or offline), regardless of
+  /// the app's current mode (B14). No-op when not recording.
+  Future<void> stopAny() async {
+    if (_isOfflineRecording) {
+      await stopOfflineRecording();
+    }
+    final webrtcPath = _webrtcFilePath;
+    if (_mediaRecorder != null && webrtcPath != null) {
+      await stopWebRTCRecording(webrtcPath);
+    } else if (_mediaRecorder != null) {
+      try {
+        await _mediaRecorder!.stop();
+      } finally {
+        _mediaRecorder = null;
+      }
+    }
+  }
 
   /// Starts recording a WebRTC MediaStream.
   /// Returns the path where the video is being recorded.
@@ -32,26 +52,43 @@ class VideoRecorderService {
     final fileName = 'webrtc_rec_${DateTime.now().millisecondsSinceEpoch}.mp4';
     final filePath = '${recordingsDir.path}/$fileName';
 
-    _mediaRecorder = MediaRecorder();
-    
+    final videoTracks = stream.getVideoTracks();
+    if (videoTracks.isEmpty) {
+      throw Exception('No video track to record');
+    }
+
+    final recorder = MediaRecorder();
+    _mediaRecorder = recorder;
+
     // Start recording
-    // Note: flutter_webrtc MediaRecorder.start only takes videoTrack in this version.
-    // Audio recording might depend on the platform implementation or require a different approach.
-    // For now, we proceed with videoTrack only to ensure the app builds and records video.
-    await _mediaRecorder!.start(
-      filePath, 
-      videoTrack: stream.getVideoTracks().first,
-    );
-    
+    // Note: audio is not recorded yet (see BUGS.md B16).
+    try {
+      await recorder.start(
+        filePath,
+        videoTrack: videoTracks.first,
+      );
+    } catch (_) {
+      // Do not stay in "recording" state if the native start failed (B13).
+      _mediaRecorder = null;
+      rethrow;
+    }
+
+    _webrtcFilePath = filePath;
     return filePath;
   }
 
   /// Stops WebRTC recording and saves to Gallery.
   Future<void> stopWebRTCRecording(String filePath) async {
-    if (_mediaRecorder == null) return;
+    final recorder = _mediaRecorder;
+    if (recorder == null) return;
 
-    await _mediaRecorder!.stop();
-    _mediaRecorder = null;
+    try {
+      await recorder.stop();
+    } finally {
+      // Always leave the recording state, even if the native stop failed (B13).
+      _mediaRecorder = null;
+      _webrtcFilePath = null;
+    }
 
     // Give it a moment to finalize the file write
     await Future.delayed(const Duration(milliseconds: 500));
