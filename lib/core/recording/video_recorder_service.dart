@@ -62,6 +62,9 @@ class VideoRecorderService {
 
     final recorder = MediaRecorder();
     _mediaRecorder = recorder;
+    // Set before the async start so a stopAny() racing the start can stop
+    // and save this file (B14).
+    _webrtcFilePath = filePath;
 
     // Start recording
     // Note: audio is not recorded yet (see BUGS.md B16).
@@ -72,11 +75,13 @@ class VideoRecorderService {
       );
     } catch (_) {
       // Do not stay in "recording" state if the native start failed (B13).
-      _mediaRecorder = null;
+      if (identical(_mediaRecorder, recorder)) {
+        _mediaRecorder = null;
+        _webrtcFilePath = null;
+      }
       rethrow;
     }
 
-    _webrtcFilePath = filePath;
     return filePath;
   }
 
