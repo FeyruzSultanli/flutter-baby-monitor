@@ -1691,6 +1691,11 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
       _refreshBottomSheet();
+    }, onError: (Object e) {
+      // e.g. Firestore permission or network errors (B23)
+      debugPrint('Room listener error: $e');
+      if (!mounted) return;
+      _handlePairingError('${AppLocalizations.of(context).error}: $e');
     });
   }
 

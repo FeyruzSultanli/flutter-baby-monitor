@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'signaling_interface.dart';
 
@@ -52,6 +53,11 @@ class FirestoreSignaling implements SignalingInterface {
 
   @override
   Future<void> connect(String roomId) async {
+    // A second connect() without disconnect() must not stack listeners (B23).
+    await _roomSub?.cancel();
+    await _alertsSub?.cancel();
+    await _candidatesSub?.cancel();
+    _candidatesSub = null;
     _currentRoomId = roomId;
     // Listen to room changes for Offer/Answer
     _roomSub = _rooms.doc(roomId).snapshots().listen((doc) {
@@ -74,7 +80,7 @@ class FirestoreSignaling implements SignalingInterface {
         final answer = RTCSessionDescription(answerMap['sdp'], answerMap['type']);
         _onAnswerController.add(answer);
       }
-    });
+    }, onError: (Object e) => debugPrint('Room signaling listener error: $e'));
 
     // Listen to alerts. The first snapshot lists every alert already stored
     // in the room; those are history, not new events, so skip it (B22).
@@ -102,7 +108,7 @@ class FirestoreSignaling implements SignalingInterface {
           _onAlertController.add(data);
         }
       }
-    });
+    }, onError: (Object e) => debugPrint('Alerts listener error: $e'));
   }
 
   // Helper to start listening for candidates based on role
@@ -127,7 +133,7 @@ class FirestoreSignaling implements SignalingInterface {
           }
         }
       }
-    });
+    }, onError: (Object e) => debugPrint('Candidates listener error: $e'));
   }
 
   @override
