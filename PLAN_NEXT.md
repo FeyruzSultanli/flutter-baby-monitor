@@ -4,6 +4,25 @@
 > Bu dosya yalnızca plan; bu turda kod yazılmadı.
 > Taban commit: `dev` @ `5a28776`. Kararlarınız: D1 iki aşamalı, D2 Cloud Function + FCM (Blaze kararı sizde), D3 Anonymous Auth + kurallar + uzun/süreli kod, B08 düzeltilecek.
 
+## İlerleme (kullanıcının onayladığı sıra)
+
+| # | İş | Durum |
+|---|---|---|
+| 1 | D11 + D6 + D7 | ✅ `a982754` (D11), `fe862a2` (D6), `0de98f1` (D7) |
+| 2 | D1-a gece modu | ⏳ |
+| 3 | D5 alarm eşiği (≥2 sn + tek dB formülü + ayarlanabilir eşik) | ⏳ |
+| 4 | B08 yeniden katılma | ⏳ |
+| 5 | D3 + D8 (auth, kurallar, süreli kod, TTL) | ⏳ |
+| 6 | D2 FCM (uygulama tarafı + Function kodu; deploy Blaze kararından sonra) | ⏳ |
+| 7 | D1-b foreground service | ⏸ Başlamadan önce kullanıcıya sorulacak (yarım günlük cihaz denemesi) |
+
+Kararlar (kullanıcı):
+- D4 bekliyor: önce farklı ağ testi, sonra Blaze kararıyla birlikte değerlendirilecek.
+- D5, D6, D7, D8, D11 kabul edildi.
+- D9 ve D10 sonraya kaldı.
+- `firebase.json`'a yalnızca `firestore` ve `functions` bölümlerinin eklenmesi onaylandı.
+- Emülatör için Android Studio JDK'sı (`JAVA_HOME` yalnızca oturumda) onaylandı.
+
 ## Önerilen uygulama sırası (özet)
 
 | Sıra | İş | Büyüklük | Neden bu sırada |

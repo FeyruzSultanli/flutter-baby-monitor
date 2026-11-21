@@ -178,7 +178,7 @@ Kullanıcı yokken alınan kararlar:
   - Tüm kameraların sesi aynı anda çalıyor.
   - Alarm desteği yok.
 - **Öneri:** Bkz. D6. En az düzeltme olarak MultiPeer'e remote description guard'ı eklenebilir.
-- **Durum:** Kısmen düzeltildi (`ac1e136`): her offer'a artık yalnızca bir kez cevap veriliyor, yeniden anlaşma döngüsü bitti. Normal eşleşmeyle çakışma ve aynı anda çalan sesler hâlâ **Karar bekliyor** (D6).
+- **Durum:** Kısmen düzeltildi (`ac1e136`): her offer'a artık tek bir cevap veriliyor. Karar D6 uygulandı (`fe862a2`): menü girişi `kMultiCameraEnabled = false` bayrağıyla gizlendi, kod silinmedi. İzleyici başına oturum gerekirse ileride tekrar açılabilir.
 
 ### B16 — WebRTC kayıtlarında ses yok
 - **Dosya:** `video_recorder_service.dart:38-44`: `_mediaRecorder!.start(filePath, videoTrack: ...)` çağrısında `audioChannel` verilmiyor.
@@ -307,7 +307,7 @@ Kullanıcı yokken alınan kararlar:
   - Çıktı mp4 değil GIF; en fazla 201 kare (`count > 200`), oynatma 10 fps sabit, ses yok.
   - Sınır aşıldıktan sonra da kareler diske yazılmaya devam ediyor.
 - **Öneri:** Bkz. D7.
-- **Durum:** Karar bekliyor
+- **Durum:** Düzeltildi (`0de98f1`, karar D7): kayıt en fazla 20 sn, 10 fps örnekleme (GIF gerçek zamanlı oynuyor), süre dolunca otomatik durup mesaj gösteriliyor, başlarken uyarı var. mp4 desteği sonraya kaldı. Cihazda doğrulanmalı.
 
 ### B33 — `addOfflineFrame` await edilmiyor; durdurma ile yarış koşulu var
 - **Dosya:** `home_screen.dart` (`_processAndSendImage`, `_onPayloadReceived`), `video_recorder_service.dart:94-110`.
@@ -403,7 +403,7 @@ Kullanıcı yokken alınan kararlar:
 ### B50 — Kullanılmayan kod ve bağımlılıklar
 - **Sorun:** `lib/core/webrtc/signaling_service.dart` hiçbir yerde kullanılmıyor. `noise_meter` bağımlılığı artık import edilmiyor (K2).
 - **Öneri:** İkisini de kaldırmak (onayınızla).
-- **Durum:** Açık
+- **Durum:** Düzeltildi (`a982754`, karar D11): `signaling_service.dart` ve `noise_meter` kaldırıldı; derlenmiş manifest izinleri değişmedi.
 
 ### B51 — l10n getter'ları `!` kullanıyor; eksik anahtar build sırasında çöker
 - **Sorun:** Şu an eksik anahtar yok; TR ve EN'de aynı 143 anahtar var.

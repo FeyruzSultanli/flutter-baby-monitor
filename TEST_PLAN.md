@@ -223,3 +223,14 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | B46 | (iOS) offline mod çökmüyor | iOS cihaz varsa: Offline → Yayını başlat → "yalnızca Android" mesajı. Android-only testte atlayın. | ✅/❌/atlandı |
 | WifiDirect kaldırma (9cc1419) | Offline mod hâlâ çalışıyor | Bölüm 3'ün tamamı | ✅/❌ |
 | 3B (6f72d30) | withValues / surfaceContainerHighest renkleri | Eşleşme sayfası ve kontrol kartlarında renkler önceki sürümle aynı görünüyor mu (açık ve koyu tema) | ✅/❌ |
+
+## 12. İkinci tur değişiklikleri (PLAN_NEXT)
+
+| # | Değişiklik | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| 12.1 | D6 (`fe862a2`) | Üç nokta menüsünü açın. | "Çoklu kamera" seçeneği **görünmez**. Bebek/ebeveyn modu ve oda seçenekleri durur. | ✅/❌ |
+| 12.2 | D7 (`0de98f1`) | Offline bağlıyken E'de kaydı başlatın. | "Offline kayıtlar sessiz, düşük çözünürlüklü GIF… En fazla süre: 20 s" mesajı görünür. | ✅/❌ |
+| 12.3 | D7 | Kaydı **durdurmayın**, 25 sn bekleyin. | ~20. saniyede kayıt kendiliğinden durur, "süre sınırına ulaştı ve kaydedildi" mesajı çıkar, kayıt butonu normale döner. | ✅/❌ + kaç sn: |
+| 12.4 | D7 | 12.3'teki GIF'i galeride oynatın, kronometreyle süresini ölçün. | Oynatma süresi ≈ kayıt süresi (≈20 sn; önceden hızlı/yavaş oynuyordu). | ___ sn |
+| 12.5 | D7 | Offline kaydı 5 sn sonra elle durdurun. | ~5 sn'lik GIF kaydedilir. | ✅/❌ |
+| 12.6 | D11 (`a982754`) | İlk kurulumdan sonra bebek modunda online ve offline yayın başlatın. | Mikrofon izni hâlâ isteniyor ve ses geliyor (noise_meter kaldırıldı, izinler değişmemeli). | ✅/❌ |
