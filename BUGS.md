@@ -423,6 +423,34 @@ Kullanıcı yokken alınan kararlar:
 - **Sorun:** Uzaktan gelen bir değer 15/30/60 ya da LOW/MEDIUM/HIGH dışındaysa dropdown assert hatası verir.
 - **Durum:** Açık
 
+## Otonom oturum: D2/D3 incelemesinden çıkan bulgular
+
+Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün Firestore yazımları doğru metodu kullanıyor ve kuralların izin listelerine uyuyor. Davranış sorunları:
+
+### B55 — İnternet yokken oda oluşturma/katılma sonsuza kadar dönüyor (Yüksek)
+- **Dosya:** `pairing_service.dart` `createRoom` / `joinRoom`.
+- **Sorun:** Firestore, çevrimdışı yazımları sunucu onaylayana kadar bekletiyor. İlk işlem okuma değil yazma olunca ekran dönüp duruyor ve meşgulken "Durdur"/"İptal" düğmeleri kapalı kalıyor.
+- **Durum:** Düzeltildi (`9b004f9`): 15 sn zaman aşımı ve "sunucudan yanıt yok" mesajı. Cihazda doğrulanmalı (uçak modu).
+
+### B56 — Ebeveyn ayrıldıktan sonra da push alıyor (Yüksek)
+- **Dosya:** `pairing_service.dart` `leaveRoom`.
+- **Durum:** Düzeltildi (`9b004f9`): ayrılınca `viewerFcmToken` siliniyor; bir sonraki katılımda yeniden yazılıyor.
+
+### B57 — Silinen oda ham "permission-denied" hatası gösteriyor (Orta)
+- **Dosya:** `home_screen.dart` `_listenRoomUpdates`, `_createRoomCode`.
+- **Sorun:** Kurallarla birlikte silinmiş bir oda okunamıyor, bu yüzden dinleyici boş snapshot yerine permission-denied ile bitiyor. Bebek yeni kod üretirken de eski odanın dinleyicisi hata veriyordu.
+- **Durum:** Düzeltildi (`a2cfafd`). Emülatörde doğrulanacak.
+
+### B58 — Telefon saati ileri ise oda oluşturulamıyor (Orta)
+- **Sorun:** `expiresAt` cihaz saati + 24 sa idi; kurallar sunucu saati + 25 sa'e kadar izin veriyor. Telefon saati 1 sa'ten fazla ileriyse her deneme kod çakışması sanılıyordu.
+- **Durum:** Düzeltildi (`9b004f9`): süre 12 sa; saat 13 sa'e kadar ileri olsa bile çalışıyor. Bebek yayın sürdükçe süreyi saatte bir uzatıyor.
+
+### B59 — Firebase yoksa bildirim izni hiç sorulmuyor (Orta)
+- **Durum:** Düzeltildi (`34bb9e0`): izin isteği `permission_handler`'a düşüyor.
+
+### B60 — Hatası yakalanmayan future'lar; giriş kapalıyken sonsuz yeniden katılma (Düşük)
+- **Durum:** Düzeltildi (`66d3ab0`).
+
 ---
 
 ## Hiç çalışmayan veya yarım kalmış özellikler
