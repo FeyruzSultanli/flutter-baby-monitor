@@ -604,6 +604,16 @@ class _HomeScreenState extends State<HomeScreen>
     // Stop Noise Monitoring (Online Mode)
     await _stopNoiseMonitoring();
 
+    // Streaming turned the wakelock on; release it again unless the user
+    // asked to keep the screen on (B24).
+    if (!_keepScreenOn) {
+      try {
+        await WakelockPlus.disable();
+      } catch (e) {
+        debugPrint('Wakelock disable failed: $e');
+      }
+    }
+
     if (restoreCamera) {
       await _restoreCameraIfIdle();
     }
