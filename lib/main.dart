@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
 import 'app.dart';
 import 'core/services/hybrid_notification_manager.dart';
+import 'core/auth/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +20,11 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform, // <-- Bu satır kritik: Platform ayarlarını otomatik seçer
     );
     await HybridNotificationManager().initialize();
+    // Sign in early (anonymous, D3) so the first room create/join is fast.
+    // Failures are retried when a room is created or joined.
+    unawaited(AuthService.instance.ensureSignedIn().then<void>((_) {}, onError: (Object e) {
+      debugPrint('Anonymous sign-in failed: $e');
+    }));
   } catch (e, st) {
     debugPrint('Firebase init failed: $e\n$st');
   }

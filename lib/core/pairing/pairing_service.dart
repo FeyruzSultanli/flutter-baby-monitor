@@ -1,68 +1,97 @@
-import 'dart:math';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../auth/auth_service.dart';
 import '../enums/connection_status.dart';
 import 'pairing_state.dart';
+import 'room_code.dart';
 import '../../models/video_settings.dart';
 
-/// Thrown by [PairingService.joinRoom] when the room does not exist (deleted
-/// by the baby, or a wrong code). Lets the parent stop automatic rejoining.
-class RoomNotFoundException implements Exception {
-  const RoomNotFoundException(this.roomCode);
+/// Thrown by [PairingService.joinRoom] when the room cannot be joined: wrong
+/// code, deleted by the baby, claim window (10 min) over, expired, or already
+/// paired with another parent. With the Firestore rules (D3) these cases are
+/// indistinguishable on purpose. Lets the parent stop automatic rejoining.
+class RoomUnavailableException implements Exception {
+  const RoomUnavailableException(this.roomCode);
   final String roomCode;
   @override
-  String toString() => 'Geçersiz oda kodu veya oda bulunamadı.';
+  String toString() => 'Room $roomCode is not available';
 }
 
 /// Handles room lifecycle in Firestore (rooms/{roomCode}).
+///
+/// Security model (D3, see firestore.rules): the baby that creates a room is
+/// its owner; the first parent that claims it within 10 minutes becomes its
+/// only viewer. Both are identified by their anonymous Firebase Auth uid.
 class PairingService {
-  PairingService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  PairingService({FirebaseFirestore? firestore, AuthService? auth})
+      : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? AuthService.instance;
 
   final FirebaseFirestore _firestore;
+  final AuthService _auth;
+
+  /// A room lives for at most this long unless the baby extends it
+  /// ([extendExpiry]); Firestore TTL deletes it afterwards (D8).
+  static const Duration roomLifetime = Duration(hours: 24);
+
+  /// A new room must be claimed by a parent within this time (enforced by the
+  /// rules with server time).
+  static const Duration claimWindow = Duration(minutes: 10);
 
   CollectionReference<Map<String, dynamic>> get _rooms =>
       _firestore.collection('rooms');
 
-  /// Creates a 6-digit numeric room and stores a fresh document.
+  static Timestamp _expiry() => Timestamp.fromDate(DateTime.now().add(roomLifetime));
+
+  /// `expiresAt` value for subcollection documents (TTL, D8).
+  static Timestamp expiryForChildDocs() => _expiry();
+
+  /// Creates a room with a new 8-character code (D3). The code is written
+  /// with create-only semantics: if it already exists the rules deny the
+  /// write (no one can read others' rooms), and another code is tried.
   Future<String> createRoom({String? previousCode, double? noiseThreshold}) async {
+    final uid = await _auth.ensureSignedIn();
     if (previousCode != null) {
-      await closeRoom(previousCode);
-    }
-
-    String code;
-    int attempts = 0;
-    final rand = Random();
-
-    // Avoid collisions with a small retry loop.
-    while (true) {
-      code = (100000 + rand.nextInt(900000)).toString();
-      final exists = await _rooms.doc(code).get();
-      if (!exists.exists) break;
-      attempts++;
-      if (attempts > 3) {
-        throw Exception('Oda kodu oluşturulamadı, lütfen tekrar deneyin.');
+      try {
+        await closeRoom(previousCode);
+      } catch (e) {
+        debugPrint('Closing previous room failed: $e');
       }
     }
 
-    await _rooms.doc(code).set({
-      'roomCode': code,
-      'createdAt': FieldValue.serverTimestamp(),
-      'isPaired': false,
-      'offer': null,
-      'answer': null,
-      'facingMode': 'environment',
-      'cryAlert': false,
-      'cryDb': null,
-      'cryUpdated': FieldValue.serverTimestamp(),
-      'videoSettings': const VideoSettings().toJson(),
-      'noiseThreshold': noiseThreshold,
-      'viewerSession': null,
-    });
+    for (var attempt = 0; attempt < 5; attempt++) {
+      final code = RoomCode.generate();
+      try {
+        await _rooms.doc(code).set({
+          'roomCode': code,
+          'ownerUid': uid,
+          'viewerUid': null,
+          'createdAt': FieldValue.serverTimestamp(),
+          'expiresAt': _expiry(),
+          'isPaired': false,
+          'offer': null,
+          'answer': null,
+          'facingMode': 'environment',
+          'cryAlert': false,
+          'cryDb': null,
+          'cryUpdated': FieldValue.serverTimestamp(),
+          'videoSettings': const VideoSettings().toJson(),
+          'noiseThreshold': noiseThreshold,
+          'viewerSession': null,
+        });
+        return code;
+      } on FirebaseException catch (e) {
+        if (e.code != 'permission-denied') rethrow;
+        debugPrint('Room code collision, retrying');
+      }
+    }
+    throw Exception('Oda kodu oluşturulamadı, lütfen tekrar deneyin.');
+  }
 
-    return code;
+  /// Baby: keeps an active room alive (moves `expiresAt` forward).
+  Future<void> extendExpiry(String roomCode) async {
+    await _rooms.doc(roomCode).update({'expiresAt': _expiry()});
   }
 
   /// Deletes a room document and its candidate and alert subcollections.
@@ -89,29 +118,23 @@ class PairingService {
     await roomRef.delete();
   }
 
-  /// Returns a snapshot of room existence.
-  Future<bool> roomExists(String roomCode) async {
-    final doc = await _rooms.doc(roomCode).get();
-    return doc.exists;
-  }
-
   /// The parent leaves the room; the baby closes the peer and waits (B08).
   Future<void> leaveRoom(String roomCode) async {
-    await _rooms.doc(roomCode).set(
-      {'viewerSession': null, 'isPaired': false},
-      SetOptions(merge: true),
-    );
+    await _rooms.doc(roomCode).update({'viewerSession': null, 'isPaired': false});
   }
+
+  // Updates use update() rather than set(merge): on a deleted room they fail
+  // instead of recreating a partial document (which the rules also deny).
 
   /// Marks room pairing state.
   Future<void> setPaired(String roomCode, bool paired) async {
-    await _rooms.doc(roomCode).set({'isPaired': paired}, SetOptions(merge: true));
+    await _rooms.doc(roomCode).update({'isPaired': paired});
   }
 
   Future<void> setFacing(String roomCode, String facingMode) async {
     await _rooms
         .doc(roomCode)
-        .set({'facingMode': facingMode}, SetOptions(merge: true));
+        .update({'facingMode': facingMode});
   }
 
   Future<void> setCryAlert(
@@ -119,48 +142,48 @@ class PairingService {
     required bool alert,
     double? decibel,
   }) async {
-    await _rooms.doc(roomCode).set(
-      {
+    await _rooms.doc(roomCode).update({
         'cryAlert': alert,
         'cryDb': decibel,
         'cryUpdated': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+      });
   }
 
   Future<void> updateNoiseThreshold(String roomCode, double threshold) async {
-    await _rooms.doc(roomCode).set(
-      {'noiseThreshold': threshold},
-      SetOptions(merge: true),
-    );
+    await _rooms.doc(roomCode).update({'noiseThreshold': threshold});
   }
 
   Future<void> updateVideoSettings(String roomCode, VideoSettings settings) async {
-    await _rooms.doc(roomCode).set(
-      {'videoSettings': settings.toJson()},
-      SetOptions(merge: true),
-    );
+    await _rooms.doc(roomCode).update({'videoSettings': settings.toJson()});
   }
 
-  /// Validates the room and joins it as viewer [session] (B08): the baby
-  /// reacts to the new session with a fresh offer. Also used to rejoin.
+  /// Joins [roomCode] as viewer [session] (B08); also used to rejoin.
+  ///
+  /// The first join claims the room (sets `viewerUid`) without reading it
+  /// first: non-members cannot read rooms (D3). A wrong, expired, deleted or
+  /// already paired code fails with [RoomUnavailableException].
   Future<PairingState> joinRoom(String roomCode, {required String session}) async {
-    final doc = await _rooms.doc(roomCode).get();
-    if (!doc.exists) {
-      throw RoomNotFoundException(roomCode);
-    }
-    await _rooms.doc(roomCode).set(
-      {
+    final code = RoomCode.normalize(roomCode);
+    if (!RoomCode.isValid(code)) throw RoomUnavailableException(code);
+    final uid = await _auth.ensureSignedIn();
+    final ref = _rooms.doc(code);
+    try {
+      await ref.update({
+        'viewerUid': uid, // unchanged on a rejoin by the same parent
         'viewerSession': session,
         'viewerJoinedAt': FieldValue.serverTimestamp(),
         'isPaired': false,
-      },
-      SetOptions(merge: true),
-    );
+      });
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied' || e.code == 'not-found') {
+        throw RoomUnavailableException(code);
+      }
+      rethrow;
+    }
+    final doc = await ref.get();
     final data = doc.data() ?? {};
     return PairingState(
-      roomCode: roomCode,
+      roomCode: code,
       isPaired: data['isPaired'] == true,
       status: ConnectionStatus.CONNECTING,
       facingMode: (data['facingMode'] as String? ?? 'environment'),
@@ -173,6 +196,7 @@ class PairingService {
           ? VideoSettings.fromJson(data['videoSettings'])
           : const VideoSettings(),
       noiseThreshold: (data['noiseThreshold'] as num?)?.toDouble(),
+      viewerSession: data['viewerSession'] as String?,
     );
   }
 

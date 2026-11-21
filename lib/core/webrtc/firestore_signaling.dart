@@ -27,6 +27,10 @@ class FirestoreSignaling implements SignalingInterface {
   CollectionReference<Map<String, dynamic>> get _rooms =>
       _firestore.collection('rooms');
 
+  /// TTL field for candidate/alert documents (D8); the rules cap it at 25 h.
+  static Timestamp _childExpiry() =>
+      Timestamp.fromDate(DateTime.now().add(const Duration(hours: 24)));
+
   @override
   Stream<RTCSessionDescription> get onOffer => _onOfferController.stream;
 
@@ -48,7 +52,7 @@ class FirestoreSignaling implements SignalingInterface {
     await _rooms
         .doc(_currentRoomId)
         .collection(collection)
-        .add(candidateToMap(candidate, session));
+        .add({...candidateToMap(candidate, session), 'expiresAt': _childExpiry()});
   }
 
   @override
@@ -200,6 +204,7 @@ class FirestoreSignaling implements SignalingInterface {
       'title': title,
       'body': body,
       'timestamp': FieldValue.serverTimestamp(),
+      'expiresAt': _childExpiry(),
     });
   }
 }

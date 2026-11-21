@@ -28,6 +28,8 @@ import '../core/audio/cry_detector.dart';
 import '../core/offline/offline_payload.dart';
 import '../core/pairing/pairing_service.dart';
 import '../core/pairing/pairing_state.dart';
+import '../core/pairing/room_code.dart';
+import '../core/auth/auth_service.dart';
 import '../core/webrtc/signaling_interface.dart';
 import '../core/webrtc/firestore_signaling.dart';
 import '../models/alert_model.dart';
@@ -126,6 +128,9 @@ class _HomeScreenState extends State<HomeScreen>
   // token is outdated stops before writing a session (no competing sessions).
   int _joinToken = 0;
 
+  // Baby: keeps the active room's expiresAt in the future (TTL, D8).
+  Timer? _roomHeartbeat;
+
   bool _isFullscreen = false;
   bool _fullscreenCryOverlay = false;
 
@@ -140,6 +145,10 @@ class _HomeScreenState extends State<HomeScreen>
   // Cry notifications (Firestore alert docs / local notifications) are rate
   // limited so a long cry does not produce a notification every 2 s (B05).
   static const Duration _cryNotificationCooldown = Duration(seconds: 60);
+  // How often the baby refreshes cryAlert/cryDb in the room (noise bar on the
+  // parent). Was 2 s; 5 s saves Firestore writes (D8). Alarm changes are
+  // still sent immediately.
+  static const Duration _cryStateUpdateInterval = Duration(seconds: 5);
   DateTime? _lastCryNotificationAt;
   DateTime? _lastCrySentAt;
   DateTime? _lastRecordedAlertTime;
@@ -372,6 +381,7 @@ class _HomeScreenState extends State<HomeScreen>
     _batterySyncTimer?.cancel();
     _thresholdSyncTimer?.cancel();
     _rejoinTimer?.cancel();
+    _roomHeartbeat?.cancel();
     _batteryStateSubscription?.cancel();
     // Resources that were not released before (B25).
     _noisePollTimer?.cancel();
@@ -553,8 +563,8 @@ class _HomeScreenState extends State<HomeScreen>
       await pairing.joinRoom(roomCode, session: session);
       if (!mounted || token != _joinToken) return;
       await webrtc.startAsParent(roomCode, session: session);
-    } on RoomNotFoundException {
-      // The baby closed the room: stop retrying.
+    } on RoomUnavailableException {
+      // The room is gone (closed by the baby or expired): stop retrying.
       _viewerSession = null;
       if (mounted) _handlePairingError(AppLocalizations.of(context).roomClosed);
     } catch (e) {
@@ -672,6 +682,7 @@ class _HomeScreenState extends State<HomeScreen>
     _joinToken++;
     _rejoinTimer?.cancel();
     _rejoinBackoff.reset();
+    _roomHeartbeat?.cancel();
     await _exitNightMode();
 
     // Finish a running recording before its source stream goes away, so the
@@ -837,6 +848,7 @@ class _HomeScreenState extends State<HomeScreen>
         _connectionStatus = ConnectionStatus.CONNECTING;
       });
       _listenRoomUpdates(newCode);
+      _startRoomHeartbeat(newCode);
       await _webrtcService!.startAsBaby(newCode, facingMode: facingMode);
       
       // Automatically start noise monitoring for Online Mode
@@ -844,16 +856,17 @@ class _HomeScreenState extends State<HomeScreen>
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).roomCode}: $newCode')),
+        SnackBar(content: Text('${AppLocalizations.of(context).roomCode}: ${RoomCode.format(newCode)}')),
       );
     } catch (e) {
       if (!mounted) return;
+      final message = _pairingErrorText(e);
       setState(() {
-        _pairingError = '${AppLocalizations.of(context).error}: $e';
+        _pairingError = message;
         _connectionStatus = ConnectionStatus.FAILED;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).error}: $e')),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) {
@@ -877,7 +890,7 @@ class _HomeScreenState extends State<HomeScreen>
       _refreshBottomSheet();
       return;
     }
-    final roomCode = (code ?? _parentRoomController.text).trim();
+    final roomCode = RoomCode.normalize(code ?? _parentRoomController.text);
     if (roomCode.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).enterRoomCodeSubtitle)),
@@ -919,12 +932,15 @@ class _HomeScreenState extends State<HomeScreen>
       );
     } catch (e) {
       if (!mounted) return;
+      // A code that cannot be joined is final: no automatic rejoin.
+      if (e is RoomUnavailableException) _viewerSession = null;
+      final message = _pairingErrorText(e);
       setState(() {
-        _pairingError = e.toString();
+        _pairingError = message;
         _connectionStatus = ConnectionStatus.FAILED;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).error}: $e')),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) {
@@ -1764,7 +1780,7 @@ class _HomeScreenState extends State<HomeScreen>
       
       final bool statusChanged = alert != _lastCryAlertSent;
       final bool timeToUpdate = _lastCrySentAt == null || 
-          now.difference(_lastCrySentAt!) > const Duration(seconds: 2);
+          now.difference(_lastCrySentAt!) > _cryStateUpdateInterval;
 
       if (roomCode != null && _pairingService != null && (statusChanged || timeToUpdate)) {
         _lastCryAlertSent = alert;
@@ -1774,7 +1790,7 @@ class _HomeScreenState extends State<HomeScreen>
             roomCode,
             alert: alert,
             decibel: db,
-          ),
+          ).catchError((Object e) => debugPrint('Cry state update failed: $e')),
         );
 
         if (alert && _takeCryNotificationSlot(now)) {
@@ -2012,9 +2028,24 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  String _formatRoomCode(String code) {
-    if (code.length <= 3) return code;
-    return '${code.substring(0, 3)} ${code.substring(3)}';
+  String _formatRoomCode(String code) => RoomCode.format(code);
+
+  /// User-facing text for room create/join errors (D3).
+  String _pairingErrorText(Object e) {
+    final l10n = AppLocalizations.of(context);
+    if (e is RoomUnavailableException) return l10n.roomUnavailable;
+    if (e is AnonymousAuthDisabledException) return l10n.anonymousAuthDisabled;
+    return '${l10n.error}: $e';
+  }
+
+  void _startRoomHeartbeat(String roomCode) {
+    _roomHeartbeat?.cancel();
+    _roomHeartbeat = Timer.periodic(const Duration(hours: 1), (_) {
+      final pairing = _pairingService;
+      if (pairing == null || _pairingState?.roomCode != roomCode) return;
+      unawaited(pairing.extendExpiry(roomCode).catchError(
+          (Object e) => debugPrint('Extending room expiry failed: $e')));
+    });
   }
 
   void _refreshBottomSheet() {
@@ -2075,6 +2106,13 @@ class _HomeScreenState extends State<HomeScreen>
                         : '${l10n.createRoomCode}.',
                     style: const TextStyle(fontSize: 16),
                   ),
+                  if (roomCode != null && !(_pairingState?.isPaired ?? false)) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.roomCodeValidHint,
+                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -2179,12 +2217,19 @@ class _HomeScreenState extends State<HomeScreen>
         if (!_isOfflineMode) ...[
           TextField(
             controller: _parentRoomController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            keyboardType: TextInputType.visiblePassword, // letters + digits, no autocorrect
+            textCapitalization: TextCapitalization.characters,
+            autocorrect: false,
+            enableSuggestions: false,
+            maxLength: RoomCode.length + 1, // with the dash
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\- ]')),
+            ],
             onSubmitted: (value) => _joinRoomWithCode(value),
             decoration: InputDecoration(
               labelText: l10n.roomCode,
-              hintText: '538241',
+              hintText: 'ABCD-EF23',
+              counterText: '',
             ),
             enabled: _firebaseReady,
           ),

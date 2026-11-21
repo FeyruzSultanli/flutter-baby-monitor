@@ -169,6 +169,9 @@ class AppLocalizations {
       'autoNightMode': 'Night mode when connected',
       'autoNightModeSubtitle': 'Baby device: screen turns black at minimum brightness once the parent connects',
       'roomClosed': 'The baby device closed the room. Ask for a new room code',
+      'roomUnavailable': 'Code is wrong, expired, or already paired with another device',
+      'anonymousAuthDisabled': 'Sign-in is not enabled for this app (Firebase: Anonymous sign-in)',
+      'roomCodeValidHint': 'Enter this code on the parent device within 10 minutes',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -325,6 +328,9 @@ class AppLocalizations {
       'autoNightMode': 'Bağlanınca gece moduna geç',
       'autoNightModeSubtitle': 'Bebek cihazı: ebeveyn bağlanınca ekran en düşük parlaklıkta kararır',
       'roomClosed': 'Bebek cihazı odayı kapattı. Yeni bir oda kodu isteyin',
+      'roomUnavailable': 'Kod hatalı, süresi dolmuş veya başka bir cihazla eşleşmiş',
+      'anonymousAuthDisabled': 'Bu uygulama için giriş açık değil (Firebase: Anonim giriş)',
+      'roomCodeValidHint': 'Bu kodu ebeveyn cihazına 10 dakika içinde girin',
     },
   };
 
@@ -482,6 +488,9 @@ class AppLocalizations {
   String get autoNightMode => _localizedValues[locale.languageCode]!['autoNightMode']!;
   String get autoNightModeSubtitle => _localizedValues[locale.languageCode]!['autoNightModeSubtitle']!;
   String get roomClosed => _localizedValues[locale.languageCode]!['roomClosed']!;
+  String get roomUnavailable => _localizedValues[locale.languageCode]!['roomUnavailable']!;
+  String get anonymousAuthDisabled => _localizedValues[locale.languageCode]!['anonymousAuthDisabled']!;
+  String get roomCodeValidHint => _localizedValues[locale.languageCode]!['roomCodeValidHint']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
