@@ -82,16 +82,23 @@ class FirestoreSignaling implements SignalingInterface {
       }
     }, onError: (Object e) => debugPrint('Room signaling listener error: $e'));
 
-    // Listen to alerts. The first snapshot lists every alert already stored
-    // in the room; those are history, not new events, so skip it (B22).
-    // A first snapshot served from an empty local cache can be followed by a
-    // server snapshot that again reports old alerts as added, so alerts older
-    // than this connection (with clock-skew margin) are ignored as well.
-    var isInitialAlertsSnapshot = true;
-    final connectedAt = DateTime.now().subtract(const Duration(seconds: 30));
-    _alertsSub = _rooms.doc(roomId).collection('alerts').snapshots().listen((snapshot) {
-      if (isInitialAlertsSnapshot) {
-        isInitialAlertsSnapshot = false;
+    // Listen to alerts. The first snapshots list every alert already stored
+    // in the room; those are history, not new events, so skip them (B22).
+    // A first snapshot served from the local cache can be followed by a
+    // server snapshot that again reports old alerts as added, so history
+    // counts as loaded only after the first snapshot from the server. (No
+    // timestamp comparison: the alert time is server time, the device clock
+    // may be off.) includeMetadataChanges makes Firestore also report the
+    // cache -> server switch when no document changed; without it the first
+    // real alert could be mistaken for history.
+    var historyLoaded = false;
+    _alertsSub = _rooms
+        .doc(roomId)
+        .collection('alerts')
+        .snapshots(includeMetadataChanges: true)
+        .listen((snapshot) {
+      if (!historyLoaded) {
+        if (!snapshot.metadata.isFromCache) historyLoaded = true;
         return;
       }
       for (final change in snapshot.docChanges) {
@@ -101,10 +108,6 @@ class FirestoreSignaling implements SignalingInterface {
           if (change.doc.metadata.hasPendingWrites) continue;
           final data = change.doc.data();
           if (data == null) continue;
-          final timestamp = data['timestamp'];
-          if (timestamp is Timestamp && timestamp.toDate().isBefore(connectedAt)) {
-            continue;
-          }
           _onAlertController.add(data);
         }
       }

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../enums/connection_status.dart';
 import 'pairing_state.dart';
@@ -64,9 +65,15 @@ class PairingService {
     for (final doc in calleeCandidates.docs) {
       await doc.reference.delete();
     }
-    final alerts = await roomRef.collection('alerts').get();
-    for (final doc in alerts.docs) {
-      await doc.reference.delete();
+    // Best effort: if the Firestore rules do not allow deleting alerts, still
+    // delete the room itself (and let createRoom continue).
+    try {
+      final alerts = await roomRef.collection('alerts').get();
+      for (final doc in alerts.docs) {
+        await doc.reference.delete();
+      }
+    } catch (e) {
+      debugPrint('Could not delete alerts of room $roomCode: $e');
     }
     await roomRef.delete();
   }
