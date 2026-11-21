@@ -76,17 +76,30 @@ class FirestoreSignaling implements SignalingInterface {
       }
     });
 
-    // Listen to alerts
+    // Listen to alerts. The first snapshot lists every alert already stored
+    // in the room; those are history, not new events, so skip it (B22).
+    // A first snapshot served from an empty local cache can be followed by a
+    // server snapshot that again reports old alerts as added, so alerts older
+    // than this connection (with clock-skew margin) are ignored as well.
+    var isInitialAlertsSnapshot = true;
+    final connectedAt = DateTime.now().subtract(const Duration(seconds: 30));
     _alertsSub = _rooms.doc(roomId).collection('alerts').snapshots().listen((snapshot) {
+      if (isInitialAlertsSnapshot) {
+        isInitialAlertsSnapshot = false;
+        return;
+      }
       for (final change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           // Skip alerts written by this device (B04): the sender's own write
           // is reported immediately as a local, pending "added" change.
           if (change.doc.metadata.hasPendingWrites) continue;
           final data = change.doc.data();
-          if (data != null) {
-             _onAlertController.add(data);
+          if (data == null) continue;
+          final timestamp = data['timestamp'];
+          if (timestamp is Timestamp && timestamp.toDate().isBefore(connectedAt)) {
+            continue;
           }
+          _onAlertController.add(data);
         }
       }
     });

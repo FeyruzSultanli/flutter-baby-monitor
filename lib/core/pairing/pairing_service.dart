@@ -53,7 +53,7 @@ class PairingService {
     return code;
   }
 
-  /// Deletes a room document and its candidate subcollections.
+  /// Deletes a room document and its candidate and alert subcollections.
   Future<void> closeRoom(String roomCode) async {
     final roomRef = _rooms.doc(roomCode);
     final callerCandidates = await roomRef.collection('callerCandidates').get();
@@ -62,6 +62,10 @@ class PairingService {
     }
     final calleeCandidates = await roomRef.collection('calleeCandidates').get();
     for (final doc in calleeCandidates.docs) {
+      await doc.reference.delete();
+    }
+    final alerts = await roomRef.collection('alerts').get();
+    for (final doc in alerts.docs) {
       await doc.reference.delete();
     }
     await roomRef.delete();
