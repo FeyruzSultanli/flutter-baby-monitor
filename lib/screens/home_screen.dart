@@ -1577,9 +1577,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _recordAlertIfNeeded(double? db) async {
     final now = DateTime.now();
-    // Record if no previous alert or if 5 seconds has passed since last recording
+    // Record at most one history entry per cry notification window (was every
+    // 5 s, up to ~720 entries per hour of crying; B29).
     if (_lastRecordedAlertTime == null || 
-        now.difference(_lastRecordedAlertTime!) > const Duration(seconds: 5)) {
+        now.difference(_lastRecordedAlertTime!) > _cryNotificationCooldown) {
       _lastRecordedAlertTime = now;
       await AlertHistoryService().addAlert(AlertModel(
         timestamp: now,
