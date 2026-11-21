@@ -1,3 +1,9 @@
+# Local Claude Code settings (permission deny rules, machine specific)
+.claude/settings.local.json
+
+# Emulator / integration test artifacts (screenshots, logcat)
+test-results/
+
 # Miscellaneous
 *.class
 *.log
