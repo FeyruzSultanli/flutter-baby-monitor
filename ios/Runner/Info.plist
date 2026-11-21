@@ -2,31 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Permission texts: English here (development language); Turkish in
-	     tr.lproj/InfoPlist.strings, English in en.lproj/InfoPlist.strings. -->
-	<key>NSCameraUsageDescription</key>
-	<string>Baby Monitor uses the camera to show the baby's video on the parent's phone.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Baby Monitor uses the microphone to stream sound and detect crying.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Baby Monitor saves your recordings to the photo library.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Baby Monitor needs access to the photo library to save recordings.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Baby Monitor connects directly to the other phone on your local network for a faster video stream.</string>
-	<!-- audio: keep the stream's sound (and the baby's microphone) running when
-	     the app goes to the background; remote-notification: cry alerts via
-	     FCM/APNs. The camera itself cannot run in the background on iOS. -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-		<string>remote-notification</string>
-	</array>
-	<key>CFBundleLocalizations</key>
-	<array>
-		<string>en</string>
-		<string>tr</string>
-	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -39,6 +14,11 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>tr</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>bebek_monitor</string>
 	<key>CFBundlePackageType</key>
@@ -51,8 +31,44 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Baby Monitor uses the camera to show the baby's video on the parent's phone.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Baby Monitor connects directly to the other phone on your local network for a faster video stream.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Baby Monitor uses the microphone to stream sound and detect crying.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Baby Monitor saves your recordings to the photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Baby Monitor needs access to the photo library to save recordings.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>FlutterSceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
