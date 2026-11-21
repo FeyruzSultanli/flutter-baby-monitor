@@ -51,6 +51,19 @@
 - **Seçim:** E2E iOS 27 simülatörlerinde (`baby-ios27`, `parent-ios27`). Kodda değişiklik yok.
 - **Not:** Eski `baby-ios` / `parent-ios` (iOS 26.5) simülatörleri ve `try-ios27` kapatıldı ama silinmedi (proje dışında dosya silmeme kuralı). İsterseniz Xcode → Devices and Simulators'tan silebilirsiniz.
 
+### A11 — iOS'ta `sound_stream` eklentisi kaydedilmiyor
+- **Durum:** `sound_stream`, iOS'ta eklenti kaydı sırasında `AVAudioEngine` başlatıyor. Bu, iOS 26.5 **ve** 27.0 simülatörlerinde açılışta `abort` ile sonuçlanıyor (CoreAudio RPC zaman aşımı); ilk iOS 27 denemesindeki sorunsuz açılış şanstı. Gerçek cihazda da kullanılmadığı halde ses donanımını açılışta alıyor.
+- **Seçenekler:**
+  - (a) Paketi kopyalayıp `platforms: android` yapmak: GPL kodu repoya girer.
+  - (b) `AppDelegate`'te eklenti kaydından önce `+[SoundStreamPlugin registerWithRegistrar:]` metodunu Objective-C runtime ile boş bir işlemle değiştirmek.
+  - (c) iOS testlerinden vazgeçmek.
+- **Seçim:** (b). Dart tarafında `sound_stream` çağrıları yalnızca Android'de yapılıyor (`_initAudioServices`, `_stopAudioStream`). Offline mod iOS'ta zaten kapalı.
+- **Geri alma:** `AppDelegate.swift`'teki `skipSoundStreamPluginOnIOS()` çağrısını silmek yeterli. Paket değiştirilirse (GPL kararı) bu kod da kalkar.
+
+### A12 — `flutter build ios --simulator` çalışmıyor, `flutter test`/`run` çalışıyor
+- **Durum:** Flutter 3.44, `flutter build ios --simulator` ile arm64 + x86_64 istiyor, ama Flutter.framework'ün simülatör sürümü yalnızca arm64 ("does not contain architectures arm64 x86_64").
+- **Seçim:** Belirli bir simülatöre yapılan derlemeler (`flutter test -d <udid>`, `flutter run`) ya da tek bir simülatör hedefiyle `xcodebuild` kullanılıyor; ikisi de sorunsuz. Gerçek cihaz derlemesi bundan etkilenmez.
+
 ## Cavid'in kararı bekleniyor
 
 - **`sound_stream` GPL-3.0 lisanslı:** Offline modda ses akışı için kullanılan bu paket GPL-3.0. Uygulama App Store/Play'de dağıtılırsa GPL yükümlülükleri (kaynak kodun açılması) doğar; App Store ile GPL uyumu da tartışmalı. Seçenekler:

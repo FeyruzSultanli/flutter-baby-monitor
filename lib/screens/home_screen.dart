@@ -275,6 +275,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _initAudioServices() async {
+    // sound_stream (offline audio) is only used by Android offline mode; it is
+    // not registered on iOS (see AppDelegate.swift).
+    if (defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _recorder.initialize();
       await _player.initialize();
@@ -1201,7 +1204,10 @@ class _HomeScreenState extends State<HomeScreen>
   void _stopAudioStream() {
     _audioSub?.cancel();
     _audioSub = null;
-    _recorder.stop();
+    if (_isAudioStreaming) {
+      unawaited(_recorder.stop().catchError(
+          (Object e) => debugPrint('Stopping offline audio failed: $e')));
+    }
     _isAudioStreaming = false;
   }
 
