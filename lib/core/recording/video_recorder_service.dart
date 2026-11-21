@@ -14,6 +14,9 @@ class VideoRecorderService {
   bool _isOfflineRecording = false;
   String? _offlineTempDir;
   int _frameCount = 0;
+  // Frame writes are chained so stop() can wait for them, and each frame gets
+  // its index before the async write starts (B33).
+  Future<void> _pendingFrameWrites = Future.value();
 
   String? _webrtcFilePath;
 
@@ -128,10 +131,16 @@ class VideoRecorderService {
 
     // Save every 3rd frame to reduce load and GIF size, or just save all.
     // Saving all for now.
-    final framePath = '$_offlineTempDir/frame_${_frameCount.toString().padLeft(5, '0')}.jpg';
-    final file = File(framePath);
-    await file.writeAsBytes(bytes);
-    _frameCount++;
+    final index = _frameCount++;
+    final framePath = '$_offlineTempDir/frame_${index.toString().padLeft(5, '0')}.jpg';
+    _pendingFrameWrites = _pendingFrameWrites.then((_) async {
+      try {
+        await File(framePath).writeAsBytes(bytes);
+      } catch (e) {
+        debugPrint('Offline frame write failed: $e');
+      }
+    });
+    await _pendingFrameWrites;
   }
 
   /// Stops offline recording, creates a GIF, and saves to Gallery.
@@ -141,6 +150,8 @@ class VideoRecorderService {
     _isOfflineRecording = false;
     final tempDir = _offlineTempDir!;
     _offlineTempDir = null;
+    // Let in-flight frame writes finish before the folder is read/deleted.
+    await _pendingFrameWrites;
 
     if (_frameCount == 0) {
       // No frames recorded
