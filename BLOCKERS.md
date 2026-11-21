@@ -1,0 +1,20 @@
+# BLOCKERS.md — Çözülemeyen ya da sizden bir şey gereken engeller
+
+> Her biri için: ne denendi, hata, sizden ne lazım.
+
+## 1. iOS simülatöründe gerçek bir "sahte video" kaynağı yok
+- **İstenen:** Simülatörde kamera olmadığı için, yalnızca debug'da sahte bir video kaynağı.
+- **Denenenler:**
+  1. `flutter_webrtc`'nin Dart API'sinde sentetik video kaynağı aranması: yok (`getUserMedia` / `getDisplayMedia` dışında kaynak yok; ekran yakalama iOS'ta broadcast extension gerektiriyor).
+  2. Simülatörün kamera desteği: iOS simülatöründe kamera aygıtı yok (`AVCaptureDevice` boş).
+  3. Yerel bir yedek: yalnızca debug + iOS simülatöründe kamera açılamazsa **sadece sesli** akışa düşmek (`2cc32a5`). Bu, signaling, peer bağlantısı ve ses yolunu test etmeyi sağlıyor, ama görüntü yok.
+- **Kalan:** Gerçek bir sahte video için native tarafta bir `RTCVideoCapturer` (ör. sabit kare üreten) yazmak gerekir. Bu, `flutter_webrtc` iOS koduna müdahale veya ayrı bir eklenti demek; kapsam dışı bıraktım.
+- **Sizden:** Gerek yok. iOS görüntüsü gerçek iPhone'da test edilmeli (TEST_PLAN "Gerçek cihaz" listesi).
+
+## 2. iOS 26.5 simülatöründe uygulama açılışta çöküyor (yalnızca simülatör)
+- **Hata:** `sound_stream` → `AVAudioEngine.mainMixerNode` → `AURemoteIO::Initialize` → `_ReportRPCTimeout` → `abort` (SIGABRT).
+- **Denenenler:**
+  1. İki simülatör yerine tek simülatör: yine çöküyor.
+  2. iOS 27.0 simülatörü: **çökmüyor**. E2E burada çalıştırıldı (DECISIONS A10).
+  3. Eklentiyi yalnızca Android'e kısıtlamak (kopyalayıp `platforms: android`): GPL-3.0 kodu repoya kopyalamak gerektiği için yapılmadı (lisans kararı sizde, DECISIONS).
+- **Sizden:** Gerçek iPhone'da açılışın sorunsuz olduğunu doğrulayın. Çökerse en temiz çözüm, offline ses akışı için GPL olmayan bir pakete geçmek.

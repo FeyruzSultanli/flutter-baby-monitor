@@ -38,6 +38,24 @@
 - **Seçim:** Ayarlarda anahtarın yerine "Offline mod yalnızca Android'de kullanılabilir" açıklaması gösteriliyor; kontrol kartı gizli. Android aynen kalıyor.
 - **Neden:** Kullanıcının istediği bu; kod silinmedi.
 
+### A8 — Android E2E: önce API 36, sonra API 35 Google Play
+- **Durum:** API 35 Google Play image'ın indirmesi takıldı (849 MB'ta durdu); ikinci denemede tamamlandı.
+- **Seçim:** Beklememek için testleri, makinede kurulu olan API 36 `google_apis` image'ı (Google Play servisleri var, Play Store yok) ile oluşturulan "baby"/"parent" AVD'leriyle geliştirdim ve hataları ayıkladım. Son koşu, aynı adlarla API 35 Google Play image üzerine yeniden kurulan AVD'lerde.
+- **Neden:** Kullanıcının istediği Play'li image; iki koşu arasında test kodu aynı.
+
+### A9 — E2E'de WebRTC bağlantısı nasıl ölçülür
+- **Seçim:** Ana ekrandaki bağlantı durumu metni ("Bağlı"). Odadaki `isPaired` alanı yeterli değil, çünkü ebeveyn cevap verirken bu alanı `true` yapıyor (ilk koşularda yanıltıcı sonuç verdi).
+
+### A10 — iOS simülatörü: iOS 27 çalışma zamanı
+- **Durum:** iOS 26.5 simülatöründe uygulama açılışta çöküyor. Neden: `sound_stream` eklentisi kayıt sırasında `AVAudioEngine` başlatıyor, CoreAudio `AURemoteIO` RPC zaman aşımına uğrayıp `abort` ediyor. Aynı derleme iOS 27.0 simülatöründe sorunsuz açılıyor.
+- **Seçim:** E2E iOS 27 simülatörlerinde (`baby-ios27`, `parent-ios27`). Kodda değişiklik yok.
+- **Not:** Eski `baby-ios` / `parent-ios` (iOS 26.5) simülatörleri ve `try-ios27` kapatıldı ama silinmedi (proje dışında dosya silmeme kuralı). İsterseniz Xcode → Devices and Simulators'tan silebilirsiniz.
+
 ## Cavid'in kararı bekleniyor
+
+- **`sound_stream` GPL-3.0 lisanslı:** Offline modda ses akışı için kullanılan bu paket GPL-3.0. Uygulama App Store/Play'de dağıtılırsa GPL yükümlülükleri (kaynak kodun açılması) doğar; App Store ile GPL uyumu da tartışmalı. Seçenekler:
+  - (a) Offline ses akışını MIT/BSD lisanslı bir paketle değiştirmek (ör. `record` + `flutter_sound` / `just_audio` ya da Android'e özel kısa bir platform kanalı),
+  - (b) Uygulamayı GPL ile yayınlamayı kabul etmek.
+  - **Önerim (a).** iOS'ta bu paket zaten kullanılmıyor (offline iOS'ta kapalı), ama açılışta ses motorunu başlatıyor.
 
 - **Android ↔ iOS offline:** Gerekli mi? Seçenekler ve önerim (yerel Wi-Fi üzerinden WebRTC + LAN signaling, sonra hotspot) PLAN_NEXT.md bölüm 6'da.

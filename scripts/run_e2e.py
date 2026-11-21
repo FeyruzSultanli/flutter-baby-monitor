@@ -254,8 +254,11 @@ def ios_simulator(name: str) -> str:
                 udid = d["udid"]
     if udid is None:
         runtimes = json.loads(run(["xcrun", "simctl", "list", "runtimes", "available", "-j"]).stdout)["runtimes"]
-        ios = sorted([r for r in runtimes if r["platform"] == "iOS"], key=lambda r: r["version"])
-        runtime_id = ios[0]["identifier"] if len(ios) == 1 else ios[-2]["identifier"]  # newest stable
+        ios = sorted([r for r in runtimes if r["platform"] == "iOS"],
+                     key=lambda r: [int(x) for x in r["version"].split(".")])
+        # Newest runtime: on the iOS 26.5 simulator the sound_stream plugin
+        # aborts at launch (CoreAudio AURemoteIO RPC timeout); iOS 27 is fine.
+        runtime_id = ios[-1]["identifier"]
         udid = run(["xcrun", "simctl", "create", name, IOS_DEVICE_TYPE, runtime_id]).stdout.strip()
         log(f"Created simulator {name} ({udid}) on {runtime_id}")
     run(["xcrun", "simctl", "boot", udid])
@@ -263,17 +266,26 @@ def ios_simulator(name: str) -> str:
     return udid
 
 
+IOS_APP = ROOT / "build/ios/iphonesimulator/Runner.app"
+
+
+def build_ios_app(out: Path) -> None:
+    log("Building iOS simulator app (emulator mode)")
+    r = run(["flutter", "build", "ios", "--simulator", "--debug", DEFINE], cwd=ROOT)
+    (out / "build_ios.txt").write_text(r.stdout + r.stderr)
+    if r.returncode != 0 and not IOS_APP.exists():
+        raise SystemExit("iOS build failed (see build_ios.txt)")
+
+
 def prepare_ios(udid: str) -> None:
+    """Fresh install + permissions granted ONCE. `simctl privacy grant` kills
+    a running app, so it must not run while the test is running; TCC grants
+    survive the reinstall that flutter test does over this install."""
     run(["xcrun", "simctl", "uninstall", udid, IOS_BUNDLE])  # fresh app data
-
-
-def grant_ios(udid: str, seconds: int) -> None:
-    """Grant privacy permissions once the app is installed by flutter test."""
-    end = time.time() + seconds
-    while time.time() < end:
-        for service in ("camera", "microphone", "photos", "photos-add"):
-            run(["xcrun", "simctl", "privacy", udid, "grant", service, IOS_BUNDLE])
-        time.sleep(3)
+    r = run(["xcrun", "simctl", "install", udid, str(IOS_APP)])
+    log(f"{udid}: install {'ok' if r.returncode == 0 else r.stderr.strip()}")
+    for service in ("camera", "microphone", "photos", "photos-add"):
+        run(["xcrun", "simctl", "privacy", udid, "grant", service, IOS_BUNDLE])
 
 
 def main() -> None:
@@ -292,11 +304,12 @@ def main() -> None:
         wipe_emulator_data()
 
     if args.platform == "ios":
-        baby = Device("baby", ios_simulator("baby-ios"), out, "ios")
-        parent = Device("parent", ios_simulator("parent-ios"), out, "ios")
+        baby = Device("baby", ios_simulator("baby-ios27"), out, "ios")
+        parent = Device("parent", ios_simulator("parent-ios27"), out, "ios")
+        if not args.no_build or not IOS_APP.exists():
+            build_ios_app(out)
         for d in (baby, parent):
             prepare_ios(d.serial)
-            threading.Thread(target=grant_ios, args=(d.serial, 900), daemon=True).start()
     else:
         baby = Device("baby", boot_avd("baby", out), out)
         parent = Device("parent", boot_avd("parent", out), out)
