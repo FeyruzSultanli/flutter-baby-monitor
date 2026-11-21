@@ -142,13 +142,20 @@ class NotificationService {
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
 
-    await _localNotifications.show(
-      cryAlertId,
-      title,
-      body,
-      platformChannelSpecifics,
-      payload: payload,
-    );
+    // Showing fails when the user denied notifications (on iOS:
+    // "Source is not authorized"); the in-app alarm still works, so log
+    // instead of leaving an unhandled error (B66).
+    try {
+      await _localNotifications.show(
+        cryAlertId,
+        title,
+        body,
+        platformChannelSpecifics,
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('Local notification not shown: $e');
+    }
   }
 
   Future<String?> getFCMToken() async {
