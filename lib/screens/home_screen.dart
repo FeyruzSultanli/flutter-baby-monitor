@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:math';
 import 'dart:typed_data';
 import 'dart:io';
-import 'dart:convert';
 
 import 'package:camera/camera.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -24,6 +22,8 @@ import '../l10n/app_localizations.dart';
 import '../core/recording/video_recorder_service.dart';
 import '../core/enums/connection_status.dart';
 import '../core/enums/device_role.dart';
+import '../core/audio/audio_level.dart';
+import '../core/offline/offline_payload.dart';
 import '../core/pairing/pairing_service.dart';
 import '../core/pairing/pairing_state.dart';
 import '../core/webrtc/signaling_interface.dart';
@@ -186,11 +186,8 @@ class _HomeScreenState extends State<HomeScreen>
       'state': _batteryState.toString(),
     };
     
-    final jsonString = jsonEncode(payloadMap);
-    final jsonBytes = utf8.encode(jsonString);
-    final payload = Uint8List(jsonBytes.length + 1);
-    payload[0] = 4; // Type 4 for Battery
-    payload.setRange(1, payload.length, jsonBytes);
+    final payload =
+        OfflinePayload.encodeJson(OfflinePayloadType.battery, payloadMap);
 
     if (_isOfflineMode && _connectedEndpointId != null) {
       await Nearby().sendBytesPayload(_connectedEndpointId!, payload);
@@ -893,9 +890,7 @@ class _HomeScreenState extends State<HomeScreen>
       _audioSub = _recorder.audioStream.listen((data) {
         if (_connectedEndpointId != null) {
           // 1. Send Audio Data
-          final payload = Uint8List(data.length + 1);
-          payload[0] = 3; // Type 3 for Audio
-          payload.setRange(1, payload.length, data);
+          final payload = OfflinePayload.encode(OfflinePayloadType.audio, data);
           Nearby().sendBytesPayload(_connectedEndpointId!, payload);
 
           // 2. Calculate dB and Send Status
@@ -918,20 +913,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _calculateAndSendDb(List<int> data) {
-    // Convert Uint8List (PCM 16-bit) to Int16List
-    final int16Data = Int16List.view(Uint8List.fromList(data).buffer);
-    
-    double sumSquare = 0;
-    for (var sample in int16Data) {
-      sumSquare += sample * sample;
-    }
-    
-    final rms = sqrt(sumSquare / int16Data.length);
-    final db = 20 * log(rms) / ln10; // log10(x) = ln(x) / ln(10)
-    
-    // Normalize or calibrate if needed. 
-    // Usually PCM 16bit max is 32768. 20*log10(32768) ~= 90dB.
-    // This is raw dBFS relative to full scale, but positive.
+    // PCM16 chunk -> positive dB (20*log10(rms), ~0..90 for full scale).
+    final db = pcm16ChunkToDb(data);
     
     final now = DateTime.now();
     final bool alert = db >= _noiseThreshold;
@@ -956,12 +939,9 @@ class _HomeScreenState extends State<HomeScreen>
         'db': db,
         'alert': alert,
       };
-      final jsonString = jsonEncode(payloadMap);
-      final jsonBytes = utf8.encode(jsonString);
-      final payload = Uint8List(jsonBytes.length + 1);
-      payload[0] = 2; // Type 2 for Settings/Status
-      payload.setRange(1, payload.length, jsonBytes);
-      
+      final payload =
+          OfflinePayload.encodeJson(OfflinePayloadType.control, payloadMap);
+
       Nearby().sendBytesPayload(_connectedEndpointId!, payload);
     }
   }
@@ -1002,9 +982,7 @@ class _HomeScreenState extends State<HomeScreen>
       // 3. Send (Main Thread)
       if (_connectedEndpointId == null) return;
 
-      final payload = Uint8List(jpegBytes.length + 1);
-      payload[0] = 1; // Type 1 for Image
-      payload.setRange(1, payload.length, jpegBytes);
+      final payload = OfflinePayload.encode(OfflinePayloadType.image, jpegBytes);
 
       await Nearby().sendBytesPayload(
         _connectedEndpointId!,
@@ -1194,15 +1172,16 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _onPayloadReceived(Uint8List bytes) {
-    if (bytes.isEmpty) return;
-    
-    final type = bytes[0];
-    if (type == 1) {
+    final message = OfflinePayload.decode(bytes);
+    if (message == null) return;
+
+    final type = message.type;
+    if (type == OfflinePayloadType.image) {
       // Image Data
       final wasEmpty = _currentImageBytesNotifier.value == null;
       
       // Update Notifier only - Avoid full screen rebuild!
-      _currentImageBytesNotifier.value = bytes.sublist(1);
+      _currentImageBytesNotifier.value = message.body;
       
       // Trigger rebuild only on first frame to update UI state (canShowPreview)
       if (wasEmpty) {
@@ -1212,11 +1191,10 @@ class _HomeScreenState extends State<HomeScreen>
       if (_recorderService.isRecording && _currentImageBytes != null) {
         _recorderService.addOfflineFrame(_currentImageBytes!);
       }
-    } else if (type == 2) {
+    } else if (type == OfflinePayloadType.control) {
       // Settings or Status Command
       try {
-        final jsonString = utf8.decode(bytes.sublist(1));
-        final map = jsonDecode(jsonString);
+        final map = message.decodeJson();
         
         if (map['type'] == 'SETTINGS') {
            final newSettings = VideoSettings.fromJson(map['data']);
@@ -1263,20 +1241,19 @@ class _HomeScreenState extends State<HomeScreen>
       } catch (e) {
         debugPrint("Error parsing payload: $e");
       }
-    } else if (type == 3) {
+    } else if (type == OfflinePayloadType.audio) {
       // Audio Data
       if (_role == DeviceRole.PARENT) {
         if (!_isPlayerRunning) {
           _player.start();
           _isPlayerRunning = true;
         }
-        _player.writeChunk(bytes.sublist(1));
+        _player.writeChunk(message.body);
       }
-    } else if (type == 4) {
+    } else if (type == OfflinePayloadType.battery) {
       // Battery Data
       try {
-        final jsonString = utf8.decode(bytes.sublist(1));
-        final map = jsonDecode(jsonString);
+        final map = message.decodeJson();
         if (map['type'] == 'BATTERY') {
           setState(() {
             _remoteBatteryLevel = map['level'];
@@ -1305,11 +1282,8 @@ class _HomeScreenState extends State<HomeScreen>
           'type': 'SETTINGS',
           'data': newSettings.toJson(),
         };
-        final jsonString = jsonEncode(payloadMap);
-        final jsonBytes = utf8.encode(jsonString);
-        final payload = Uint8List(jsonBytes.length + 1);
-        payload[0] = 2; // Type 2 for Settings/Status
-        payload.setRange(1, payload.length, jsonBytes);
+        final payload =
+            OfflinePayload.encodeJson(OfflinePayloadType.control, payloadMap);
         
         await Nearby().sendBytesPayload(_connectedEndpointId!, payload);
       }
@@ -1395,11 +1369,8 @@ class _HomeScreenState extends State<HomeScreen>
         final payloadMap = {
           'type': 'SWITCH_CAMERA',
         };
-        final jsonString = jsonEncode(payloadMap);
-        final jsonBytes = utf8.encode(jsonString);
-        final payload = Uint8List(jsonBytes.length + 1);
-        payload[0] = 2; // Type 2 for Settings/Status/Control
-        payload.setRange(1, payload.length, jsonBytes);
+        final payload =
+            OfflinePayload.encodeJson(OfflinePayloadType.control, payloadMap);
         
         await Nearby().sendBytesPayload(_connectedEndpointId!, payload);
         
@@ -1472,19 +1443,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (_webrtcService == null) return;
       final level = await _webrtcService!.getAudioLevel();
       if (level != null) {
-        // Convert linear 0..1 to rough dB
-        // 0.0 -> Silence
-        // 1.0 -> Max (0 dBFS)
-        // Mapping: dB = 20 * log10(level) + 100
-        // level 0.001 (-60dB) -> 40
-        // level 0.01 (-40dB) -> 60
-        // level 0.1 (-20dB) -> 80
-        // level 1.0 (0dB) -> 100
-        double db = 0;
-        if (level > 0) {
-          db = 20 * log(level) / ln10 + 100;
-        }
-        _processNoiseLevel(db.clamp(0.0, 120.0));
+        // Linear 0..1 -> 20*log10(level) + 100, clamped to 0..120.
+        _processNoiseLevel(webrtcAudioLevelToDb(level));
       }
     });
 
