@@ -460,6 +460,13 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Etki:** Debug'da test/assertion hatası; release'te loglanan bir istisna.
 - **Durum:** Düzeltildi (`0a4932c`): yalnızca sayfanın context'i hâlâ mounted ise çağrılıyor. E2E ile doğrulandı.
 
+### B62 — Ana ekran kapanırken dispose içinden setState çağrılıyor (Orta)
+- **Dosya:** `home_screen.dart` `dispose`, `_handleConnectionStatus`, `_handlePairingError`.
+- **Sorun:** `dispose`, `WebRTCService`'i kapatıyor; servisin `hangUp` çağrısı DISCONNECTED durumunu senkron olarak bildiriyor. `mounted` dispose sırasında hâlâ true olduğu için `setState` çağrılıyordu.
+- **Nasıl bulundu:** Emülatör E2E testi; ana ekran kapatıldı.
+- **Etki:** Bağlıyken uygulama kapatılırsa debug'da assertion, release'te istisna.
+- **Durum:** Düzeltildi (`771e3bc`): `_disposing` bayrağı.
+
 ---
 
 ## Hiç çalışmayan veya yarım kalmış özellikler
