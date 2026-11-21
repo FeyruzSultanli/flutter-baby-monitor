@@ -348,6 +348,29 @@ class _HomeScreenState extends State<HomeScreen>
     }
     _batterySyncTimer?.cancel();
     _batteryStateSubscription?.cancel();
+    // Resources that were not released before (B25).
+    _noisePollTimer?.cancel();
+    _audioSub?.cancel();
+    unawaited(Future(() async {
+      try {
+        await _recorder.stop();
+        await _player.stop();
+      } catch (e) {
+        debugPrint('Audio stream stop on dispose failed: $e');
+      }
+    }));
+    if (_isOfflineMode) {
+      unawaited(Future(() async {
+        try {
+          await Nearby().stopAdvertising();
+          await Nearby().stopDiscovery();
+          await Nearby().stopAllEndpoints();
+        } catch (e) {
+          debugPrint('Nearby stop on dispose failed: $e');
+        }
+      }));
+    }
+    _currentImageBytesNotifier.dispose();
     _discoveryStreamController.close();
     _controller?.dispose();
     _alertController.dispose();
