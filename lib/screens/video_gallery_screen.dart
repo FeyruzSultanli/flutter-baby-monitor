@@ -16,6 +16,12 @@ class VideoGalleryScreen extends StatefulWidget {
 
 class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
   List<FileSystemEntity> _videos = [];
+  // One thumbnail future per file. Creating the future inside build() made
+  // every rebuild re-extract every thumbnail (B31).
+  final Map<String, Future<String?>> _thumbnailFutures = {};
+
+  Future<String?> _thumbnailFor(String path) =>
+      _thumbnailFutures.putIfAbsent(path, () => _generateThumbnail(path));
   bool _isLoading = true;
 
   @override
@@ -40,6 +46,7 @@ class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
           return b.statSync().modified.compareTo(a.statSync().modified);
         });
 
+        if (!mounted) return;
         setState(() {
           _videos = files;
         });
@@ -47,7 +54,7 @@ class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
     } catch (e) {
       debugPrint('Error loading videos: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -85,6 +92,8 @@ class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
     try {
       if (await file.exists()) {
         await file.delete();
+        _thumbnailFutures.remove(file.path);
+        if (!mounted) return;
         setState(() {
           _videos.remove(file);
         });
@@ -199,7 +208,7 @@ class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
                                 fit: StackFit.expand,
                                 children: [
                                   FutureBuilder<String?>(
-                                    future: _generateThumbnail(file.path),
+                                    future: _thumbnailFor(file.path),
                                     builder: (context, snapshot) {
                                       if (snapshot.connectionState == ConnectionState.waiting) {
                                         return Container(
