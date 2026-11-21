@@ -45,6 +45,10 @@ class WebRTCService {
 
   ConnectionStatus _status = ConnectionStatus.DISCONNECTED;
   Timer? _disconnectTimer;
+  // Parent: no offer for our session within this time counts as failed, so
+  // the automatic rejoin (with backoff) takes over.
+  static const Duration offerTimeout = Duration(seconds: 20);
+  Timer? _offerTimer;
 
   // Baby side
   String? _roomCode;
@@ -82,6 +86,8 @@ class WebRTCService {
   Future<void> _closePeer() async {
     _disconnectTimer?.cancel();
     _disconnectTimer = null;
+    _offerTimer?.cancel();
+    _offerTimer = null;
     await _remoteCandidateSub?.cancel();
     await _answerSub?.cancel();
     await _offerSub?.cancel();
@@ -238,6 +244,13 @@ class WebRTCService {
         _setStatus(ConnectionStatus.CONNECTING);
         await _buildBabyPeer(roomCode, session: session, generation: generation);
       } catch (e) {
+        if (generation != _generation) {
+          // Cancelled by hangUp()/a new start: the closed peer threw; not an error.
+          debugPrint('Abandoned baby negotiation: $e');
+          return;
+        }
+        // Let the next room snapshot with this session try again.
+        _babySession = null;
         _reportError('Teklif oluşturulamadı: $e', e);
       }
     });
@@ -274,7 +287,15 @@ class WebRTCService {
       _onPeerState(state, roomCode);
     };
 
-    if (session == null) return; // standby: no parent yet
+    if (session == null) {
+      // Standby (no parent yet): a local description makes libwebrtc create the
+      // audio sender, so getAudioLevel() (cry detection) works before a parent
+      // joins. Nothing is sent; candidates without a session are not written.
+      final standbyOffer = await pc.createOffer();
+      if (generation != _generation || !identical(_peerConnection, pc)) return;
+      await pc.setLocalDescription(standbyOffer);
+      return;
+    }
 
     final offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -305,7 +326,7 @@ class WebRTCService {
   Future<void> startAsParent(String roomCode, {required String session}) async {
     try {
       _setStatus(ConnectionStatus.CONNECTING);
-      _generation++;
+      final generation = ++_generation;
       await _ensurePeerClosed();
       _isBaby = false;
       _signalingService.session = session;
@@ -313,8 +334,14 @@ class WebRTCService {
 
       // Connect signaling
       await _signalingService.connect(roomCode);
+      if (generation != _generation) return; // hangUp()/another start meanwhile
 
       final pc = await _createPeerConnection();
+      if (generation != _generation) {
+        await pc.close();
+        await pc.dispose();
+        return;
+      }
       _peerConnection = pc;
 
       pc.onIceCandidate = (candidate) {
@@ -331,7 +358,8 @@ class WebRTCService {
         if (event.streams.isNotEmpty) {
           remoteRenderer.srcObject = event.streams.first;
         }
-        _setStatus(ConnectionStatus.CONNECTED);
+        // CONNECTED comes from the peer connection state, not from the track
+        // (a track arrives before ICE connects).
       };
 
       // Wait for the offer of our session
@@ -363,6 +391,14 @@ class WebRTCService {
         },
         onError: (e) => _reportError('ICE candidate okunamadı: $e'),
       );
+
+      _offerTimer = Timer(offerTimeout, () async {
+        if (!identical(_peerConnection, pc)) return;
+        if (await pc.getRemoteDescription() == null) {
+          debugPrint('No offer for session $session within ${offerTimeout.inSeconds} s');
+          _setStatus(ConnectionStatus.FAILED);
+        }
+      });
     } catch (e) {
       _reportError('Bağlantı kurulamadı: $e', e);
       rethrow;

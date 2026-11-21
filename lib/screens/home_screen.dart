@@ -122,6 +122,9 @@ class _HomeScreenState extends State<HomeScreen>
   String? _viewerSession;
   final ReconnectBackoff _rejoinBackoff = ReconnectBackoff();
   Timer? _rejoinTimer;
+  // Bumped by every manual join, rejoin attempt and reset; an attempt whose
+  // token is outdated stops before writing a session (no competing sessions).
+  int _joinToken = 0;
 
   bool _isFullscreen = false;
   bool _fullscreenCryOverlay = false;
@@ -543,11 +546,12 @@ class _HomeScreenState extends State<HomeScreen>
     final webrtc = _webrtcService;
     if (!mounted || roomCode == null || pairing == null || webrtc == null) return;
     if (_viewerSession == null || _role != DeviceRole.PARENT) return;
+    final token = ++_joinToken;
     final session = newViewerSessionId();
     _viewerSession = session;
     try {
       await pairing.joinRoom(roomCode, session: session);
-      if (!mounted || _viewerSession != session) return;
+      if (!mounted || token != _joinToken) return;
       await webrtc.startAsParent(roomCode, session: session);
     } on RoomNotFoundException {
       // The baby closed the room: stop retrying.
@@ -555,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (mounted) _handlePairingError(AppLocalizations.of(context).roomClosed);
     } catch (e) {
       debugPrint('Rejoin failed: $e');
-      _scheduleRejoin();
+      if (token == _joinToken) _scheduleRejoin();
     }
   }
 
@@ -661,6 +665,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _resetPairing({bool deleteRoom = false, bool restoreCamera = true}) async {
     final activeRoom = _pairingState?.roomCode;
+    // Stop automatic rejoin first, so nothing writes a new session while (or
+    // after) we leave the room (B08).
+    final wasViewer = _viewerSession != null;
+    _viewerSession = null;
+    _joinToken++;
     _rejoinTimer?.cancel();
     _rejoinBackoff.reset();
     await _exitNightMode();
@@ -716,7 +725,7 @@ class _HomeScreenState extends State<HomeScreen>
       try {
         if (deleteRoom) {
           await _pairingService?.closeRoom(activeRoom);
-        } else if (_role == DeviceRole.PARENT && _viewerSession != null) {
+        } else if (_role == DeviceRole.PARENT && wasViewer) {
           // Clear our session so the baby closes its peer and waits (B08).
           await _pairingService?.leaveRoom(activeRoom);
         } else {
@@ -726,7 +735,6 @@ class _HomeScreenState extends State<HomeScreen>
         debugPrint('Room cleanup failed: $e');
       }
     }
-    _viewerSession = null;
     if (!mounted) return;
     setState(() {
       _pairingState = null;
@@ -896,10 +904,13 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       // Each join is a new viewer session; the baby answers it with a fresh
       // offer, so leaving and joining the same room works (B08).
+      _rejoinTimer?.cancel();
+      _rejoinBackoff.reset();
+      final token = ++_joinToken;
       final session = newViewerSessionId();
       _viewerSession = session;
-      _rejoinBackoff.reset();
       await _pairingService!.joinRoom(roomCode, session: session);
+      if (token != _joinToken) return;
       _listenRoomUpdates(roomCode);
       await _webrtcService!.startAsParent(roomCode, session: session);
       if (!mounted) return;

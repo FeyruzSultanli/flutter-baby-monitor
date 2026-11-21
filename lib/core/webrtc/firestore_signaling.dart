@@ -42,6 +42,8 @@ class FirestoreSignaling implements SignalingInterface {
   @override
   Future<void> sendCandidate(RTCIceCandidate candidate) async {
     if (_currentRoomId == null) return;
+    // A baby standby peer has no session; its candidates are useless (B08).
+    if (session == null) return;
     final collection = _isCaller ? 'callerCandidates' : 'calleeCandidates';
     await _rooms
         .doc(_currentRoomId)
