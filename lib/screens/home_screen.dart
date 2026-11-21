@@ -1556,7 +1556,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (_listeningNoise) return;
 
-    // Use WebRTC stats polling instead of NoiseMeter to avoid mic conflict on devices like Redmi Note 9 Pro
+    // Use WebRTC stats polling instead of a separate mic reader (e.g. noise_meter) to avoid mic conflict on devices like Redmi Note 9 Pro
     _noisePollTimer?.cancel();
     _noisePollTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) async {
       if (_webrtcService == null) return;
