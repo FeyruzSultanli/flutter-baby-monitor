@@ -905,6 +905,9 @@ class _HomeScreenState extends State<HomeScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(seconds: 8),
+            // With an action a SnackBar persists by default and would cover
+            // the bottom controls for good (B67).
+            persist: false,
             content: Text(l10n.iosCameraForegroundHint),
             action: SnackBarAction(
               label: l10n.nightModeAction,
@@ -1092,6 +1095,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(seconds: 8),
+            persist: false,
             content: Text(AppLocalizations.of(context).permissionDenied),
             action: SnackBarAction(
               label: AppLocalizations.of(context).settings,
@@ -2141,6 +2146,8 @@ class _HomeScreenState extends State<HomeScreen>
     final l10n = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(seconds: 8),
+        persist: false,
         content: Text(l10n.notificationsPermissionRequired),
         action: SnackBarAction(label: l10n.settings, onPressed: () => openAppSettings()),
       ),
