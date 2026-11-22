@@ -116,6 +116,58 @@
   - Eklenti token'ı zaten almışsa bu adım atlanıyor.
   - Simülatör APNs'e yanıt vermediği için bu zincir yalnızca gerçek iPhone'da doğrulanabilir (TEST_PLAN P1–P3). Loglar: `Push: FCM token stored in room` ya da `APNs token not available ... (registration: ...)`.
 
+## Oturum: Ninni v2 (otonom)
+
+### A18 — Foreground service: eklenti yerine kendi küçük servisimiz
+- **Seçenekler:** (a) `flutter_foreground_task` 11.0.3 (MIT), (b) kendi Kotlin servisimiz (`MonitorService.kt`, ~200 satır) + `ninni/monitor_service` kanalı.
+- **Seçim:** (b).
+- **Neden:** Eklentinin Android tarafı, geri çağırma verilmese bile servis başlarken **ikinci bir `FlutterEngine`** oluşturuyor; bu motor tüm eklentileri (flutter_webrtc, camera, firebase…) yeniden kaydediyor. Kamera/mikrofon/WebRTC'nin aynı süreçte iki kez kaydı cihazda öngörülemeyen sorunlara yol açabilir. Bizim ihtiyacımız yalnızca bildirim + süreç önceliği + wake/Wi-Fi kilidi; iş zaten uygulamanın kendi motorunda.
+- **Ayrıntılar:** Tür, verilmiş izinlere göre seçilir (Android 14+ izinsiz `camera`/`microphone` türünü reddeder): bebek `camera|microphone` (+ offline `connectedDevice`), ebeveyn `mediaPlayback`. `stopWithTask=true`: uygulama görev listesinden atılırsa servis de durur (Flutter motoru aktiviteyle birlikte ölüyor). Sistem servisi kendisi yeniden başlatırsa bildirim göstermeden durur. "Durdur" düğmesi yok; bildirime dokununca uygulama açılır.
+- **Geri alma:** `MonitorForegroundService` çağrılarını kaldırmak yeterli.
+
+### A19 — `environment.sdk` alt sınırı değişmedi
+- PLAN_NEXT §5'teki `^3.12.0` yükseltmesi yalnızca `flutter_foreground_task` içindi; A18 ile gerek kalmadı. Dil sürümü değişmesin diye `^3.6.2` kaldı.
+
+### A20 — Bağlantı koptu alarmının eşikleri (V2 5.6)
+- Plan: "disconnected/failed ya da 20 sn kare/ses gelmezse".
+- **Seçim:** `failed` → hemen; WebRTC `disconnected` (bizde CONNECTING) / Nearby kopması → 5 sn sonra; bağlıyken 20 sn hiç medya (inbound RTP bayt sayısı artmıyor / offline kare-ses yok) → alarm. Hiç bağlanmamış oturumda alarm yok (o durumda eşleşme hatası gösteriliyor).
+- **Neden:** Wi-Fi'daki 1–2 sn'lik takılmalar her seferinde alarm çaldırmasın; 5 sn yine de "hemen" sayılır. Bağlı görünüp medya gelmiyorsa (takılı peer) otomatik yeniden katılma da başlatılıyor.
+- Ses: `assets/audio/alarm_connection.wav` (kendi sentezimiz), alarm akışında (Android `USAGE_ALARM`), ses odağı istenmeden; titreşim 3 sn'de bir. "Alarmı sustur" sesi/titreşimi keser, ekran bağlantı dönene kadar kalır. Ekranda ayrıca "Bağlantıyı kes" var (taslakta yok): bebek telefonu tamamen gittiyse ekrandan çıkılabilsin.
+
+### A21 — Firestore kurallarına v2 alanları tek seferde
+- `battery` (5.7) şimdi kullanılıyor; `roomName`, `soothe`, `nightLight` (Faz 3) şimdiden eklendi; `alerts`'e `type` (`cry`/`battery`) ve `level`.
+- **Neden:** Cavid kuralları bir kez yayınlasın. Yeni alanlar ayrı `update()` ile yazılıyor; kurallar yayınlanmadan önce reddedilseler de ağlama alarmı ve eşleşme etkilenmez.
+
+### A22 — Impeller opt-out
+- Depoda ve git geçmişinde `EnableImpeller` / `io.flutter.embedding.android.EnableImpeller` yok. Android zaten Impeller ile çalışıyor; kaldırılacak bir şey yok.
+
+### A23 — iOS'ta uygulamanın kendi sesleri
+- `audioplayers` (MIT) iOS'ta tek bir ses oturumu kullanır ve çalma bitince oturumu kapatmayı dener. Global bağlam `playAndRecord` + `mixWithOthers` + `defaultToSpeaker` (WebRTC ile aynı kategori). iOS, çalışan bir ses birimi (WebRTC) varken oturumun kapatılmasını reddeder; yine de alarm/ninni sonrası WebRTC sesinin sürdüğü gerçek iPhone'da doğrulanmalı (TEST_PLAN V2).
+
+### A24 — Sayfa geçişleri: iOS'ta yerel geçiş
+- Plan: `animations` ile SharedAxis/FadeThrough. Android'de ve aşamalar arası (rol → kod → canlı) SharedAxis, karşılama → uygulama FadeThrough.
+- **iOS'ta itilen sayfalar** (Ayarlar, Geçmiş, Galeri) için Cupertino geçişi kaldı: kaydırarak geri dönme hareketini o taşıyor; SharedAxis bunu kaldırırdı.
+
+### A25 — Karşılama 3: isteğe bağlı izin düğmesi
+- Taslakta "Yakındaki cihazlar" satırında yalnızca "Sonra" yazan çerçeveli bir düğme var; plan ise her satırda "İzin ver"/"Verildi" istiyor ve izin penceresi yalnızca kullanıcı "İzin ver"e basınca açılmalı.
+- **Seçim:** İsteğe bağlı satırda çerçeveli (ikincil) "İzin ver"; zorunlu satırlarda dolu "İzin ver". Reddedilen izinde "Ayarları aç". Hiçbir izin karşılamayı engellemez ("Hazırım" her zaman açık).
+- Dokunma alanı 44 pt (taslaktaki 36 px yerine; plan §2 ≥44).
+
+### A26 — Eski çoklu kamera ekranı
+- `multi_camera_screen.dart` + `multi_peer_service.dart` `kMultiCameraEnabled = false` ile zaten kapalıydı ve v2 planında yok. Dosyalar silinmedi (özellik kararı Cavid'in), yeni arayüzden bağlantı yok.
+
+### A27 — HomeScreen'in parçalanması
+- PLAN_NEXT.md'de "refactor planı adım 2–6" diye bir bölüm yok (PLAN_NEXT'teki adımlar D1–D3 işleri). Kendi planım:
+  1. Tüm mantık `MonitorController`'a (ChangeNotifier) taşındı; kod satır satır korunarak (`setState`/`mounted` küçük ara katmanlarla), böylece B08/B70/D3 davranışı değişmedi.
+  2. `BuildContext` gerektiren yerler: snackbar ve diyaloglar uygulama genelindeki `rootMessengerKey`/`rootNavigatorKey` ile.
+  3. Ekranlar yalnızca controller'ı okur; aşama (rol seç → bebek kod → bebek canlı / ebeveyn kod → canlı) controller durumundan türetilir (`stageOf`), yönlendirme yok.
+  4. Ebeveyn alarmları (ağlama, bağlantı koptu) `MaterialApp.builder` içinde tüm sayfaların üstünde.
+- Davranış farkları (bilinçli): bebek rolü seçilince oda hemen kurulur (eskiden menüden); online bebekte kamera önizlemesi yalnızca WebRTC ile (camera eklentisi yalnızca offline); ebeveynin başarısız ilk katılımı kod ekranına döner.
+
+### A28 — Ağlama alarmı ekranı (ebeveyn)
+- Yeni bir ağlama başlayınca tam ekran alarm açılır, ses (`alarm_cry.wav`, döngü) + titreşim çalar. Ağlama bitince ses durur ama ekran ebeveyn bir şey seçene kadar kalır ("6 saniyedir" yerine "durdu"). "5 dk sessize al" 5 dk boyunca ekran ve ses açmaz; geçmiş ve bildirimler sürer.
+- Bildirim sesi zaten çalıyor; uygulama içi ses yalnızca uygulama açıkken (arka planda bildirim + push).
+
 ## Cavid'in kararı bekleniyor
 
 - **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.

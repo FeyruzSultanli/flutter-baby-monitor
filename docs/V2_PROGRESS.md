@@ -54,5 +54,44 @@ Riskler: iOS'ta `audioplayers` ses oturumu WebRTC'yi bozabilir → `AudioContext
 Semantics etiketleri, büyük yazı (textScaler 1.3–2.0) taşma testleri, kontrast kontrolü (token çiftleri için birim test), iPhone SE (320×568 pt) ve tablet düzenleri (en fazla 560 pt içerik genişliği), bebek cihazında yeniden çizim sıklığı (RepaintBoundary, ~10 Hz), E2E'nin tamamı, mağaza görüntüleri için `--dart-define=NINNI_DEMO=true` demo durumları.
 Riskler: emülatörde gerçek CPU/ısı ölçülemez → gerçek cihaz maddesi.
 
+## Faz 1 — Özet (tamamlandı)
+
+Commit'ler: `339ddea` (servis), `a28e284` (kurallar + Function), `6faf617` (bekçi, pil, arka planda dinleme), `42ce83c` (pil push'u için sunucu sınırı), `3a17624` (B71).
+
+- **5.12 Foreground service (Android):** kendi `MonitorService.kt`'miz (DECISIONS A18). Bebek yayını başlayınca (online oda / offline yayın) "Ninni yayında" bildirimiyle başlar; yayın bitince, rol değişince ya da uygulama görevden atılınca durur. Wake lock + Wi-Fi kilidi tutar. Tür izinlere göre (`camera|microphone` [+ `connectedDevice`]).
+- **5.10 Arka planda dinleme:** ebeveynde ayar (varsayılan açık). Android: `mediaPlayback` servisi; iOS: `audio` arka plan modu (zaten vardı). Kapalıyken uygulama görünmezse bebek sesi kısılır.
+- **5.6 Bağlantı koptu:** `ConnectionWatchdog` (saf mantık, testli): `failed` → hemen, kopuk 5 sn, bağlıyken 20 sn medya yok → tam ekran amber uyarı + döngüsel alarm sesi + titreşim + bildirim; bağlantı dönünce kendiliğinden kapanır. "Tekrar dene", "Alarmı sustur", "Bağlantıyı kes".
+- **5.7 Bebek pili:** online pil senkronu yoktu, eklendi (`battery` alanı). Ebeveynde %15 altı ve şarjda değilse **bir kez** amber kart (arka plandaysa yerel bildirim). Uygulama kapalıyken: bebek `alerts`'e `type: battery` belgesi yazar, Function ayrı etiketle push eder (sunucuda 30 dk sınır).
+- **Impeller:** opt-out yoktu (A22).
+- **B71 (yeni hata, E2E buldu):** ebeveyn aynı teklife iki kez cevap verebiliyordu; düzeltildi.
+- **Testler:** `flutter analyze` 0 error/0 warning; `flutter test` 106/106 (Faz 1 sonu); Firestore kuralları 29/29; Function 11/11.
+- **Android ↔ Android E2E** (`test-results/20261122-181807-android`, Faz 1 kodu, `3a17624`): iki taraf da geçti, 54 kontrolün 53'ü doğru. Yeni: `connection_lost_alarm_shown` ve `..._cleared_after_reconnect` ✅ (uçak modu). Ekran görüntüsünde online pil senkronu görünüyor (%100, şarjda). Tek ❌ `gallery_opens`: eski arayüzde kayıt durduktan sonra galeri ikonuna dokunuş karşılanmadı; eski arayüz Faz 2'de kaldırıldığı için ayrıca düzeltilmedi (yeni arayüzde galeri Ayarlar'da).
+- İlk iki koşu: biri ebeveyn emülatörünün ağı olmadığı için (emülatör yeniden başlatıldı), biri B71 yüzünden düştü.
+- `dev`'e push: `3a17624`.
+
+### Faz 1 — Gerçek cihazda test edilecekler
+TEST_PLAN.md §14 (V1.1–V1.16). En önemlileri: **V1.1/V1.2** (ekran kapalıyken / başka uygulamadayken kamera-mikrofon sürüyor mu — en büyük risk), V1.6–V1.8 (kilitliyken dinleme, Android ve iPhone), V1.9–V1.13 (bağlantı koptu alarmı), V1.14–V1.15 (pil).
+
 ## Cavid yapacak
-_(Firebase deploy ve konsol adımları fazlar ilerledikçe buraya eklenir.)_
+
+Firebase tarafı (kod hazır, deploy edilmedi):
+
+1. **Firestore kuralları** (v2 alanları: `battery`, `roomName`, `soothe`, `nightLight`, alarm türü). Telefon testinden sonra:
+
+   ```bash
+   cd /Users/feyruz/Desktop/baby_monitor_app && npx firebase-tools@latest deploy --only firestore:rules --project bebekmonitor-282fd
+   ```
+
+   Kurallar yayınlanmadan da uygulama çalışır; yalnızca pil/oda adı/ninni/gece lambası alanları sunucuda reddedilir (ağlama alarmı ve eşleşme etkilenmez).
+
+2. **Function** (pil push'u, Azerbaycanca metinler):
+
+   ```bash
+   npm --prefix functions ci && npm --prefix functions test
+   ```
+
+   ```bash
+   npx firebase-tools@latest deploy --only functions --project bebekmonitor-282fd
+   ```
+
+3. **Google Play** (yayın öncesi): Play Console → "Foreground service types" beyanı (kamera, mikrofon, connectedDevice, mediaPlayback) ve kısa bir kullanım videosu.

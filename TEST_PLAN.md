@@ -462,3 +462,49 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 13.6 | Ayarlar → Offline. | Anahtar yok; "Offline mod yalnızca Android'de" açıklaması var (A7). | ✅ | ✅/❌ |
 | 13.7 | APNs anahtarı yüklendikten ve Function deploy edildikten sonra: iPhone ebeveyn arka planda, Android bebekte ağlama. | iPhone'a push gelir. | — (simülatörde FCM token yok) | ✅/❌ + gecikme: |
 | 13.8 | Ebeveynde kayıt başlatıp durdurun, galeriyi açın, Fotoğraflar'a kaydedin. | Fotoğraf izni sorulur, kayıt Fotoğraflar'da görünür. | — | ✅/❌ |
+
+## 14. Ninni v2 — Faz 1 (güvenilirlik)
+
+> B = bebek telefonu, E = ebeveyn telefonu. Logcat'te `Monitor service`, `Connection watchdog` satırlarını arayın.
+
+| # | Özellik | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| V1.1 | 5.12 servis (Android B, online) | B'de oda oluşturun, E bağlansın. B'de ekranı kapatın (güç tuşu), 10 dk bekleyin. | Bildirim çubuğunda "Ninni yayında". E'de görüntü ve ses **kesilmeden** sürer; ağlama alarmı ve push çalışır. | ✅/❌ + kaç dk: |
+| V1.2 | 5.12 servis | V1.1'de B'de Home'a basıp başka bir uygulama açın, 5 dk. | Görüntü/ses sürer. (Kamera duruyorsa logcat'i gönderin: en büyük risk budur.) | ✅/❌ |
+| V1.3 | 5.12 servis (offline) | Offline modda V1.1. | Nearby görüntü + ses sürer. | ✅/❌ |
+| V1.4 | 5.12 servis | B'de "Bağlantıyı Kes". B'yi son uygulamalardan kaydırıp kapatın (ayrı denemede). | İki durumda da "Ninni yayında" bildirimi kaybolur. | ✅/❌ |
+| V1.5 | 5.12 Android 14+ | B'de kamera iznini reddedip oda oluşturmayı deneyin. | Uygulama çökmez (servis yalnızca izinli türlerle başlar). | ✅/❌ |
+| V1.6 | 5.10 arka planda dinleme (Android E) | E bağlı; E'yi kilitleyin, B'nin yanında konuşun. | E'de ses duyulur; bildirimde "Ninni dinliyor". | ✅/❌ |
+| V1.7 | 5.10 (iPhone E) | iPhone E bağlı; kilitleyin, B'nin yanında konuşun. | Ses duyulmaya devam eder (iOS `audio` arka plan modu). | ✅/❌ |
+| V1.8 | 5.10 kapalı | E Ayarlar → "Arka planda dinle" kapalı; E'yi kilitleyin. | Ses kesilir (Android: bildirim yok). Açınca ses geri gelir. Ağlama bildirimleri yine gelir. | ✅/❌ |
+| V1.9 | 5.6 bağlantı koptu | Bağlıyken B'de Wi-Fi'ı kapatın. | E'de ~5–20 sn içinde tam ekran amber "Bebek telefonuyla bağlantı koptu", alarm sesi + titreşim, bildirim. | ✅/❌ + sn: |
+| V1.10 | 5.6 | V1.9'da "Alarmı sustur". | Ses/titreşim durur, ekran kalır. | ✅/❌ |
+| V1.11 | 5.6 | B'de Wi-Fi'ı açın. | Bağlantı dönünce ekran ve bildirim kendiliğinden kapanır. | ✅/❌ + sn: |
+| V1.12 | 5.6 | B uygulamasını zorla kapatın. | E'de alarm; "Tekrar dene" çalışır (B açılınca yeni oda gerekiyorsa "oda kapandı" görünür ve alarm durur). | ✅/❌ |
+| V1.13 | 5.6 | E ekranı kilitliyken V1.9. | Alarm sesi kilit ekranında da çalar, bildirim görünür. | ✅/❌ |
+| V1.14 | 5.7 pil | B'nin pili %15'in altındayken şarjdan çıkarın (ya da `adb shell dumpsys battery set level 12; adb shell dumpsys battery unplug`). | E'de **bir kez** amber "Bebek telefonunun pili azaldı" kartı; E arka plandaysa bildirim. B şarja takılınca kart kapanır. | ✅/❌ |
+| V1.15 | 5.7 push (kurallar + Function deploy sonrası) | E uygulaması kapalı, V1.14. | E'ye "Bebek telefonunun pili azaldı — Pil %12…" push'u gelir; ağlama bildirimini **değiştirmez** (ayrı bildirim). | ✅/❌ |
+| V1.16 | Uzun test | B ve E 2 saat açık, B'nin ekranı kapalı. | Isınma ve pil tüketimini not edin; yayın kesilmez. | Pil %/saat: |
+
+## 15. Ninni v2 — Faz 2 (yeni tasarım)
+
+> Referans: `design/mockups/*.dc.html`. Yazı tipi uygulamaya gömülü (internetsiz de Plus Jakarta Sans görünmeli).
+
+| # | Ekran | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| V2.1 | Simge, ad | Kurulumdan sonra ana ekrana bakın (Android ve iPhone). | "Ninni" adı; koyu zeminde krem hilal + kayısı nokta. Android 13+ "temalı simge" kapalıyken de düzgün. Bildirim çubuğunda beyaz hilal. | ✅/❌ |
+| V2.2 | Açılış | Uygulamayı soğuk başlatın. | Koyu (#12142B) zemin + ortada simge; beyaz flaş yok. | ✅/❌ |
+| V2.3 | Karşılama 1–3 | Temiz kurulumda açın. | Yıldızlar yanıp söner, ay "nefes alır". "Geç" 3. sayfaya atlar. İzin pencereleri **yalnızca** "İzin ver"e basınca açılır; verilenlerde "Verildi". Reddedince "Ayarları aç". İkinci açılışta karşılama yok. | ✅/❌ |
+| V2.4 | Karşılama | Ayarlar → "Tanıtımı tekrar göster". | Karşılama açılır, "Hazırım" ile ayarlara döner. | ✅/❌ |
+| V2.5 | Rol seçimi | Sistem temasını açık/koyu yapın. | Rol ekranı temaya uyar; "Bebeğin yanında" kartı her zaman koyu. iPhone'da "İnternetsiz mod" satırı yok. | ✅/❌ |
+| V2.6 | Bebek: kod | "Bebeğin yanında". | Kamera/mikrofon izni (gerekirse), 8 kutulu kod, 10:00'dan geri sayım, Paylaş (sistem paylaşım menüsü) ve Kopyala ("Kod kopyalandı"). Nabız noktası. | ✅/❌ |
+| V2.7 | Bebek: kod süresi | 10 dk bekleyin. | "Kodun süresi doldu" + "Yeni kod". | ✅/❌ |
+| V2.8 | Ebeveyn: kod | Kodu yazın, sonra yapıştırın (`abcd-ef23` biçiminde de). | Harfler büyük harfe döner; 0/O/1/I yazınca kutular sallanır; 8. harfte küçük zıplama; "Bağlan" ancak 8 harfle açılır. Yanlış kodda kırmızı/kayısı hata metni. | ✅/❌ |
+| V2.9 | Bebek: yayında | Ebeveyn bağlanınca. | Bebek ekranı yayın ekranına geçer: "Ebeveyn bağlı" (nane), pil, oda kodu, CANLI, ses seviyesi kartı (eşik işareti), "Gece moduna geç", "Yayını bitir" (onay sorar). | ✅/❌ |
+| V2.10 | Gece modu | "Gece moduna geç". | Siyah, sönük saat, "Yayın sürüyor · ebeveyn bağlı"; iki dokunuşla ve geri tuşuyla çıkış. Animasyon yok. | ✅/❌ |
+| V2.11 | Ebeveyn: canlı | Bağlıyken. | Üstte görüntü (oda adı, kod, CANLI, "Bağlantı iyi", bebek pili, tam ekran), ses çubukları gerçek sesle oynar (~10 Hz), "Bebek sakin" · dB · son alarm, Geçmiş. Kaydet / Çevir / Ayarlar. | ✅/❌ |
+| V2.12 | Ağlama alarmı | B'de 3 sn ağlama sesi. | E'de tam ekran kayısı alarm, halkalar, ses + titreşim; "Görüntüyü aç" canlı ekrana döner; "5 dk sessize al" 5 dk boyunca alarmı açmaz; "Tamam" kapatır. Ağlama bitince ses durur, ekranda "durdu". | ✅/❌ |
+| V2.13 | Alarm geçmişi | Birkaç alarmdan sonra Geçmiş. | Gece özeti: alarm sayısı, toplam ağlama, en uzun sessiz dönem; Bu gece / Dün / 7 gün; boş durumda "Sakin bir gece!". | ✅/❌ |
+| V2.14 | Ayarlar | Hassasiyet, kalite, dil, tema. | Kaydırıcı 40–80 dB; Tasarruf/Dengeli/Net görüntüyü değiştirir; dil ve tema uygulama yeniden açılınca korunur. | ✅/❌ |
+| V2.15 | Erişilebilirlik (ön kontrol) | TalkBack / VoiceOver açık, ekranları gezin. | Düğmeler ve durumlar anlamlı okunur (ayrıntılı kontrol Faz 4). | ✅/❌ |
+| V2.16 | Küçük ekran | iPhone SE / küçük Android. | Taşma yok; uzun ekranlar kayar. | ✅/❌ |
