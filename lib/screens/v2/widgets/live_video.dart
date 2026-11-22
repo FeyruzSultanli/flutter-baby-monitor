@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../features/monitor/monitor_controller.dart';
 import '../../../theme/tokens.dart';
+import 'demo_video_art.dart';
 
 /// The baby's picture: own camera on the baby phone (WebRTC renderer online,
 /// camera preview offline), the received stream on the parent phone (WebRTC
@@ -57,7 +58,7 @@ class LiveVideo extends StatelessWidget {
     }
     return ColoredBox(
       color: NinniColors.nightVideo,
-      child: video ?? placeholder,
+      child: video ?? (c.isDemo ? const DemoVideoArt() : placeholder),
     );
   }
 }
@@ -85,12 +86,12 @@ class VideoPlaceholder extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2.4, color: NinniColors.primarySoftOnNight),
               )
             else if (icon != null)
-              Icon(icon, size: 32, color: const Color(0xFF6F7399)),
+              Icon(icon, size: 32, color: NinniColors.onNightMuted),
             const SizedBox(height: 12),
             Text(
               label.toUpperCase(),
               textAlign: TextAlign.center,
-              style: NinniType.label.copyWith(color: const Color(0xFF6F7399), letterSpacing: 0.5),
+              style: NinniType.label.copyWith(color: NinniColors.onNightMuted, letterSpacing: 0.5),
             ),
           ],
         ),

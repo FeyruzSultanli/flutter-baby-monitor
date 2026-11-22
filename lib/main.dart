@@ -46,7 +46,14 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider.value(value: language),
         // All monitoring logic (V2: moved out of the old HomeScreen).
-        ChangeNotifierProvider(create: (_) => MonitorController(locale: () => language.locale)),
+        ChangeNotifierProvider(create: (_) {
+          final controller = MonitorController(locale: () => language.locale);
+          // Store screenshots: --dart-define=NINNI_DEMO=<scene> (V2 phase 4).
+          final demo = DemoScene.fromDefine();
+          // ignore: invalid_use_of_visible_for_testing_member
+          if (demo != null) controller.debugDemo(demo);
+          return controller;
+        }),
       ],
       child: const BebekMonitorApp(),
     ),

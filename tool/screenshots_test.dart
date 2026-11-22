@@ -38,6 +38,8 @@ const String _locale = String.fromEnvironment('SHOT_LOCALE', defaultValue: 'tr')
 final double _w = double.tryParse(const String.fromEnvironment('SHOT_W')) ?? 390;
 final double _h = double.tryParse(const String.fromEnvironment('SHOT_H')) ?? 844;
 final double _textScale = double.tryParse(const String.fromEnvironment('SHOT_TEXT')) ?? 1.0;
+// 3 with 430x932 gives App Store 6.7" (1290x2796).
+final double _ratio = double.tryParse(const String.fromEnvironment('SHOT_RATIO')) ?? 2.0;
 
 Future<void> _loadFonts() async {
   final family = FontLoader('PlusJakartaSans');
@@ -57,7 +59,7 @@ Future<void> _shot(WidgetTester tester, String name) async {
   await tester.pump(const Duration(milliseconds: 600));
   final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const Key('shotBoundary')));
   final bytes = await tester.runAsync(() async {
-    final image = await boundary.toImage(pixelRatio: 2);
+    final image = await boundary.toImage(pixelRatio: _ratio);
     return image.toByteData(format: ui.ImageByteFormat.png);
   });
   final suffix = _textScale != 1.0 ? '_x$_textScale' : '';

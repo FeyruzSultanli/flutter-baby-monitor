@@ -41,6 +41,10 @@ class _AppRootState extends State<AppRoot> {
   @override
   void initState() {
     super.initState();
+    if (DemoScene.fromDefine() != null) {
+      _onboardingDone = true;
+      return;
+    }
     unawaited(OnboardingScreen.isDone().then((done) {
       if (mounted) setState(() => _onboardingDone = done);
     }));
