@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { PUSH_COOLDOWN_MS, isStaleTokenError, shouldSendPush } from '../cooldown';
-import { CHANNEL_ID, TAG, buildCryPushText, normalizeLocale } from '../messages';
+import { CHANNEL_ID, TAG, TAG_BATTERY, buildBatteryPushText, buildCryPushText, normalizeLocale } from '../messages';
 
 describe('cooldown', () => {
   const now = 1_000_000_000;
@@ -57,5 +57,19 @@ describe('messages', () => {
     assert.equal(buildCryPushText('en', undefined).body, 'The baby monitor detected a loud noise.');
     assert.equal(buildCryPushText('tr', Number.NaN).body, 'Bebek monitörü yüksek ses algıladı.');
     assert.equal(buildCryPushText('tr', '72').body, 'Bebek monitörü yüksek ses algıladı.');
+  });
+});
+
+describe('v2 messages', () => {
+  it('knows Azerbaijani', () => {
+    assert.equal(normalizeLocale('az'), 'az');
+    assert.equal(buildCryPushText('az', 70).title, 'Körpə ağlayır');
+  });
+
+  it('builds low battery texts with their own tag', () => {
+    assert.equal(TAG_BATTERY, 'battery_low');
+    assert.equal(buildBatteryPushText('tr', 12).body, 'Pil %12. Bebek telefonunu şarja takın.');
+    assert.equal(buildBatteryPushText('en', 9.6).body, 'Battery at 10%. Plug the baby phone into a charger.');
+    assert.equal(buildBatteryPushText('en', undefined).body, 'Plug the baby phone into a charger.');
   });
 });

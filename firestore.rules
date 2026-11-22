@@ -26,20 +26,24 @@ service cloud.firestore {
     function roomKeys() {
       return ['roomCode', 'ownerUid', 'viewerUid', 'createdAt', 'expiresAt',
               'isPaired', 'offer', 'answer', 'facingMode', 'cryAlert', 'cryDb',
-              'cryUpdated', 'videoSettings', 'noiseThreshold', 'viewerSession'];
+              'cryUpdated', 'videoSettings', 'noiseThreshold', 'viewerSession',
+              // Ninni v2: battery (5.7), room name (5.2), lullaby (5.4),
+              // night light (5.5).
+              'battery', 'roomName', 'soothe', 'nightLight'];
     }
 
     // Fields the baby (owner) may change after creation.
     function ownerFields() {
       return ['offer', 'isPaired', 'facingMode', 'cryAlert', 'cryDb',
-              'cryUpdated', 'videoSettings', 'noiseThreshold', 'expiresAt'];
+              'cryUpdated', 'videoSettings', 'noiseThreshold', 'expiresAt',
+              'battery', 'roomName', 'soothe', 'nightLight'];
     }
 
     // Fields the parent (viewer) may change.
     function viewerFields() {
       return ['viewerSession', 'viewerJoinedAt', 'answer', 'isPaired',
               'facingMode', 'videoSettings', 'noiseThreshold',
-              'viewerFcmToken', 'viewerLocale'];
+              'viewerFcmToken', 'viewerLocale', 'soothe', 'nightLight'];
     }
 
     function roomData(code) {
@@ -128,13 +132,15 @@ service cloud.firestore {
         allow delete: if isRoomOwner(code);
       }
 
-      // Cry alerts are written by the baby; the Cloud Function (admin) reads
-      // new ones and sends FCM to the parent.
+      // Cry (and, v2, low battery) alerts are written by the baby; the Cloud
+      // Function (admin) reads new ones and sends FCM to the parent.
       match /alerts/{id} {
         allow read: if isRoomMember(code);
         allow create: if isRoomOwner(code)
           && request.resource.data.keys().hasOnly(
-               ['title', 'body', 'timestamp', 'db', 'expiresAt']);
+               ['title', 'body', 'timestamp', 'db', 'expiresAt', 'type', 'level'])
+          && (!('type' in request.resource.data)
+              || request.resource.data.type in ['cry', 'battery']);
         allow delete: if isRoomOwner(code);
       }
     }

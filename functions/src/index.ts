@@ -5,7 +5,7 @@ import { logger } from 'firebase-functions';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 
 import { isStaleTokenError, shouldSendPush } from './cooldown';
-import { CHANNEL_ID, TAG, buildCryPushText } from './messages';
+import { CHANNEL_ID, TAG, TAG_BATTERY, buildBatteryPushText, buildCryPushText } from './messages';
 
 initializeApp();
 
@@ -32,6 +32,9 @@ export const onCryAlertCreated = onDocumentCreated(
     const alert = event.data?.data() ?? {};
     const db = getFirestore();
     const roomRef = db.collection('rooms').doc(roomId);
+    // v2: low battery alerts (once per episode, decided by the baby app)
+    // bypass the cry cooldown and use their own notification tag.
+    const isBattery = alert.type === 'battery';
 
     // Read token + apply the cooldown atomically (one push per minute).
     const target = await db.runTransaction(async (tx) => {
@@ -40,6 +43,7 @@ export const onCryAlertCreated = onDocumentCreated(
       const data = room.data() ?? {};
       const token = data.viewerFcmToken;
       if (typeof token !== 'string' || token.length === 0) return null;
+      if (isBattery) return { token, locale: data.viewerLocale };
       const lastPushAt = data.lastPushAt instanceof Timestamp ? data.lastPushAt.toMillis() : null;
       if (!shouldSendPush(lastPushAt, Date.now())) return null;
       tx.update(roomRef, { lastPushAt: FieldValue.serverTimestamp() });
@@ -51,13 +55,17 @@ export const onCryAlertCreated = onDocumentCreated(
       return;
     }
 
-    const { title, body } = buildCryPushText(target.locale, alert.db);
+    const { title, body } = isBattery
+      ? buildBatteryPushText(target.locale, alert.level)
+      : buildCryPushText(target.locale, alert.db);
+    const tag = isBattery ? TAG_BATTERY : TAG;
 
     // In the local Functions emulator there is no FCM emulator: never call the
     // real FCM API from tests, just record what would have been sent.
     if (process.env.FUNCTIONS_EMULATOR === 'true') {
       logger.info('EMULATOR: would send cry push', { roomId, alertId, title, body });
-      await roomRef.update({ lastPushPreview: { title, body } }).catch(() => undefined);
+      const field = isBattery ? 'lastBatteryPushPreview' : 'lastPushPreview';
+      await roomRef.update({ [field]: { title, body } }).catch(() => undefined);
       return;
     }
 
@@ -65,11 +73,11 @@ export const onCryAlertCreated = onDocumentCreated(
       await getMessaging().send({
         token: target.token,
         notification: { title, body },
-        data: { type: 'cry_alert', roomId, alertId },
+        data: { type: isBattery ? 'battery_low' : 'cry_alert', roomId, alertId },
         android: {
           priority: 'high',
-          ttl: 60_000,
-          notification: { channelId: CHANNEL_ID, tag: TAG, sound: 'default' },
+          ttl: isBattery ? 600_000 : 60_000,
+          notification: { channelId: CHANNEL_ID, tag, sound: 'default' },
         },
         apns: {
           headers: { 'apns-priority': '10' },

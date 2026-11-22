@@ -218,6 +218,17 @@ describe('updates by each side', () => {
     await assertFails(updateDoc(room('baby'), { expiresAt: Timestamp.fromMillis(Date.now() + 30 * HOUR) }));
   });
 
+  it('v2: battery, room name, lullaby and night light fields', async () => {
+    await assertSucceeds(updateDoc(room('baby'), { battery: { level: 12, charging: false, at: serverTimestamp() } }));
+    await assertSucceeds(updateDoc(room('baby'), { roomName: 'Bebek odası' }));
+    await assertSucceeds(updateDoc(room('parent'), { soothe: { track: 'rain', volume: 0.5, endsAt: null } }));
+    await assertSucceeds(updateDoc(room('baby'), { soothe: null }));
+    await assertSucceeds(updateDoc(room('parent'), { nightLight: { on: true, color: 'amber' } }));
+    await assertFails(updateDoc(room('parent'), { battery: { level: 100, charging: true } }));
+    await assertFails(updateDoc(room('parent'), { roomName: 'x' }));
+    await assertFails(updateDoc(room('stranger'), { soothe: { track: 'rain' } }));
+  });
+
   it('strangers cannot update', async () => {
     await assertFails(updateDoc(room('stranger'), { isPaired: true }));
   });
@@ -259,6 +270,15 @@ describe('subcollections', () => {
     await assertFails(addDoc(collection(db('parent'), 'rooms', CODE, 'alerts'), alert));
     await assertSucceeds(getDocs(collection(db('parent'), 'rooms', CODE, 'alerts')));
     await assertFails(getDocs(collection(db('stranger'), 'rooms', CODE, 'alerts')));
+  });
+
+  it('alerts: v2 battery type is allowed, unknown types are not', async () => {
+    const base = {
+      title: 'Pil', body: 'Pil %12', timestamp: serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(Date.now() + 24 * HOUR),
+    };
+    await assertSucceeds(addDoc(collection(db('baby'), 'rooms', CODE, 'alerts'), { ...base, type: 'battery', level: 12 }));
+    await assertFails(addDoc(collection(db('baby'), 'rooms', CODE, 'alerts'), { ...base, type: 'spam' }));
   });
 
   it('before a parent claims, a stranger cannot read candidates either', async () => {
