@@ -1,176 +1,144 @@
-# REPORT.md — Oturum özeti
+# REPORT.md — Otonom oturum raporu (21–22.11.2026)
 
-**Branch:** `dev`, `main`'in üzerine 43 commit. **Push yapılmadı.** `main`'e dokunulmadı, merge edilmedi.
+## Sabah özeti
 
-Firebase config dosyalarına ve Firebase proje ayarlarına dokunulmadı.
-
-Ayrıntılar başka dosyalarda:
-- [BUGS.md](BUGS.md): tüm bulgular, karar günlüğü ve her maddenin durumu.
-- [TEST_PLAN.md](TEST_PLAN.md): cihaz testleri.
-
-## Kısaca
-
-- Temizlik, WifiDirect'in kaldırılması ve ölü kodun silinmesi istediğiniz gibi yapıldı.
-- Derin incelemede **54 madde** çıktı:
-  - 24'ü düzeltildi, 1'i kısmen düzeltildi.
-  - 1'i doğrulama sonucu hata olmadığı anlaşıldı (B09).
-  - 12'si sizden **karar bekliyor**.
-  - Kalanlar açık (düşük öncelikli ya da güvenli bir yerel düzeltmesi yok).
-- **En kritik 3 konu** kodla çözülemez, altyapı ve ürün kararı gerektiriyor:
-  1. Bebek telefonunda ekran kapanınca yayın duruyor (foreground service yok).
-  2. Uygulama kapalıyken ebeveyne bildirim gitmiyor (FCM'i gönderen bir sunucu yok).
-  3. Kimlik doğrulama yok ve oda kodu tahmin edilebilir (gizlilik riski).
+1. **Yapıldı:** D2/D3 uygulama değişiklikleri bağımsız olarak incelendi; 6 bulgu düzeltildi (B55–B60). Android ve iOS için emülatörde çalışan uçtan uca testler yazıldı. Bu testler 7 hata daha buldu ve hepsi düzeltildi (B61–B67).
+2. **Android ↔ Android (API 35 Google Play emülatörleri):** 44/44 kontrol ✅. Kapsam: oda kodu, WebRTC, yanlış/süresi geçmiş kod, üçüncü cihazın reddi, ağlama alarmı (2 sn kuralı, 60 sn sınırı), alarm geçmişi, eşik senkronu, yeniden katılma, uçak modundan dönüş, gece modu, kayıt, galeri, dil, tema.
+3. **Android bebek ↔ iOS ebeveyn:** ✅ iki test de geçti, bağlantı kuruluyor. **iOS ↔ iOS:** koşu 7'de her şey geçti; tek sorun B67'ydi. B67 düzeltildikten sonraki tekrar koşusu bitirilemedi (BLOCKERS 5).
+4. **iOS uyumluluğu:** İzin metinleri TR/EN, minimum iOS 15, arka plan modları. Offline seçeneği iOS'ta gizli. iPhone bebekse gece modu öneriliyor. Simülatörde açılış çökmesi giderildi (B63).
+5. **Emülatörde test edilemeyenler:** offline (Nearby), farklı ağlar (TURN yok), gerçek push, gerçek ses kalibrasyonu, ekran kapalıyken yayın (7. adım bekliyor), iPhone kamerası.
+6. **Kararınız bekleniyor (DECISIONS.md):** `sound_stream` GPL-3.0 lisanslı (önerim: değiştirmek). Android ↔ iOS offline gerekli mi? TURN (D4)?
+7. **Sizin ilk 3 işiniz:**
+8. ① Firebase konsolu: Anonymous girişi açın, kuralları yayınlayın, TTL politikasını tanımlayın; Blaze kararından sonra Function'ı deploy edin (PLAN_NEXT.md, "D3 + D8 için konsol adımları" ve "D2 deploy adımları").
+9. ② İki Android telefonla TEST_PLAN.md'nin başındaki **G1–G8** kısa listesini yapın (~1,5 saat).
+10. ③ iPhone için Apple Developer hesabı ve APNs anahtarı (aşağıda "iOS: sizin yapmanız gerekenler"). Her şey `dev`'de ve push edildi; `main`'e dokunulmadı.
 
 ## Durum
 
 | Kontrol | Sonuç |
 |---|---|
-| `flutter analyze` | **0 error, 0 warning**, 13 info. Bunların hepsi dokunmamamı istediğiniz 3C kapsamında: 6 `constant_identifier_names`, 7 `use_build_context_synchronously`. Başlangıçta 64 sorun vardı. |
-| `flutter test` | **49/49 ✅**. Başta tek test vardı ve o da kırıktı. |
-| `flutter build apk --debug` | ✅ (son commit'te) |
-| Cihaz testi | **Yapılmadı.** Gerçek cihaz gerekiyor; TEST_PLAN.md hazır. |
+| `flutter analyze` | 0 error, 0 warning, 13 info (bilerek bırakılan enum adları ve `use_build_context_synchronously`) |
+| `flutter test` | 87/87 ✅ |
+| Android debug derlemesi | ✅ (E2E derlemeleri) |
+| E2E Android ↔ Android | ✅ 44/44 (`test-results/20261122-133651-android`) |
+| E2E Android ↔ iOS | ✅ (`test-results/20261122-030630-mixed`) |
+| E2E iOS ↔ iOS | Koşu 7'de ✅. Tek hata B67'ydi, düzeltildi. Sonraki tekrar koşusu yarım kaldı (BLOCKERS 5). |
+| Gerçek cihaz testi | Yapılmadı: TEST_PLAN.md G1–G9 |
+| Branch | `dev`, `main`'in 103 commit önünde, push edildi. `main`'e push/merge yok. Firebase config dosyalarına ve gerçek projeye dokunulmadı. |
 
-## Yapılanlar
+## Bu oturumda yapılanlar
 
-1. **Temizlik (ADIM 1):**
-   - 3A: kullanılmayan import ve değişkenler, etkisiz `!` işaretleri ve null kontrolleri, stil uyarıları.
-   - 3B: `withValues`, `surfaceContainerHighest`, `SharePlus`.
-   - WifiDirect servisi ve `flutter_p2p_connection` kaldırıldı. Derlenmiş manifest'te izin farkı **çıkmadı**. Offline modda artık WebRTCService oluşturulmuyor; mod değiştirilince eski servis dispose ediliyor.
-   - README güncellendi.
-   - home_screen'deki ölü kod silindi.
-2. **İnceleme (ADIM 2):** `lib/` ve Android tarafı tarandı; bulgular BUGS.md'de. Bir bulgu (B09, Nearby'nin 32 KB sınırı) kütüphanenin içine bakılarak çürütüldü: projedeki sürümde sınır yaklaşık 1 MB.
-3. **Testler (ADIM 3):**
-   - Testlenebilsin diye offline mesaj kodlama/çözme ve PCM→dB hesabı ayrı dosyalara çıkarıldı.
-   - Unit testler: payload, dB hesabı, VideoSettings, AlertModel, PairingState, TR/EN anahtar eşitliği ve alarm geçmişi servisi.
-   - Kırık şablon test, gerçek bir smoke testle değiştirildi (SettingsSheet ve NoiseLevelBar, iki dilde).
-4. **Düzeltmeler (ADIM 4):** Sadece koddan açıkça görülen, yerel ve davranışı genişletmeyen hatalar düzeltildi. Her biri ayrı commit, mesajında bug ID'si var.
-   - Düzeltmeler bitince diff'i bağımsız bir inceleme ajanına okuttum. Bulduğu 5 sorunun hepsi benim düzeltmelerimden çıkmıştı; hepsi follow-up commit'leriyle giderildi (BUGS.md → K7).
-5. **TEST_PLAN.md ve bu rapor** (ADIM 5–6).
+1. **Güvenlik kuralları:** `.claude/settings.local.json` içinde `main`'e push, force push, merge, `reset --hard`, Firebase login ve deploy yasak (git dışı).
+2. **Bağımsız inceleme (D2/D3):** pairing_service, auth_service, notification_service ve home_screen ayrı bir ajana okutuldu. Bulgular B55–B60 olarak ayrı commit'lerle düzeltildi.
+3. **Firebase Emulator Suite:**
+   - Auth, Firestore (bizim `firestore.rules`) ve Functions yerelde çalışıyor (`scripts/firebase_emulators.sh`, `firebase.emulators.json`).
+   - Uygulama emülatöre yalnızca debug derlemede ve `--dart-define=USE_FIREBASE_EMULATOR=true` ile bağlanıyor (Android 10.0.2.2, iOS localhost). Release her zaman gerçek Firebase'e bağlanır.
+   - Function emülatörde gerçek FCM'e gitmiyor; bildirimin içeriğini odaya `lastPushPreview` olarak yazıyor.
+4. **Uçtan uca testler:**
+   - Testler `integration_test/baby_test.dart` ve `parent_test.dart`. İki cihaz Firestore emülatörü üzerinden koordine oluyor.
+   - Runner `scripts/run_e2e.py --platform android|ios|mixed`: izinleri `adb pm grant` / `simctl privacy` ile veriyor, ekran görüntüsü ve log topluyor, `test-results/` altına `summary.md` yazıyor.
+   - Sahte ağlama yalnızca debug'da çalışıyor (`DebugHooks.fakeNoiseDb`).
+5. **Android emülatörleri:** API 35 Google Play image indirildi; "baby" ve "parent" AVD'leri oluşturuldu.
+6. **iOS (Xcode 27):** Ayrıntılar aşağıda, "iOS".
+7. **Belgeler:**
+   - TEST_PLAN.md: her maddede emülatör sonucu ve gerçek cihaz gerekip gerekmediği; en kısa telefon listesi (G1–G9); iPhone bölümü (13).
+   - DECISIONS.md (A1–A14), BLOCKERS.md (1–5), BUGS.md (B55–B67) ve CLAUDE.md güncellendi.
 
-## Düzeltilen hatalar
+## Bu oturumda bulunan ve düzeltilen hatalar
 
-| ID | Önem | Ne düzeltildi |
-|---|---|---|
-| B04 | Yüksek | Bebek telefonu kendi ağlama bildirimini (sesli) alıyordu. |
-| B05 | Yüksek | Ağlama sürdükçe 2 sn'de bir bildirim geliyordu; artık en fazla 60 sn'de bir. Offline ebeveyndeki aynı spam da düzeldi. |
-| B06 | Yüksek | Bebek kendi offer'ını görünce rol değiştiriyordu; ICE adayları yanlış koleksiyona yazılıyordu. Bu, farklı ağlarda bağlanmayı zorlaştırıyordu. |
-| B10 | Yüksek | Offline modda her kare için yeni bir isolate açılıyordu (ısınma, artan gecikme); artık aynı anda tek kare işleniyor. |
-| B11 | Yüksek | Sessizlikte dB = −∞/NaN çıkıyordu; JSON hatası yüzünden ses çubuğu donuyordu. |
-| B12 | Yüksek | Offline bebek modunda mikrofon izni istenmiyordu; açılışta izin istekleri çakışıyordu. |
-| B13 | Yüksek | Kayıt hata verince buton "kayıtta" durumunda takılı kalıyordu. |
-| B14 | Yüksek | Bağlantı kesilince veya mod değişince kayıt durmuyordu; mp4 oynatılamaz kalıyordu. |
-| B15 | Yüksek (kısmi) | Multi-camera'daki sonsuz yeniden-cevap döngüsü. Asıl uyumsuzluk karar bekliyor. |
-| B18 | Orta | Mod değişiminde WebRTCService sızıyordu. |
-| B19 | Orta | Pil aboneliği iptal edilmiyordu; dispose sonrası `setState` çağrılıyordu. |
-| B20 | Orta | Offline bebek modunda her ses parçası tüm ekranı yeniden çiziyordu. |
-| B21 | Orta | Firestore'daki `offer: null` alanı her güncellemede hata attırıyordu. |
-| B22 | Orta | Ebeveyn bağlanınca eski alarmlar yeniden bildirim olarak geliyordu; `closeRoom` alarmları silmiyordu. |
-| B23 | Orta | Firestore dinleyicileri üst üste biniyordu; dinleyici hataları yakalanmıyordu. |
-| B24 | Orta | Yayın bittikten sonra ekran hiç kapanmıyordu (wakelock). |
-| B25 | Orta | Dispose'da timer, ses akışı, Nearby ve notifier kapatılmıyordu. |
-| B26 | Orta | Offline bağlantı kopunca yakalanmamış CameraException oluşuyordu. |
-| B29 | Orta | Alarm geçmişi sınırsız büyüyordu; tek bir bozuk kayıt tüm geçmişi siliyordu; 5 sn'de bir kayıt ekleniyordu. |
-| B30 | Orta | Video oynatıcı boş dosyada ya da hızlı çıkışta çöküyordu. |
-| B31 | Orta | Galeri her yeniden çizimde tüm thumbnail'ları baştan çıkarıyordu. |
-| B33 | Orta | Offline kayıtta kare yazımı ile durdurma arasında yarış vardı. |
-| B40, B41 | Düşük | Sabit metinler çevrildi; arayüzdeki "Wi-Fi Direct" yazıları kaldırıldı. |
-| B46 | Düşük | iOS'ta offline mod çökmek yerine "yalnızca Android" mesajı gösteriyor. |
-
-Bu düzeltmelerin çoğu **cihazda doğrulanmalı**. Hangi testle doğrulanacakları TEST_PLAN.md Bölüm 11'de.
-
-## Açık kalan önemli hatalar (kod düzeltmesi yapılmadı)
-
-- **B08 (Yüksek):** Ebeveyn aynı odaya yeniden katılınca bağlantı kurulmuyor. Şimdilik bebekte oda yeniden oluşturulmalı. Çözüm sinyal protokolünü değiştiriyor (yeni offer veya ICE restart), o yüzden yerel bir düzeltme değil.
-- **B16:** WebRTC kayıtlarında ses yok. Tek satırlık bir düzeltme, ama yeni davranış eklediği için cihazda denenmeden yapmadım.
-- **B36:** Geçici kopmalar hemen "hata" olarak gösteriliyor.
-- **B37:** Online modda video ayarları uygulanmıyor.
-- **B39:** Offline'da otomatik yeniden bağlanma yok.
-- **B35:** Dil ve tema kalıcı değil. `shared_preferences` bağımlılığı gerekiyor.
-- **Düşük:** B34, B42–B44, B47–B50, B53, B54.
-
-## Sizden karar bekleyen konular
-
-| # | Konu | Seçenekler | Önerim |
+| ID | Önem | Ne | Commit |
 |---|---|---|---|
-| D1 | **Bebek telefonu ekran kapalıyken yayın (B01, Kritik)** | (a) `camera\|microphone` türünde, kalıcı bildirimli foreground service (`flutter_foreground_task` ya da kendi Kotlin servisimiz). (b) Servis olmadan, "ekranı açık bırakın" uyarısı ve kilit. | **(a).** İlk adım olarak (b)'deki uyarı hemen eklenebilir. |
-| D2 | **Uygulama kapalıyken bildirim (B02, Kritik)** | (a) Ebeveynin FCM token'ı odaya yazılır, Cloud Function `alerts` onCreate olunca FCM gönderir (Blaze planı). (b) Ebeveyn cihazında da foreground service. | Online için **(a)**, offline için **(b)**. |
-| D3 | **Güvenlik (B03, Kritik)** | Anonymous Auth + Firestore kuralları (oda sahibi ve izleyicinin uid'i) + uzun kod veya QR ile eşleşme. | Üçü birlikte. Önce **konsoldaki mevcut kurallara bakın.** |
-| D4 | **TURN (B07)** | (a) Yönetilen TURN (Cloudflare, Twilio, Metered); kısa ömürlü kimlik bilgileri bir Cloud Function'dan gelir. (b) Kendi coturn sunucumuz. | **(a).** Kimlik bilgileri uygulamaya gömülmemeli. |
-| D5 | **Yanlış alarm ve eşik (B27, B28)** | Alarm için 2–3 sn sürekli eşik üstü şartı; online ve offline dB ölçeğini birleştirmek (offline'a +9.7 dB). | **2 sn şartı + tek ölçek.** Cihazda kalibrasyon gerekir. |
-| D6 | **Multi-camera (B15)** | İzleyici başına ayrı oturum, ya da özelliği şimdilik gizlemek. | **Şimdilik gizle.** |
-| D7 | **Offline kayıt (B32: ~15 sn GIF)** | ffmpeg_kit/MediaCodec ile mp4, ya da açık bir süre sınırı. | Kısa vadede **süre sınırı + uyarı**. |
-| D8 | **Firestore temizliği (B38)** | TTL politikası (`expireAt`) ya da zamanlanmış bir Function; oda güncellemesini 2 sn → 5 sn yapmak. | **TTL.** |
-| D9 | **Yayın hazırlığı (B45)** | Yeni applicationId (Firebase'de yeni Android uygulaması ve yeni google-services.json gerektirir), release keystore, google-services 4.4.x. | Mağaza yayını planlanınca. |
-| D10 | **iOS kapsamı (B17, B52)** | iOS'ta kayıt yok, arka plan modları ve push entitlement'ı yok. | iOS hedefleniyorsa ayrı bir tur. |
-| D11 | **Kullanılmayan kod (B50)** | `signaling_service.dart` ve `noise_meter` bağımlılığı silinsin mi? | Silinsin. |
+| B55 | Orta | İnternet yokken eşleşme sonsuz dönüyordu → 15 sn zaman aşımı ve "sunucu yanıt vermiyor" mesajı | `9b004f9` |
+| B56 | Orta | Ebeveyn ayrıldıktan sonra da push gidebiliyordu → ayrılırken token siliniyor | `9b004f9` |
+| B57 | Orta | Silinmiş odada izin hatası "oda kapandı" sayılmıyordu; eski oda dinleyicisi açık kalıyordu | `a2cfafd` |
+| B58 | Düşük | Oda ömrü 24 sa → 12 sa | `9b004f9` |
+| B59 | Orta | FCM izni alınamazsa bildirim izni hiç istenmiyordu | `34bb9e0` |
+| B60 | Düşük | Yakalanmayan future'lar; Anonymous giriş kapalıyken sonsuz yeniden katılma | `66d3ab0` |
+| B61 | Orta | Kapanmış eşleşme sayfasında `setState` | `0a4932c` |
+| B62 | Orta | Ana ekran kapanırken `setState` | `771e3bc` |
+| B63 | Yüksek (iOS) | `sound_stream` iOS'ta açılışta uygulamayı çöktürüyordu | `4a28326`, `41e43eb` |
+| B64 | Yüksek | Answer'dan önce gelen ICE adayları kayboluyordu (farklı ağlarda bağlantıyı zorlaştırır) | `0f50f77` |
+| B65 | Orta (iOS) | Rol değişiminde iOS'ta Nearby'ye dokunuluyordu | `f080481` |
+| B66 | Orta | Bildirim izni yokken yerel bildirim hatası yakalanmıyordu | `609f427` |
+| B67 | Orta | Eylem düğmeli uyarılar hiç kapanmıyor, alttaki düğmeleri örtüyordu | `9e10308` |
 
-## Sizin şimdi yapmanız gerekenler
+## E2E sonuçları
 
-1. **Android lisanslarını kabul edin** (etkileşimli bir komut):
+| Koşu | Cihazlar | Sonuç |
+|---|---|---|
+| Android ↔ Android | AVD "baby" + "parent", API 35 Google Play | ✅ 44/44, iki test de geçti (6,8 dk) |
+| Android bebek ↔ iOS ebeveyn | API 35 + iOS 27 simülatörü | ✅ İki test de geçti; WebRTC iki tarafta "Bağlı", yeniden katılma çalıştı. iOS ekran görüntülerini sistemin bildirim izni diyaloğu kapladığı için görüntü iOS'ta görsel olarak doğrulanamadı (TEST_PLAN 13.3). |
+| iOS ↔ iOS | iki iOS 27 simülatörü | Koşu 7 ✅ (yalnızca ses; simülatörde kamera yok). Tek hata B67'ydi. |
 
-   ```bash
-   flutter doctor --android-licenses
-   ```
+**Ölçülenler (Android):**
+- Alarm ağlamadan ~2,4 sn sonra çalıyor. 1 sn'lik ses alarm vermiyor.
+- Sürekli ağlamada alarmlar: 10. sn'de 1, 50. sn'de 1, 70. sn'de 2.
+- Alarm geçmişinde 2 kayıt var, uygulama dilinde.
+- Function'ın hazırladığı bildirim: "Bebek ağlıyor | Ses seviyesi: 85.0 dB".
+- Eşik ebeveynden bebeğe geçiyor.
+- Ayrılınca oturum ve push token'ı siliniyor.
+- Bebek bağlantıyı kesince oda siliniyor.
 
-2. **Firebase konsolu → Firestore → Rules** bölümüne bakın: `rooms` herkese açık mı? (B03)
-3. **İki Android telefonla TEST_PLAN.md'yi uygulayın.** Öncelik sırası:
-   - Bölüm 3 (offline)
-   - Bölüm 5 (alarm ve bildirim)
-   - Bölüm 2B (farklı ağlar)
-   - Bölüm 11 (düzeltilen hataların tekrar testleri)
+**iOS'ta beklenen farklar:** FCM token yok (APNs gerekiyor), uçak modu adımı atlandı, görüntü yerine yalnızca ses.
 
-   Logları TEST_PLAN Bölüm 0'daki komutlarla toplayın.
-4. **D1–D11 için karar verin.** D1, D2 ve D3 en kritikleri.
-5. **Push için onay verin**, ya da önce commit'leri gözden geçirin:
+**Test altyapısı sorunları** (uygulama hatası değil):
+- Yavaş emülatörde menü ve açılır listeler için sabit bekleme yetmiyordu; düzeltildi.
+- Mac uykuya geçince emülatör koptu; koşular artık `caffeinate` ile.
+- Aynı anda fazla simülatör açıkken CoreAudio zaman aşımı oluyor (BLOCKERS 4).
 
-   ```bash
-   git log --oneline main..dev
-   ```
+## iOS
 
-## Commit listesi (`main..dev`, eskiden yeniye)
+- **Yapılanlar:**
+  - Kamera, mikrofon, yerel ağ ve fotoğraf kaydetme izin metinleri TR/EN (`InfoPlist.strings`).
+  - Minimum iOS 15 (Podfile + proje).
+  - Arka plan modları: `audio`, `remote-notification`.
+  - Podfile'da `permission_handler` makroları.
+  - Flutter'ın UIScene ve SPM geçişleri yapıldı.
+- **Davranış:**
+  - Offline seçeneği iOS'ta gizli; yerine "yalnızca Android" açıklaması var.
+  - iPhone'da oda açılınca, kamera arka planda çalışmadığı için gece modu öneriliyor.
+  - Simülatörde yalnızca debug'da sesli yedek akış var (BLOCKERS 1).
+  - `nearby_connections` ve `sound_stream` yalnızca Android'de çağrılıyor. `sound_stream` iOS'ta hiç kaydedilmiyor (DECISIONS A11).
+- **Paket desteği:** firebase_*, flutter_webrtc, camera, permission_handler, flutter_local_notifications, wakelock_plus, screen_brightness, gal, video_player ve share_plus iOS'u destekliyor.
+- **Bilinen:** `flutter build ios --simulator` Flutter 3.44'te hata veriyor; `flutter run` / `flutter test -d <udid>` çalışıyor (DECISIONS A12). Gerçek cihaz derlemesi etkilenmiyor.
+- **Android ↔ iOS offline:** Kod yazılmadı. Seçenekler PLAN_NEXT.md §6'da.
 
-| Hash | Mesaj |
+### iOS: sizin yapmanız gerekenler
+
+1. **Apple Developer hesabı:** Ücretsiz Apple ID ile kendi iPhone'unuza 7 günlük kurulum yapabilirsiniz. Push için ücretli Apple Developer Program (yıllık 99 USD) gerekir.
+2. **İmzalama:**
+   - `ios/Runner.xcworkspace`'i Xcode'da açın.
+   - Runner → Signing & Capabilities → Team'i seçin.
+   - Bundle ID `com.feyruz.bebekmonitorclean` kalabilir. Değiştirirseniz Firebase'de yeni bir iOS uygulaması ve yeni bir `GoogleService-Info.plist` gerekir.
+3. **Capability ekleyin:** "+ Capability" → **Push Notifications** ve **Background Modes** (Audio ile Remote notifications işaretli; Info.plist'te hazır).
+4. **APNs anahtarı:**
+   - developer.apple.com → Certificates, IDs & Profiles → Keys → "+" → Apple Push Notifications service (APNs) → `.p8` dosyasını indirin. Key ID ve Team ID'yi not edin.
+   - Firebase konsolu → Proje ayarları → Cloud Messaging → Apple uygulaması → APNs Authentication Key → `.p8`'i, Key ID'yi ve Team ID'yi yükleyin.
+5. **iPhone'a kurulum:**
+   - iPhone'u kabloyla bağlayın, Ayarlar → Gizlilik ve Güvenlik → Geliştirici Modu'nu açın.
+   - `flutter run -d <iphone>` (ya da Xcode'da ▶).
+   - İlk açılışta Ayarlar → Genel → VPN ve Cihaz Yönetimi → geliştirici sertifikasına güvenin.
+6. **Test:** TEST_PLAN.md bölüm 13.
+
+## Genel durum: D kararları ve açık konular
+
+| Konu | Durum |
 |---|---|
-| `015c34f` | docs: add CLAUDE.md with architecture, run instructions and known limits |
-| `7248cd1` | build(android): keep Flutter migrator gradle flags (builtInKotlin/newDsl=false) |
-| `72ddd26` | chore: remove stray notebook and .DS_Store files, ignore .DS_Store |
-| `c0e0cd0` | chore: track pubspec.lock to pin dependency versions |
-| `474ef31` | chore(lint): remove unused imports/locals, redundant ! and null checks |
-| `6f72d30` | chore(lint): migrate deprecated withOpacity, surfaceVariant and Share APIs |
-| `9cc1419` | refactor: remove unused WifiDirectSignalingService and flutter_p2p_connection |
-| `a4b75e3` | refactor(home): remove dead code from home_screen |
-| `451e421` | refactor: extract offline payload codec and audio dB helpers |
-| `cd3af29` | test: add unit tests for payload codec, dB math, models, l10n parity |
-| `06ae4ac` | docs: add BUGS.md with deep review findings and progress log |
-| `fb29391` | fix(B04): don't notify the baby device about its own cry alerts |
-| `56a2919` | fix(B05): rate-limit cry notifications to one per 60 s |
-| `31778e4` | fix(B06): keep the baby as caller after its own offer echoes back |
-| `a1b3e4b` | fix(B21): ignore null offer/answer fields in the room snapshot |
-| `199bb77` | fix(B22): don't replay stored alerts when joining a room |
-| `7687a9b` | fix(B23): cancel stale Firestore listeners and handle listener errors |
-| `ffeab24` | fix(B11): never produce -Infinity/NaN dB from offline PCM chunks |
-| `d0ac84f` | fix(B10): process at most one offline camera frame at a time |
-| `b9968be` | docs(BUGS): update status for B04-B06, B09-B11, B21-B23 |
-| `bd5bda7` | fix(B12): request microphone for offline baby mode, serialize startup prompts |
-| `404525a` | fix(B13): don't get stuck in recording state when start/stop fails |
-| `afba4ad` | fix(B14): stop recordings on reset/dispose and regardless of mode |
-| `0e880a1` | fix(B19): store/cancel the battery subscription and guard setState |
-| `0bae805` | fix(B20): rebuild the baby UI at most every 200 ms in offline audio mode |
-| `5a244dc` | fix(B26): handle stopImageStream errors when the offline peer disconnects |
-| `13b506f` | fix(B24): release the wakelock when pairing/streaming is reset |
-| `9af8135` | fix(B25): release timers, audio streams, Nearby and notifier on dispose |
-| `bbb5562` | fix(B29): make alert history bounded, crash-safe and tolerant |
-| `d9d238c` | fix(B30): don't crash VideoPlayerScreen on missing/empty files or early exit |
-| `865f0d6` | fix(B31): cache gallery thumbnail futures, guard setState after await |
-| `da8efa9` | fix(B33): serialize offline frame writes and wait for them on stop |
-| `e94e406` | fix(B40,B41): localize hard-coded UI strings, drop Wi-Fi Direct wording |
-| `1ddeeb1` | fix(B46): show a message instead of crashing when offline mode is used on iOS |
-| `ac1e136` | fix(B15): answer each multi-camera offer only once |
-| `1897b85` | docs(BUGS): update statuses after step 4 fixes |
-| `71d2d89` | docs: add TEST_PLAN.md for two-device manual testing |
-| `23380b4` | chore(lint): drop now-unnecessary dart:typed_data import in home_screen |
-| `0de6bb6` | fix(B22): don't filter alerts by device clock; make alert cleanup best effort |
-| `718049c` | fix(B29): don't treat I/O errors as corruption in alert history |
-| `0e44646` | fix(B25): ignore Nearby payloads that arrive after dispose |
-| `c99e4ed` | fix(B14): let stopAny() stop a WebRTC recording that is still starting |
-| (son) | docs: add REPORT.md, update BUGS.md statuses |
+| D1-a gece modu | ✅ Kodda. D1-b foreground service (7. adım) **bekletiliyor**: ekran kapanınca Android'de yayın hâlâ duruyor (B01). |
+| D2 push (B02) | ✅ Uygulama ve Function kodu hazır, emülatörde doğrulandı. **Deploy edilmedi** (Blaze kararı sizde). |
+| D3 güvenlik + D8 TTL (B03, B38) | ✅ Kod ve kurallar hazır, emülatörde doğrulandı. **Konsol adımları sizde.** |
+| D5 alarm eşiği, D6 multi-camera gizli, D7 offline kayıt sınırı, D11 | ✅ |
+| B08 yeniden katılma, B36 | ✅ Emülatörde doğrulandı |
+| D4 TURN (B07) | Karar bekliyor. Farklı ağlarda bağlantı G2 testine bağlı. |
+| D9 yayın hazırlığı (B45), D10 iOS kapsamı (B17, B52) | Karar bekliyor (iOS'un temel uyumluluğu bu oturumda yapıldı) |
+| `sound_stream` GPL-3.0 | Karar bekliyor (DECISIONS.md) |
+| Açık hatalar | B16 (WebRTC kayıtlarında ses yok), B35 (dil/tema kalıcı değil), B37 (online video ayarları), B39 (offline otomatik yeniden bağlanma) ve düşük öncelikliler. Hepsi BUGS.md'de. |
+
+## Nerede ne var
+
+- [BUGS.md](BUGS.md): tüm bulgular (B01–B67) ve durumları.
+- [TEST_PLAN.md](TEST_PLAN.md): telefon testleri. En üstte emülatör sonuçları ve kısa liste.
+- [DECISIONS.md](DECISIONS.md): bu oturumdaki kararlar ve sizin kararınızı bekleyenler.
+- [BLOCKERS.md](BLOCKERS.md): çözülemeyenler.
+- [PLAN_NEXT.md](PLAN_NEXT.md): D adımları, konsol ve deploy komutları, Android ↔ iOS offline seçenekleri.
+- Commit geçmişi: `git log --oneline main..dev`.
