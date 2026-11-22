@@ -94,7 +94,7 @@ TEST_PLAN.md §14 (V1.1–V1.16). En önemlileri: **V1.1/V1.2** (ekran kapalıyk
 - **Testler:** Android ↔ Android E2E `test-results/20261122-190615-android`: iki taraf da geçti; yeni kontroller (son oda, bas-konuş düğmesi, ninni/gece lambası odaya yazıldı ve durdu) ✅. iOS derlemesi ✅.
 - Gerçek cihaz maddeleri: TEST_PLAN §16 (V3.1–V3.14). Kulakla/anadilde kontrol: BLOCKERS 9.
 
-## Faz 4 — Özet
+## Faz 4 — Özet (tamamlandı, `dev` @ son commit)
 
 - **Erişilebilirlik:** simge düğmelerinde 48 dp dokunma alanı (görünüm aynı), her denetimde anlamlı etiket, canlı bölgeler (alarm, bağlantı, hata metinleri), kod kutuları ekran okuyucuda harf harf; Flutter'ın dokunma alanı/etiket yönergeleri 9 ekranda test ediliyor (`test/a11y_test.dart`). Tüm renk çiftleri WCAG ≥4,5:1 (`test/contrast_test.dart`, iki ton koyulaştırıldı, A34).
 - **Büyük yazı / küçük ekran / tablet:** ×1,3, ×2, 320×568 ve 820×1180'de tüm ekranlar taşmasız (ekran görüntüsü aracıyla denetlendi; düzeltmeler: ninni kutuları, durum hapları, kelime işareti).
@@ -110,7 +110,7 @@ TEST_PLAN.md §14 (V1.1–V1.16). En önemlileri: **V1.1/V1.2** (ekran kapalıyk
 - **Testler (Faz 4 sonu):** `flutter analyze` 0 error / 0 warning (7 info: bilinçli bırakılan enum adları ve `use_build_context_synchronously`); `flutter test` 161/161; kurallar 29/29; Function 11/11; lisans taraması temiz (A36).
 - **E2E:**
   - Android ↔ Android `test-results/20261122-193020-android`: iki taraf da geçti (0 hata).
-  - Android bebek ↔ iOS ebeveyn `test-results/20261122-191353-mixed`: iOS ebeveyn tamamen geçti; Android bebekte tek hata testin kendisindeydi (ebeveynin gece lambası bebeği gece moduna almıştı, test bunu beklemiyordu) — test düzeltildi, tekrar koşusu aşağıda.
+  - Android bebek ↔ iOS ebeveyn `test-results/20261122-193757-mixed`: iki taraf da geçti (0 hata). Önceki koşuda (`…191353-mixed`) tek hata testin kendisindeydi (ebeveynin gece lambası bebeği gece moduna almıştı); test düzeltildi.
   - Ağ kesintisi adımı karma koşuda atlanır (iOS simülatöründe uçak modu yok, A14).
 - iOS derlemesi (`flutter build ios --no-codesign`) ✅, Android debug APK ✅.
 
