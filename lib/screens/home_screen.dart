@@ -14,6 +14,7 @@ import 'package:nearby_connections/nearby_connections.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:image/image.dart' as img;
 
@@ -23,7 +24,11 @@ import '../core/enums/connection_status.dart';
 import '../core/enums/device_role.dart';
 import '../core/feature_flags.dart';
 import '../core/debug/debug_hooks.dart';
+import '../core/audio/app_audio.dart';
 import '../core/audio/audio_level.dart';
+import '../core/monitor/battery_alert.dart';
+import '../core/monitor/connection_watchdog.dart';
+import '../core/services/monitor_foreground_service.dart';
 import '../core/audio/cry_detector.dart';
 import '../core/audio/offline_audio.dart';
 import '../core/audio/pcm_microphone.dart';
@@ -43,6 +48,7 @@ import '../core/webrtc/signaling_messages.dart';
 import '../core/webrtc/webrtc_service.dart';
 import '../core/services/hybrid_notification_manager.dart';
 import '../widgets/camera_preview_card.dart';
+import '../widgets/connection_lost_view.dart';
 import '../widgets/fullscreen_view.dart';
 import '../widgets/night_mode_overlay.dart';
 import '../widgets/noise_level_bar.dart';
@@ -66,7 +72,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<CameraDescription> _cameras = [];
   CameraController? _controller;
   CameraLensDirection _currentLens = CameraLensDirection.back;
@@ -182,9 +188,33 @@ class _HomeScreenState extends State<HomeScreen>
   // Noise Polling for WebRTC
   Timer? _noisePollTimer;
 
+  // V2 phase 1 -----------------------------------------------------------
+  // Parent: connection lost alarm (5.6).
+  final ConnectionWatchdog _watchdog = ConnectionWatchdog();
+  Timer? _watchdogTimer;
+  int _watchdogTicks = 0;
+  int? _lastInboundBytes;
+  bool _connectionLost = false;
+  DateTime? _connectionLostSince;
+  bool _connectionAlarmSilenced = false;
+  final AlarmSound _connectionAlarm = AlarmSound();
+  // Parent: one warning per low battery episode of the baby phone (5.7).
+  final LowBatteryAlert _lowBattery = LowBatteryAlert();
+  bool _showBatteryWarning = false;
+  // Baby: one battery push (alert document) per low battery episode.
+  final LowBatteryAlert _babyBatteryPush = LowBatteryAlert();
+  int? _sentBatteryLevel;
+  bool? _sentBatteryCharging;
+  // Parent: keep hearing the baby with the screen locked (5.10).
+  static const String _backgroundListeningKey = 'backgroundListening';
+  bool _backgroundListening = true;
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_loadPreferences());
     _alertController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -268,16 +298,195 @@ class _HomeScreenState extends State<HomeScreen>
       } catch (e) {
         debugPrint('Battery payload send error: $e');
       }
-    } else if (!_isOfflineMode && _pairingState?.roomCode != null) {
-      // For online mode, we could use signaling or data channel. 
-      // Since we don't have a dedicated data channel set up in this snippet for generic data,
-      // we will skip online battery sync for now or implement it via Firestore if needed.
-      // But let's assume we use the same WebRTC data channel if available.
-      // For now, let's stick to Offline mode support as requested or add Firestore support.
-      // Adding Firestore support for battery:
-      if (_pairingService != null) {
-         // We can add a field to the room document.
-         // But for simplicity, let's just focus on Offline mode first as it's direct.
+    } else if (!_isOfflineMode && _pairingState?.roomCode != null && _pairingService != null) {
+      // Online: the room's `battery` field (V2 5.7), written only when the
+      // level or charging state changed.
+      final roomCode = _pairingState!.roomCode;
+      final charging = _isCharging(_batteryState);
+      if (_sentBatteryLevel != _batteryLevel || _sentBatteryCharging != charging) {
+        _sentBatteryLevel = _batteryLevel;
+        _sentBatteryCharging = charging;
+        try {
+          await _pairingService!.setBattery(roomCode, level: _batteryLevel, charging: charging);
+        } catch (e) {
+          // e.g. rules that do not know the field yet; retried next minute.
+          debugPrint('Battery update failed: $e');
+          _sentBatteryLevel = null;
+        }
+      }
+      // Low battery: one alert document per episode, so the Cloud Function
+      // can push it while the parent app is closed.
+      if (_babyBatteryPush.update(level: _batteryLevel, charging: charging) && mounted) {
+        final l10n = AppLocalizations.of(context);
+        unawaited(HybridNotificationManager()
+            .sendAlert(
+              l10n.batteryLowTitle,
+              l10n.batteryLowBody.replaceAll('{level}', '$_batteryLevel'),
+              type: 'battery',
+              level: _batteryLevel,
+            )
+            .catchError((Object e) => debugPrint('Battery alert failed: $e')));
+      }
+    }
+  }
+
+  static bool _isCharging(BatteryState? state) =>
+      state == BatteryState.charging || state == BatteryState.full;
+
+  // V2 phase 1 helpers -------------------------------------------------------
+
+  Future<void> _loadPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final listening = prefs.getBool(_backgroundListeningKey);
+      if (listening != null && mounted) {
+        setState(() => _backgroundListening = listening);
+      }
+    } catch (e) {
+      debugPrint('Loading preferences failed: $e');
+    }
+  }
+
+  Future<void> _setBackgroundListening(bool value) async {
+    setState(() => _backgroundListening = value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_backgroundListeningKey, value);
+    } catch (e) {
+      debugPrint('Saving background listening failed: $e');
+    }
+    if (_role == DeviceRole.PARENT && _pairingState != null) {
+      if (value) {
+        await _startMonitorService();
+      } else {
+        await MonitorForegroundService.instance.stop();
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
+    if (_role != DeviceRole.PARENT || _backgroundListening) return;
+    // Background listening off: mute the baby while the app is not visible
+    // (on iOS the `audio` background mode would keep playing otherwise).
+    final visible = state == AppLifecycleState.resumed || state == AppLifecycleState.inactive;
+    _webrtcService?.setRemoteAudioEnabled(visible);
+  }
+
+  bool get _inForeground => _lifecycle == AppLifecycleState.resumed;
+
+  /// Android foreground service: baby broadcast always, parent only with
+  /// background listening on (V2 5.10 / 5.12).
+  Future<void> _startMonitorService() async {
+    if (!MonitorForegroundService.isSupported || !mounted) return;
+    final isBaby = _role == DeviceRole.BABY;
+    if (!isBaby && !_backgroundListening) return;
+    final l10n = AppLocalizations.of(context);
+    if (isBaby) {
+      // Android 13+: without notification permission the service still
+      // runs, but its notification is hidden.
+      unawaited(HybridNotificationManager().requestPermission().then<void>((_) {},
+          onError: (Object e) => debugPrint('Notification permission failed: $e')));
+    }
+    await MonitorForegroundService.instance.start(
+      role: _role,
+      offline: _isOfflineMode,
+      title: isBaby ? l10n.serviceBabyTitle : l10n.serviceParentTitle,
+      text: isBaby ? l10n.serviceBabyText : l10n.serviceParentText,
+    );
+  }
+
+  /// Parent: starts the connection watchdog for a new session (V2 5.6).
+  void _startWatchdog() {
+    _watchdog.start();
+    _watchdog.onStatus(_connectionStatus, DateTime.now());
+    _lastInboundBytes = null;
+    _watchdogTicks = 0;
+    _watchdogTimer?.cancel();
+    _watchdogTimer =
+        Timer.periodic(const Duration(seconds: 1), (_) => unawaited(_watchdogTick()));
+  }
+
+  Future<void> _watchdogTick() async {
+    if (!mounted || _disposing || !_watchdog.isActive) return;
+    // Online: media flows while inbound RTP bytes grow (checked every 2 s).
+    if (!_isOfflineMode && (++_watchdogTicks).isEven) {
+      final bytes = await _webrtcService?.getInboundBytes();
+      if (bytes != null) {
+        final last = _lastInboundBytes;
+        if (last != null && bytes > last) _watchdog.onMedia(DateTime.now());
+        _lastInboundBytes = bytes;
+      }
+    }
+    if (!mounted || !_watchdog.isActive) return;
+    if (_watchdog.evaluate(DateTime.now())) {
+      _onConnectionLostChanged(_watchdog.isLost);
+    }
+  }
+
+  void _stopWatchdog() {
+    _watchdog.stop();
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    if (_connectionLost) _onConnectionLostChanged(false);
+  }
+
+  void _onConnectionLostChanged(bool lost) {
+    if (!mounted) return;
+    setState(() {
+      _connectionLost = lost;
+      _connectionLostSince = lost ? (_watchdog.lostSince ?? DateTime.now()) : null;
+      if (!lost) _connectionAlarmSilenced = false;
+    });
+    if (lost) {
+      debugPrint('Connection watchdog: connection lost');
+      if (_isFullscreen) _exitFullscreen();
+      unawaited(HapticFeedback.heavyImpact());
+      if (!_connectionAlarmSilenced) unawaited(_connectionAlarm.start());
+      final l10n = AppLocalizations.of(context);
+      unawaited(HybridNotificationManager().showConnectionLost(
+          title: l10n.connectionLostTitle, body: l10n.connectionLostNotification));
+      // Connected but no media: the peer is stuck, start a new session.
+      if (!_isOfflineMode && _connectionStatus == ConnectionStatus.CONNECTED) {
+        _scheduleRejoin();
+      }
+    } else {
+      debugPrint('Connection watchdog: connection back');
+      unawaited(_connectionAlarm.stop());
+      unawaited(HybridNotificationManager().cancelConnectionLost());
+    }
+  }
+
+  void _silenceConnectionAlarm() {
+    setState(() => _connectionAlarmSilenced = true);
+    unawaited(_connectionAlarm.stop());
+  }
+
+  void _retryConnection() {
+    if (_isOfflineMode) {
+      unawaited(_startDiscovery());
+      return;
+    }
+    _rejoinTimer?.cancel();
+    _rejoinBackoff.reset();
+    unawaited(_rejoinRoom());
+  }
+
+  /// Parent: battery of the baby phone (room field or Nearby payload).
+  void _onRemoteBattery(int level, bool charging) {
+    _remoteBatteryLevel = level;
+    _remoteBatteryState = charging ? BatteryState.charging : BatteryState.discharging;
+    if (_role != DeviceRole.PARENT) return;
+    if (charging || level >= _lowBattery.rearmLevel) _showBatteryWarning = false;
+    if (_lowBattery.update(level: level, charging: charging)) {
+      _showBatteryWarning = true;
+      unawaited(HapticFeedback.mediumImpact());
+      if (!_inForeground && mounted) {
+        final l10n = AppLocalizations.of(context);
+        unawaited(HybridNotificationManager().showBatteryLow(
+            title: l10n.batteryLowTitle,
+            body: l10n.batteryLowBody.replaceAll('{level}', '$level')));
       }
     }
   }
@@ -402,6 +611,10 @@ class _HomeScreenState extends State<HomeScreen>
     // WebRTCService.hangUp -> DISCONNECTED); `mounted` is still true during
     // dispose, so the handlers check this flag instead (B62).
     _disposing = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _watchdogTimer?.cancel();
+    unawaited(_connectionAlarm.dispose());
+    unawaited(MonitorForegroundService.instance.stop());
     if (_recorderService.isRecording) {
       unawaited(_recorderService.stopAny().catchError(
           (Object e) => debugPrint('Stopping recording on dispose failed: $e')));
@@ -545,6 +758,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _handleConnectionStatus(ConnectionStatus status) {
     if (!mounted || _disposing) return;
+    if (_role == DeviceRole.PARENT) _watchdog.onStatus(status, DateTime.now());
     setState(() {
       _connectionStatus = status;
       if (status == ConnectionStatus.CONNECTED ||
@@ -598,6 +812,7 @@ class _HomeScreenState extends State<HomeScreen>
     } on RoomUnavailableException {
       // The room is gone (closed by the baby or expired): stop retrying.
       _viewerSession = null;
+      _stopWatchdog();
       if (mounted) _handlePairingError(AppLocalizations.of(context).roomClosed);
     } on AnonymousAuthDisabledException {
       // Retrying cannot help until sign-in is enabled in the console (B60).
@@ -611,6 +826,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _handlePairingError(String message) {
     if (!mounted || _disposing) return;
+    if (_role == DeviceRole.PARENT) {
+      _watchdog.onStatus(ConnectionStatus.FAILED, DateTime.now());
+    }
     setState(() {
       _pairingError = message;
       _connectionStatus = ConnectionStatus.FAILED;
@@ -723,6 +941,13 @@ class _HomeScreenState extends State<HomeScreen>
     _rejoinTimer?.cancel();
     _rejoinBackoff.reset();
     _roomHeartbeat?.cancel();
+    _stopWatchdog();
+    unawaited(MonitorForegroundService.instance.stop());
+    _showBatteryWarning = false;
+    _lowBattery.reset();
+    _babyBatteryPush.reset();
+    _sentBatteryLevel = null;
+    _sentBatteryCharging = null;
     await _exitNightMode();
 
     // Finish a running recording before its source stream goes away, so the
@@ -902,6 +1127,9 @@ class _HomeScreenState extends State<HomeScreen>
       _listenRoomUpdates(newCode);
       _startRoomHeartbeat(newCode);
       await _webrtcService!.startAsBaby(newCode, facingMode: facingMode);
+      unawaited(_startMonitorService());
+      _sentBatteryLevel = null;
+      unawaited(_sendBatteryUpdate());
       
       // Automatically start noise monitoring for Online Mode
       await _startNoiseMonitoring();
@@ -997,6 +1225,8 @@ class _HomeScreenState extends State<HomeScreen>
       _listenRoomUpdates(roomCode);
       await _webrtcService!.startAsParent(roomCode, session: session);
       unawaited(_registerPushToken(roomCode));
+      _startWatchdog();
+      unawaited(_startMonitorService());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppLocalizations.of(context).waitingForConnection}: $roomCode')),
@@ -1168,6 +1398,7 @@ class _HomeScreenState extends State<HomeScreen>
           await _initControllerForLens(CameraLensDirection.back);
         }
         await WakelockPlus.enable(); // Keep screen on for Wifi Direct
+        unawaited(_startMonitorService());
       } else {
         throw Exception("Advertising failed to start");
       }
@@ -1532,6 +1763,9 @@ class _HomeScreenState extends State<HomeScreen>
         // The baby's threshold is the active one; tell the new parent.
         unawaited(_syncNoiseThreshold());
       } else if (_role == DeviceRole.PARENT) {
+        if (!_watchdog.isActive) _startWatchdog();
+        _watchdog.onStatus(ConnectionStatus.CONNECTED, DateTime.now());
+        unawaited(_startMonitorService());
         // Reset the player but DO NOT start it yet: it starts when the first
         // audio packet arrives, to avoid a buffer underrun.
         // Note: We do NOT use Helper.setSpeakerphoneOn(true) here for Offline mode
@@ -1567,6 +1801,7 @@ class _HomeScreenState extends State<HomeScreen>
       _isStreaming = false;
       _stopAudioStream();
     } else if (_role == DeviceRole.PARENT) {
+      _watchdog.onStatus(ConnectionStatus.DISCONNECTED, DateTime.now());
       unawaited(_offlineAudio.stopPlayer().catchError(
           (Object e) => debugPrint('Offline player stop failed: $e')));
       _isPlayerRunning = false;
@@ -1581,6 +1816,10 @@ class _HomeScreenState extends State<HomeScreen>
     if (message == null) return;
 
     final type = message.type;
+    if (_role == DeviceRole.PARENT &&
+        (type == OfflinePayloadType.image || type == OfflinePayloadType.audio)) {
+      _watchdog.onMedia(DateTime.now());
+    }
     if (type == OfflinePayloadType.image) {
       // Image Data
       final wasEmpty = _currentImageBytesNotifier.value == null;
@@ -1654,6 +1893,8 @@ class _HomeScreenState extends State<HomeScreen>
     } else if (type == OfflinePayloadType.audio) {
       // Audio Data
       if (_role == DeviceRole.PARENT) {
+        // Background listening off: do not play while the app is not visible.
+        if (!_backgroundListening && !_inForeground) return;
         // Platform channel messages are handled in order, so the player is
         // started before the first chunk is written.
         if (!_isPlayerRunning) {
@@ -1672,14 +1913,15 @@ class _HomeScreenState extends State<HomeScreen>
       try {
         final map = message.decodeJson();
         if (map['type'] == 'BATTERY') {
-          setState(() {
-            _remoteBatteryLevel = map['level'];
-            final stateStr = map['state'] as String;
-            _remoteBatteryState = BatteryState.values.firstWhere(
-              (e) => e.toString() == stateStr,
-              orElse: () => BatteryState.unknown,
-            );
-          });
+          final stateStr = map['state'] as String;
+          final state = BatteryState.values.firstWhere(
+            (e) => e.toString() == stateStr,
+            orElse: () => BatteryState.unknown,
+          );
+          final level = map['level'];
+          if (level is num) {
+            setState(() => _onRemoteBattery(level.round(), _isCharging(state)));
+          }
         }
       } catch (e) {
         debugPrint("Error parsing battery payload: $e");
@@ -2135,6 +2377,10 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
       if (_role == DeviceRole.PARENT) {
+        final battery = roomState.battery;
+        if (battery != null) {
+          setState(() => _onRemoteBattery(battery.level, battery.charging));
+        }
         final updatedAt = roomState.cryUpdatedAt;
         final isFresh =
             updatedAt == null || DateTime.now().difference(updatedAt) < const Duration(seconds: 20);
@@ -2178,6 +2424,7 @@ class _HomeScreenState extends State<HomeScreen>
         if (_role == DeviceRole.PARENT) {
           _viewerSession = null;
           _rejoinTimer?.cancel();
+          _stopWatchdog();
         }
         _handlePairingError(AppLocalizations.of(context).roomClosed);
         return;
@@ -2733,6 +2980,18 @@ class _HomeScreenState extends State<HomeScreen>
                 onExit: () => unawaited(_exitNightMode()),
               ),
             ),
+          // Parent: connection lost alarm (V2 5.6)
+          if (_connectionLost && _role == DeviceRole.PARENT && _connectionLostSince != null)
+            Positioned.fill(
+              child: ConnectionLostView(
+                lostSince: _connectionLostSince!,
+                alarmSilenced: _connectionAlarmSilenced,
+                lastBatteryLevel: _remoteBatteryLevel,
+                onRetry: _retryConnection,
+                onSilence: _silenceConnectionAlarm,
+                onDisconnect: () => unawaited(_resetPairing()),
+              ),
+            ),
         ],
       ),
     );
@@ -2817,6 +3076,10 @@ class _HomeScreenState extends State<HomeScreen>
                       onAutoNightModeChanged: (v) {
                         setState(() => _autoNightMode = v);
                       },
+                      backgroundListening: _backgroundListening,
+                      onBackgroundListeningChanged: _role == DeviceRole.PARENT
+                          ? (v) => unawaited(_setBackgroundListening(v))
+                          : null,
                       onOfflineModeChanged: (val) async {
                         Navigator.pop(context);
                         setState(() {
@@ -3124,6 +3387,10 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       child: Column(
         children: [
+          if (_showBatteryWarning && _role == DeviceRole.PARENT) ...[
+            _buildBatteryWarning(),
+            const SizedBox(height: 16),
+          ],
           Row(
             children: [
               Icon(Icons.wifi, color: _connectionStatusColor(scheme)),
@@ -3222,6 +3489,43 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Parent: low battery of the baby phone (V2 5.7). Amber, as in the plan.
+  Widget _buildBatteryWarning() {
+    final l10n = AppLocalizations.of(context);
+    const amber = Color(0xFFFFC46B);
+    const onAmber = Color(0xFF2A1D06);
+    return Container(
+      key: const Key('batteryWarning'),
+      padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+      decoration: BoxDecoration(color: amber, borderRadius: BorderRadius.circular(18)),
+      child: Row(
+        children: [
+          const Icon(Icons.battery_alert_rounded, color: onAmber),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.batteryLowTitle,
+                    style: const TextStyle(color: onAmber, fontWeight: FontWeight.w800)),
+                Text(
+                  l10n.batteryLowBody.replaceAll('{level}', '${_remoteBatteryLevel ?? '?'}'),
+                  style: const TextStyle(color: onAmber, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: l10n.dismiss,
+            color: onAmber,
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => setState(() => _showBatteryWarning = false),
+          ),
         ],
       ),
     );

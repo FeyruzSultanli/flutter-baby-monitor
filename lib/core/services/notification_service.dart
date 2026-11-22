@@ -22,6 +22,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 ///   an FCM notification (once deployed).
 /// Both use the same channel, notification id and tag ([cryAlertTag]), so
 /// Android replaces one with the other instead of showing the alert twice.
+/// Non-cry alerts with their own notification slot (id + tag), so they do
+/// not replace the cry alert. Tags must match functions/src/messages.ts.
+enum StatusNotification {
+  connectionLost(1, 'connection_lost'),
+  batteryLow(2, 'battery_low');
+
+  const StatusNotification(this.id, this.tag);
+  final int id;
+  final String tag;
+}
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -157,6 +168,39 @@ class NotificationService {
       );
     } catch (e) {
       debugPrint('Local notification not shown: $e');
+    }
+  }
+
+  Future<void> showStatusNotification({
+    required StatusNotification kind,
+    required String title,
+    required String body,
+  }) async {
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        channelId,
+        'Baby Monitor Alerts',
+        channelDescription: 'Notifications for baby monitor events',
+        importance: Importance.max,
+        priority: Priority.high,
+        showWhen: true,
+        tag: kind.tag,
+        icon: smallIcon,
+      ),
+      iOS: const DarwinNotificationDetails(presentSound: true),
+    );
+    try {
+      await _localNotifications.show(kind.id, title, body, details);
+    } catch (e) {
+      debugPrint('Status notification not shown: $e');
+    }
+  }
+
+  Future<void> cancelStatusNotification(StatusNotification kind) async {
+    try {
+      await _localNotifications.cancel(kind.id, tag: kind.tag);
+    } catch (e) {
+      debugPrint('Cancelling status notification failed: $e');
     }
   }
 

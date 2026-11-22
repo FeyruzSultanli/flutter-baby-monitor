@@ -218,7 +218,12 @@ void main() {
     } else {
       final sessionBeforeDrop = (await db.get('rooms/$code'))?['viewerSession'];
       await hostAction('airplane_on', wait: const Duration(seconds: 3));
-      await pumpFor(tester, const Duration(seconds: 25));
+      // V2 5.6: the connection lost alarm appears while the network is down.
+      final lostShown = await pumpUntil(
+          tester, () => find.byKey(const Key('connectionLostView')).evaluate().isNotEmpty,
+          timeout: const Duration(seconds: 25));
+      result('connection_lost_alarm_shown', lostShown);
+      await pumpFor(tester, const Duration(seconds: 3));
       screenshot('parent_08_offline');
       await hostAction('airplane_off', wait: const Duration(seconds: 3));
       final autoRejoined = await pumpUntil(tester, () async {
@@ -230,6 +235,10 @@ void main() {
         }
       }, timeout: const Duration(minutes: 4), step: const Duration(seconds: 2));
       result('auto_rejoin_after_drop', autoRejoined);
+      final lostCleared = await pumpUntil(
+          tester, () => find.byKey(const Key('connectionLostView')).evaluate().isEmpty,
+          timeout: const Duration(seconds: 90));
+      result('connection_lost_alarm_cleared_after_reconnect', lostCleared);
       screenshot('parent_09_after_drop');
     }
 

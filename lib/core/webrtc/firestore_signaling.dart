@@ -199,7 +199,8 @@ class FirestoreSignaling implements SignalingInterface {
   }
 
   @override
-  Future<void> sendAlert(String title, String body, {double? db}) async {
+  Future<void> sendAlert(String title, String body,
+      {double? db, String? type, int? level}) async {
     if (_currentRoomId == null) return;
     await _rooms.doc(_currentRoomId).collection('alerts').add({
       'title': title,
@@ -207,6 +208,10 @@ class FirestoreSignaling implements SignalingInterface {
       'timestamp': FieldValue.serverTimestamp(),
       'expiresAt': _childExpiry(),
       if (db != null && db.isFinite) 'db': db,
+      // Only non-cry alerts carry a type, so cry alerts keep working with
+      // rules that do not know the field yet.
+      if (type != null) 'type': type,
+      if (level != null) 'level': level,
     });
   }
 }

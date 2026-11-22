@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../auth/auth_service.dart';
 import '../enums/connection_status.dart';
+import '../monitor/battery_alert.dart';
 import 'pairing_state.dart';
 import 'room_code.dart';
 import '../../models/video_settings.dart';
@@ -176,6 +177,14 @@ class PairingService {
       });
   }
 
+  /// Baby: battery of this phone for the parent (V2 5.7). A separate write,
+  /// so rules that do not know the field yet cannot break other updates.
+  Future<void> setBattery(String roomCode, {required int level, required bool charging}) async {
+    await _rooms.doc(roomCode).update({
+      'battery': {'level': level, 'charging': charging, 'at': FieldValue.serverTimestamp()},
+    });
+  }
+
   Future<void> updateNoiseThreshold(String roomCode, double threshold) async {
     await _rooms.doc(roomCode).update({'noiseThreshold': threshold});
   }
@@ -259,6 +268,7 @@ class PairingService {
             : const VideoSettings(),
         noiseThreshold: (data['noiseThreshold'] as num?)?.toDouble(),
         viewerSession: data['viewerSession'] as String?,
+        battery: BabyBattery.fromRoom(data['battery']),
       );
     });
   }

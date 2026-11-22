@@ -19,6 +19,8 @@ class SettingsSheet extends StatefulWidget {
     this.onVideoSettingsChanged,
     this.autoNightMode = false,
     this.onAutoNightModeChanged,
+    this.backgroundListening = true,
+    this.onBackgroundListeningChanged,
   });
 
   final double noiseThreshold;
@@ -31,6 +33,8 @@ class SettingsSheet extends StatefulWidget {
   final ValueChanged<VideoSettings>? onVideoSettingsChanged;
   final bool autoNightMode;
   final ValueChanged<bool>? onAutoNightModeChanged;
+  final bool backgroundListening;
+  final ValueChanged<bool>? onBackgroundListeningChanged;
 
   @override
   State<SettingsSheet> createState() => _SettingsSheetState();
@@ -40,6 +44,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
   late double _sliderValue;
   late bool _localKeepScreenOn;
   late bool _localAutoNightMode;
+  late bool _localBackgroundListening;
   late VideoSettings _localVideoSettings;
 
   @override
@@ -48,6 +53,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
     _sliderValue = widget.noiseThreshold;
     _localKeepScreenOn = widget.keepScreenOn;
     _localAutoNightMode = widget.autoNightMode;
+    _localBackgroundListening = widget.backgroundListening;
     _localVideoSettings = widget.videoSettings ?? const VideoSettings();
   }
 
@@ -260,6 +266,19 @@ class _SettingsSheetState extends State<SettingsSheet> {
                 onChanged: (v) {
                   setState(() => _localAutoNightMode = v);
                   widget.onAutoNightModeChanged!(v);
+                },
+              ),
+
+            // -------------------------- ARKA PLANDA DİNLEME --------------------------
+            if (widget.onBackgroundListeningChanged != null)
+              SwitchListTile(
+                key: const Key('backgroundListeningSwitch'),
+                title: Text(l10n.backgroundListening),
+                subtitle: Text(l10n.backgroundListeningSubtitle),
+                value: _localBackgroundListening,
+                onChanged: (v) {
+                  setState(() => _localBackgroundListening = v);
+                  widget.onBackgroundListeningChanged!(v);
                 },
               ),
           ],

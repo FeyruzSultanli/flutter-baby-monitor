@@ -194,6 +194,41 @@ class WebRTCService {
     return null;
   }
 
+  /// Parent: total bytes received over inbound RTP (video + audio), used to
+  /// see whether media still arrives (connection watchdog, V2 5.6). Null if
+  /// there is no peer or stats are unavailable.
+  Future<int?> getInboundBytes() async {
+    final pc = _peerConnection;
+    if (pc == null) return null;
+    try {
+      final stats = await pc.getStats();
+      var total = 0;
+      var found = false;
+      for (final report in stats) {
+        if (report.type != 'inbound-rtp') continue;
+        final bytes = report.values['bytesReceived'];
+        if (bytes is num) {
+          total += bytes.toInt();
+          found = true;
+        }
+      }
+      return found ? total : null;
+    } catch (e) {
+      debugPrint('getStats (inbound) error: $e');
+      return null;
+    }
+  }
+
+  /// Parent: mutes/unmutes the baby's audio locally, e.g. when background
+  /// listening is turned off and the app goes to the background (V2 5.10).
+  void setRemoteAudioEnabled(bool enabled) {
+    final stream = remoteRenderer.srcObject;
+    if (stream == null) return;
+    for (final track in stream.getAudioTracks()) {
+      track.enabled = enabled;
+    }
+  }
+
   /// Handles a peer connection state change. A `disconnected` peer gets
   /// [disconnectGrace] to recover before it counts as failed (B36).
   void _onPeerState(RTCPeerConnectionState state, String roomCode) {

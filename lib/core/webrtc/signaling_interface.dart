@@ -35,7 +35,10 @@ abstract class SignalingInterface {
   Stream<RTCIceCandidate> get onCandidate;
 
   /// Sends an alert message ([db]: noise level, used for push texts).
-  Future<void> sendAlert(String title, String body, {double? db});
+  /// [type] is `cry` (default, omitted) or `battery` ([level] in %); the
+  /// Cloud Function picks the push text by type.
+  Future<void> sendAlert(String title, String body,
+      {double? db, String? type, int? level});
 
   /// Stream of incoming alert messages.
   Stream<Map<String, dynamic>> get onAlert;

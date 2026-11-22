@@ -1,5 +1,6 @@
 import '../enums/connection_status.dart';
 import '../../models/video_settings.dart';
+import '../monitor/battery_alert.dart';
 
 // Simple pairing state snapshot kept in UI.
 class PairingState {
@@ -15,6 +16,7 @@ class PairingState {
     this.videoSettings = const VideoSettings(),
     this.noiseThreshold,
     this.viewerSession,
+    this.battery,
   });
 
   final String roomCode;
@@ -32,6 +34,8 @@ class PairingState {
   /// Session id of the currently joined parent; null when no parent is in
   /// the room (B08).
   final String? viewerSession;
+  /// Baby phone battery as written by the baby (V2 5.7); null if unknown.
+  final BabyBattery? battery;
 
   PairingState copyWith({
     bool? isPaired,
@@ -44,6 +48,7 @@ class PairingState {
     VideoSettings? videoSettings,
     double? noiseThreshold,
     String? viewerSession,
+    BabyBattery? battery,
   }) {
     return PairingState(
       roomCode: roomCode,
@@ -57,6 +62,7 @@ class PairingState {
       videoSettings: videoSettings ?? this.videoSettings,
       noiseThreshold: noiseThreshold ?? this.noiseThreshold,
       viewerSession: viewerSession ?? this.viewerSession,
+      battery: battery ?? this.battery,
     );
   }
 }

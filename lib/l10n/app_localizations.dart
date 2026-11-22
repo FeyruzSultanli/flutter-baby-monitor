@@ -175,6 +175,25 @@ class AppLocalizations {
       'anonymousAuthDisabled': 'Sign-in is not enabled for this app (Firebase: Anonymous sign-in)',
       'roomCodeValidHint': 'Enter this code on the parent device within 10 minutes',
       'noServerResponse': 'No response from the server. Check the internet connection and try again',
+      'backgroundListening': 'Listen in the background',
+      'backgroundListeningSubtitle': 'Parent phone: keep hearing the baby when the screen is locked',
+      'serviceBabyTitle': 'Ninni is broadcasting',
+      'serviceBabyText': 'Camera and microphone stay on for the parent phone',
+      'serviceParentTitle': 'Ninni is listening',
+      'serviceParentText': 'You will hear the baby and get alerts',
+      'connectionLostTitle': 'Lost connection to the baby phone',
+      'connectionLostBody': 'No picture or sound for {seconds} seconds. You cannot watch the baby right now.',
+      'reconnecting': 'Trying to reconnect…',
+      'tryAgain': 'Try again',
+      'silenceAlarm': 'Silence alarm',
+      'checkBabyPhone': 'CHECK THE BABY PHONE',
+      'checkWifi': 'Is Wi-Fi on?',
+      'checkAppOpen': 'The app may have been closed',
+      'checkCharger': 'Last battery: {level}% — it may not be charging',
+      'batteryLowTitle': 'Baby phone battery is low',
+      'batteryLowBody': 'Battery at {level}%. Plug the baby phone into a charger.',
+      'dismiss': 'Dismiss',
+      'connectionLostNotification': 'No picture or sound from the baby phone. Open Ninni.',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -337,6 +356,25 @@ class AppLocalizations {
       'anonymousAuthDisabled': 'Bu uygulama için giriş açık değil (Firebase: Anonim giriş)',
       'roomCodeValidHint': 'Bu kodu ebeveyn cihazına 10 dakika içinde girin',
       'noServerResponse': 'Sunucudan yanıt yok. İnternet bağlantısını kontrol edip tekrar deneyin',
+      'backgroundListening': 'Arka planda dinle',
+      'backgroundListeningSubtitle': 'Ebeveyn telefonu: ekran kilitliyken de bebeği duymaya devam et',
+      'serviceBabyTitle': 'Ninni yayında',
+      'serviceBabyText': 'Kamera ve mikrofon ebeveyn telefonu için açık',
+      'serviceParentTitle': 'Ninni dinliyor',
+      'serviceParentText': 'Bebeği duyacak ve uyarı alacaksınız',
+      'connectionLostTitle': 'Bebek telefonuyla bağlantı koptu',
+      'connectionLostBody': '{seconds} saniyedir görüntü ve ses gelmiyor. Bebeği şu anda izleyemiyorsunuz.',
+      'reconnecting': 'Yeniden bağlanmaya çalışıyoruz…',
+      'tryAgain': 'Tekrar dene',
+      'silenceAlarm': 'Alarmı sustur',
+      'checkBabyPhone': 'BEBEK TELEFONUNDA KONTROL EDİN',
+      'checkWifi': 'Wi-Fi bağlantısı açık mı?',
+      'checkAppOpen': 'Uygulama kapatılmış olabilir',
+      'checkCharger': 'Son pil durumu: %{level} — şarjda olmayabilir',
+      'batteryLowTitle': 'Bebek telefonunun pili azaldı',
+      'batteryLowBody': 'Pil %{level}. Bebek telefonunu şarja takın.',
+      'dismiss': 'Kapat',
+      'connectionLostNotification': 'Bebek telefonundan görüntü ve ses gelmiyor. Ninni\'yi açın.',
     },
   };
 
@@ -500,6 +538,28 @@ class AppLocalizations {
   String get anonymousAuthDisabled => _localizedValues[locale.languageCode]!['anonymousAuthDisabled']!;
   String get roomCodeValidHint => _localizedValues[locale.languageCode]!['roomCodeValidHint']!;
   String get noServerResponse => _localizedValues[locale.languageCode]!['noServerResponse']!;
+
+  String _t(String key) =>
+      _localizedValues[locale.languageCode]?[key] ?? _localizedValues['en']![key]!;
+  String get backgroundListening => _t('backgroundListening');
+  String get backgroundListeningSubtitle => _t('backgroundListeningSubtitle');
+  String get serviceBabyTitle => _t('serviceBabyTitle');
+  String get serviceBabyText => _t('serviceBabyText');
+  String get serviceParentTitle => _t('serviceParentTitle');
+  String get serviceParentText => _t('serviceParentText');
+  String get connectionLostTitle => _t('connectionLostTitle');
+  String get connectionLostBody => _t('connectionLostBody');
+  String get reconnecting => _t('reconnecting');
+  String get tryAgain => _t('tryAgain');
+  String get silenceAlarm => _t('silenceAlarm');
+  String get checkBabyPhone => _t('checkBabyPhone');
+  String get checkWifi => _t('checkWifi');
+  String get checkAppOpen => _t('checkAppOpen');
+  String get checkCharger => _t('checkCharger');
+  String get batteryLowTitle => _t('batteryLowTitle');
+  String get batteryLowBody => _t('batteryLowBody');
+  String get dismiss => _t('dismiss');
+  String get connectionLostNotification => _t('connectionLostNotification');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
