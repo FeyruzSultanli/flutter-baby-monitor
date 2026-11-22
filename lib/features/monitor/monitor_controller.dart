@@ -923,6 +923,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     });
     if (status == ConnectionStatus.CONNECTED) {
       _watchingSince ??= DateTime.now();
+      // A new call (parent rejoined): set the speaker again on its first voice.
+      _speakerReasserted = false;
       if (_role == DeviceRole.PARENT) unawaited(_refreshTonightAlarms());
       if (_role == DeviceRole.BABY && !_parentEverConnected) {
         setState(() => _parentEverConnected = true);
