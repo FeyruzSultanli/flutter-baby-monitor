@@ -7,7 +7,8 @@
 import 'package:bebek_monitor_clean/core/debug/debug_hooks.dart';
 import 'package:bebek_monitor_clean/core/pairing/room_code.dart';
 import 'package:bebek_monitor_clean/main.dart' as app;
-import 'package:bebek_monitor_clean/widgets/night_mode_overlay.dart';
+import 'package:bebek_monitor_clean/screens/v2/baby_night_view.dart';
+import 'package:bebek_monitor_clean/theme/components/code_boxes.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,14 +23,8 @@ void main() {
     final db = EmulatorDb();
     app.main();
 
-    // --- First start -------------------------------------------------------
-    final homeVisible = await pumpUntil(
-      tester,
-      () => find.byKey(const Key('mainMenuButton')).evaluate().isNotEmpty,
-      timeout: const Duration(seconds: 90),
-    );
-    expect(homeVisible, isTrue, reason: 'home screen visible');
-    await pumpFor(tester, const Duration(seconds: 4)); // camera init
+    // --- First start: intro, then the role screen (V2) ------------------------
+    await passOnboarding(tester);
     screenshot('baby_01_first_start');
     result('baby_home_visible', true);
 
@@ -38,8 +33,8 @@ void main() {
     expect(uid, isNotNull, reason: 'anonymous sign-in on the Auth emulator');
     result('baby_anonymous_sign_in', true);
 
-    // --- Create a room -----------------------------------------------------
-    await chooseMenuItem(tester, tr('createRoomCode'));
+    // --- "Next to the baby": the room is created right away ------------------
+    await tester.tap(find.byKey(const Key('roleBaby')));
     final room = await waitFor(() async {
       final rooms = await db.rooms();
       for (final r in rooms) {
@@ -52,16 +47,17 @@ void main() {
     expect(RoomCode.isValid(code), isTrue, reason: 'new 8-char code format');
     result('room_code_valid_format', true);
     await pumpFor(tester, const Duration(seconds: 2));
-    result('room_code_shown_formatted',
-        find.textContaining(RoomCode.format(code)).evaluate().isNotEmpty);
+    final shownCode = await pumpUntil(tester, () {
+      final boxes = find.byType(CodeBoxes);
+      return boxes.evaluate().isNotEmpty && tester.widget<CodeBoxes>(boxes.first).code == code;
+    }, timeout: const Duration(seconds: 10));
+    result('room_code_shown_formatted', shownCode);
     expect(room['expiresAt'], isA<DateTime>(),
         reason: 'expiresAt for TTL (D8)');
     screenshot('baby_02_room_code');
     log('ROOM_CODE=$code');
     // ignore: avoid_print
     print('E2E_BABY_READY');
-    await tester.tapAt(const Offset(20, 60)); // close the pairing sheet
-    await pumpFor(tester, const Duration(seconds: 1));
 
     Future<Map<String, dynamic>?> roomNow() => db.get('rooms/$code');
 
@@ -187,14 +183,11 @@ void main() {
       return t is num && t >= 79.5;
     }, timeout: const Duration(minutes: 6), step: const Duration(seconds: 1));
     result('threshold_from_parent_in_room', thresholdSynced);
-    final thresholdUi = await pumpUntil(
-      tester,
-      () => find
-          .textContaining('${tr('threshold')}: 80 dB')
-          .evaluate()
-          .isNotEmpty,
-      timeout: const Duration(seconds: 15),
-    );
+    final thresholdUi = await pumpUntil(tester, () {
+      final label = find.byKey(const Key('thresholdLabel'));
+      return label.evaluate().isNotEmpty &&
+          (tester.widget<Text>(label).data ?? '').contains('80');
+    }, timeout: const Duration(seconds: 15));
     result('threshold_from_parent_in_ui', thresholdUi);
     screenshot('baby_05_threshold_synced');
 
@@ -252,7 +245,7 @@ void main() {
     if (nightButton.evaluate().isNotEmpty) {
       await tester.tap(nightButton);
       await pumpFor(tester, const Duration(seconds: 1));
-      final overlayShown = find.byType(NightModeOverlay).evaluate().isNotEmpty;
+      final overlayShown = find.byType(BabyNightView).evaluate().isNotEmpty;
       result('night_mode_overlay_shown', overlayShown);
       screenshot('baby_07_night_mode');
       final overlay = find.byKey(const Key('nightModeOverlay'));
@@ -263,7 +256,7 @@ void main() {
         await pumpFor(tester, const Duration(seconds: 1));
       }
       result('night_mode_double_tap_exit',
-          find.byType(NightModeOverlay).evaluate().isEmpty);
+          find.byType(BabyNightView).evaluate().isEmpty);
     } else {
       result(
           'night_mode_overlay_shown', 'button not found (no camera preview?)');
@@ -272,6 +265,10 @@ void main() {
     // --- Baby closes the room ------------------------------------------------------
     await tester.ensureVisible(find.byKey(const Key('disconnectButton')));
     await tester.tap(find.byKey(const Key('disconnectButton')));
+    await pumpUntil(tester,
+        () => find.byKey(const Key('confirmEndBroadcast')).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 5));
+    await tester.tap(find.byKey(const Key('confirmEndBroadcast')));
     final deleted = await pumpUntil(
         tester, () async => (await roomNow()) == null,
         timeout: const Duration(seconds: 20));

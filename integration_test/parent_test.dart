@@ -26,31 +26,34 @@ void main() {
     final db = EmulatorDb();
     app.main();
 
-    final homeVisible = await pumpUntil(
-      tester,
-      () => find.byKey(const Key('mainMenuButton')).evaluate().isNotEmpty,
-      timeout: const Duration(seconds: 90),
-    );
-    expect(homeVisible, isTrue);
+    await passOnboarding(tester);
     final uid = await waitFor(() => FirebaseAuth.instance.currentUser?.uid,
         tester: tester, timeout: const Duration(seconds: 30));
     expect(uid, isNotNull);
     result('parent_anonymous_sign_in', true);
 
-    // --- Switch to parent mode ----------------------------------------------
-    await chooseMenuItem(tester, tr('parentMode'));
+    // --- "With me": the join screen ----------------------------------------
+    await tester.tap(find.byKey(const Key('roleParent')));
     await pumpFor(tester, const Duration(seconds: 2));
     screenshot('parent_01_parent_mode');
 
     Future<void> submitCode(String code) async {
-      await chooseMenuItem(tester, tr('enterRoomCode'));
-      final sheet = await pumpUntil(tester,
+      final screen = await pumpUntil(tester,
           () => find.byKey(const Key('roomCodeField')).evaluate().isNotEmpty,
-          timeout: const Duration(seconds: 10));
-      expect(sheet, isTrue, reason: 'join sheet open');
+          timeout: const Duration(seconds: 15));
+      expect(screen, isTrue, reason: 'join screen visible');
       await tester.enterText(find.byKey(const Key('roomCodeField')), code);
       await pumpFor(tester, const Duration(milliseconds: 500));
       await tester.tap(find.byKey(const Key('joinRoomButton')));
+    }
+
+    // V2: a cry opens the full-screen alarm; acknowledge it ("Tamam").
+    Future<bool> dismissCryAlarm() async {
+      final ok = find.byKey(const Key('cryOk'));
+      if (ok.evaluate().isEmpty) return false;
+      await tester.tap(ok);
+      await pumpFor(tester, const Duration(milliseconds: 800));
+      return true;
     }
 
     Future<bool> snackbarShows(String text) =>
@@ -157,6 +160,10 @@ void main() {
         tester, () async => (await db.list('rooms/$code/alerts')).length >= 2,
         timeout: const Duration(minutes: 5), step: const Duration(seconds: 2));
     result('parent_saw_two_alerts', twoAlerts);
+    result('cry_alarm_screen_shown',
+        find.byKey(const Key('cryAlertView')).evaluate().isNotEmpty);
+    screenshot('parent_04a_cry_alarm');
+    await dismissCryAlarm();
     await pumpFor(tester, const Duration(seconds: 5));
     final history = await AlertHistoryService().getAlerts();
     result('alert_history_entries', history.length);
@@ -166,7 +173,8 @@ void main() {
         history.isNotEmpty && history.first.message == tr('babyCryAlert'));
     screenshot('parent_04_after_cry');
 
-    await tester.tap(find.byIcon(Icons.history));
+    await dismissCryAlarm();
+    await tester.tap(find.byKey(const Key('historyButton')));
     await pumpFor(tester, const Duration(seconds: 2));
     screenshot('parent_05_alert_history');
     await goBack(tester);
@@ -175,13 +183,15 @@ void main() {
     // --- Threshold calibration from the parent (D5) -------------------------------
     await tester.tap(find.byKey(const Key('settingsButton')));
     await pumpFor(tester, const Duration(seconds: 1));
-    final slider = find.byType(Slider);
+    final slider = find.byKey(const Key('thresholdSlider'));
+    await pumpUntil(tester, () => slider.evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
     await tester.ensureVisible(slider);
     await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.drag(slider, const Offset(1000, 0));
     await pumpFor(tester, const Duration(seconds: 2));
     screenshot('parent_06_threshold');
-    await tester.tapAt(const Offset(20, 60)); // close the sheet
+    await goBack(tester); // close settings
     await pumpFor(tester, const Duration(seconds: 1));
     final thresholdWritten = await pumpUntil(tester, () async {
       final t = (await db.get('rooms/$code'))?['noiseThreshold'];
@@ -243,44 +253,34 @@ void main() {
     }
 
     // --- Settings: language and theme ------------------------------------------------
+    await dismissCryAlarm();
     await tester.tap(find.byKey(const Key('settingsButton')));
     final settingsOpen = await pumpUntil(
-        tester, () => find.text('Türkçe').evaluate().isNotEmpty,
+        tester, () => find.byKey(const Key('thresholdSlider')).evaluate().isNotEmpty,
         timeout: const Duration(seconds: 20));
-    expect(settingsOpen, isTrue, reason: 'settings sheet open');
-    await pumpFor(tester, const Duration(seconds: 1));
-    // Dropdowns: wait until the opened list shows the option (slow emulators).
-    for (var attempt = 0;
-        attempt < 3 && find.text('English').evaluate().isEmpty;
-        attempt++) {
-      await tester.tap(find.text('Türkçe').first);
-      await pumpUntil(tester, () => find.text('English').evaluate().isNotEmpty,
+    expect(settingsOpen, isTrue, reason: 'settings screen open');
+    Future<void> pickRow(String rowKey, String option) async {
+      final row = find.byKey(Key(rowKey));
+      await tester.dragUntilVisible(row, find.byType(ListView), const Offset(0, -250));
+      await pumpFor(tester, const Duration(milliseconds: 400));
+      await tester.tap(row);
+      await pumpUntil(tester, () => find.text(option).evaluate().isNotEmpty,
           timeout: const Duration(seconds: 10));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      await tester.tap(find.text(option).last);
+      await pumpFor(tester, const Duration(seconds: 1));
     }
-    await pumpFor(tester, const Duration(milliseconds: 500));
-    await tester.tap(find.text('English').last);
-    await pumpFor(tester, const Duration(seconds: 1));
+    await pickRow('languageRow', 'English');
     result('language_switch_to_english',
-        find.text(en('settings')).evaluate().isNotEmpty);
-    await tester.tap(find.text(en('systemDefault')));
-    await pumpUntil(
-        tester, () => find.text(en('darkMode')).evaluate().isNotEmpty,
-        timeout: const Duration(seconds: 10));
-    await pumpFor(tester, const Duration(milliseconds: 500));
-    await tester.tap(find.text(en('darkMode')).last);
-    await pumpFor(tester, const Duration(seconds: 1));
+        find.text(en('language')).evaluate().isNotEmpty);
+    await pickRow('themeRow', en('themeDark'));
     screenshot('parent_10_english_dark');
-    final theme = Theme.of(tester.element(find.byType(Scaffold).first));
+    final theme = Theme.of(tester.element(find.byKey(const Key('languageRow'))));
     result('theme_dark_applied', theme.brightness == Brightness.dark);
-    await tester.tap(find.text('English'));
-    await pumpUntil(tester, () => find.text('Türkçe').evaluate().isNotEmpty,
-        timeout: const Duration(seconds: 10));
-    await pumpFor(tester, const Duration(milliseconds: 500));
-    await tester.tap(find.text('Türkçe').last);
-    await pumpFor(tester, const Duration(seconds: 1));
+    await pickRow('languageRow', 'Türkçe');
     result('language_switch_back_to_turkish',
-        find.text(tr('settings')).evaluate().isNotEmpty);
-    await tester.tapAt(const Offset(20, 60));
+        find.text(tr('language')).evaluate().isNotEmpty);
+    await goBack(tester);
     await pumpFor(tester, const Duration(seconds: 1));
 
     // --- Recording and gallery ---------------------------------------------------------
@@ -296,14 +296,21 @@ void main() {
     } else {
       result('recording_start_stop_no_crash', 'record button not shown');
     }
-    await tester.tap(find.byIcon(Icons.video_library_rounded).first);
+    await tester.tap(find.byKey(const Key('settingsButton')));
+    await pumpFor(tester, const Duration(seconds: 1));
+    final galleryRow = find.byKey(const Key('galleryButton'));
+    await tester.dragUntilVisible(galleryRow, find.byType(ListView), const Offset(0, -250));
+    await pumpFor(tester, const Duration(milliseconds: 400));
+    await tester.tap(galleryRow);
     final galleryOpen = await pumpUntil(
         tester, () => find.byType(VideoGalleryScreen).evaluate().isNotEmpty,
         timeout: const Duration(seconds: 10));
     await pumpFor(tester, const Duration(seconds: 2));
     screenshot('parent_12_gallery');
     result('gallery_opens', galleryOpen);
-    await goBack(tester);
+    await goBack(tester); // gallery
+    await pumpFor(tester, const Duration(seconds: 1));
+    await goBack(tester); // settings
     await pumpFor(tester, const Duration(seconds: 1));
 
     // --- Leave for good --------------------------------------------------------------------

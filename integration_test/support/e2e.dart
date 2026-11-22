@@ -70,13 +70,36 @@ Future<bool> pumpUntil(
   return await condition();
 }
 
-/// The WebRTC connection state shown on the home screen equals "connected".
-/// (The room's isPaired flag is not enough: the parent sets it when answering.)
-bool showsConnected() {
-  final finder = find.byKey(const Key('connectionStatusText'));
-  if (finder.evaluate().isEmpty) return false;
-  final text = (finder.evaluate().first.widget as Text).data;
-  return text == tr('connected') || text == en('connected');
+/// The real WebRTC state shown in the UI is "connected" (V2: the mint
+/// status pill). The room's isPaired flag is not enough: the parent sets it
+/// when answering.
+bool showsConnected() => find.byKey(const Key('linkConnected')).evaluate().isNotEmpty;
+
+/// V2: the first launch shows the intro (3 pages); go through it.
+Future<void> passOnboarding(WidgetTester tester) async {
+  final shown = await pumpUntil(
+    tester,
+    () =>
+        find.byKey(const Key('onboardingNext')).evaluate().isNotEmpty ||
+        find.byKey(const Key('roleBaby')).evaluate().isNotEmpty,
+    timeout: const Duration(seconds: 90),
+  );
+  expect(shown, isTrue, reason: 'intro or role screen visible');
+  for (var i = 0; i < 2; i++) {
+    final next = find.byKey(const Key('onboardingNext'));
+    if (next.evaluate().isEmpty) break;
+    await tester.tap(next.hitTestable().first);
+    await pumpFor(tester, const Duration(milliseconds: 900));
+  }
+  final done = find.byKey(const Key('onboardingDone'));
+  if (done.evaluate().isNotEmpty) {
+    await tester.tap(done.hitTestable().first);
+  }
+  final roles = await pumpUntil(
+      tester, () => find.byKey(const Key('roleBaby')).evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 20));
+  expect(roles, isTrue, reason: 'role screen after the intro');
+  await pumpFor(tester, const Duration(milliseconds: 600));
 }
 
 /// Leaves the current route (screens without a standard back button).
