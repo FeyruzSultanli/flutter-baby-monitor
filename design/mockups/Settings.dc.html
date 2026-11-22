@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ayarlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+a{color:#4B4BD8}a:hover{color:#3434B0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FBF8F3; padding: 60px 20px 34px; display: flex; flex-direction: column; gap: 18px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #191B33">
+  <div style="display: flex; align-items: center; gap: 12px">
+    <a href="ParentLive.dc.html" aria-label="Geri" style="width: 44px; height: 44px; border-radius: 14px; background: #F1ECE3; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191B33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px">Ayarlar</h1>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 13px; font-weight: 700; color: #5E6283; padding-left: 4px">ALARM</span>
+    <div style="display: flex; flex-direction: column; padding: 4px 16px; border-radius: 22px; background: #FFFFFF; border: 1.5px solid #ECE6DB">
+      <div style="display: flex; flex-direction: column; gap: 12px; padding: 14px 0; border-bottom: 1px solid #F1ECE3">
+        <div style="display: flex; justify-content: space-between; align-items: baseline">
+          <label for="sens" style="font-size: 15px; font-weight: 700">Hassasiyet</label>
+          <span style="font-size: 14px; font-weight: 700; color: #4B4BD8">65 dB</span>
+        </div>
+        <input id="sens" type="range" min="40" max="80" value="65" style="width: 100%; accent-color: #5B5BF0">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #5E6283"><span>Daha hassas</span><span>Daha az hassas</span></div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #F1ECE3">
+        <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Alarm için süre</span><span style="font-size: 13px; color: #5E6283">Ses bu kadar sürerse</span></span>
+        <span style="font-size: 15px; font-weight: 700; color: #5E6283">2 sn</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0">
+        <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Bildirim aralığı</span><span style="font-size: 13px; color: #5E6283">Ağlama sürerken en fazla</span></span>
+        <span style="font-size: 15px; font-weight: 700; color: #5E6283">1 / dk</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 13px; font-weight: 700; color: #5E6283; padding-left: 4px">GÖRÜNTÜ</span>
+    <div style="display: flex; flex-direction: column; padding: 4px 16px; border-radius: 22px; background: #FFFFFF; border: 1.5px solid #ECE6DB">
+      <div style="display: flex; flex-direction: column; gap: 12px; padding: 14px 0; border-bottom: 1px solid #F1ECE3">
+        <span style="font-size: 15px; font-weight: 700">Kalite</span>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 14px; background: #F1ECE3">
+          <button type="button" style="height: 38px; border: none; border-radius: 10px; background: transparent; color: #5E6283; font: 600 14px 'Plus Jakarta Sans', sans-serif">Tasarruf</button>
+          <button type="button" aria-pressed="true" style="height: 38px; border: none; border-radius: 10px; background: #FFFFFF; color: #191B33; font: 700 14px 'Plus Jakarta Sans', sans-serif">Dengeli</button>
+          <button type="button" style="height: 38px; border: none; border-radius: 10px; background: transparent; color: #5E6283; font: 600 14px 'Plus Jakarta Sans', sans-serif">Net</button>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0">
+        <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Bağlanınca gece modu</span><span style="font-size: 13px; color: #5E6283">Bebek telefonunun ekranı kararır</span></span>
+        <button type="button" role="switch" aria-checked="true" aria-label="Bağlanınca gece modu" style="width: 52px; height: 32px; border: none; border-radius: 999px; background: #5B5BF0; padding: 3px; display: flex; justify-content: flex-end"><span style="width: 26px; height: 26px; border-radius: 50%; background: #FFFFFF"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 13px; font-weight: 700; color: #5E6283; padding-left: 4px">UYGULAMA</span>
+    <div style="display: flex; flex-direction: column; padding: 4px 16px; border-radius: 22px; background: #FFFFFF; border: 1.5px solid #ECE6DB">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #F1ECE3">
+        <span style="font-size: 15px; font-weight: 700">Dil</span>
+        <span style="font-size: 15px; font-weight: 600; color: #5E6283">Türkçe ›</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 0">
+        <span style="font-size: 15px; font-weight: 700">Tema</span>
+        <span style="font-size: 15px; font-weight: 600; color: #5E6283">Otomatik ›</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

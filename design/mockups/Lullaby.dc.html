@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ninni ve gece lambası</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+a{color:#B9B9FF}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; box-sizing: border-box; background: #0B0C1C; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #FFFFFF; overflow: hidden">
+  <div style="height: 200px; background: #171933; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #4C5078; letter-spacing: 0.5px">CANLI GÖRÜNTÜ (arka planda)</div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; top: 150px; box-sizing: border-box; border-radius: 32px 32px 0 0; background: #1C1F3D; padding: 12px 20px 34px; display: flex; flex-direction: column; gap: 18px">
+    <span style="align-self: center; width: 40px; height: 5px; border-radius: 999px; background: #3A3E6B"></span>
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px">Bebeği sakinleştir</h1>
+      <a href="ParentLive.dc.html" aria-label="Kapat" style="width: 40px; height: 40px; border-radius: 12px; background: #2A2E55; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg></a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <button type="button" aria-pressed="true" style="height: 76px; border: 2px solid #8C8CFF; border-radius: 18px; background: #2A2E55; color: #FFFFFF; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 0 14px; font: 700 15px 'Plus Jakarta Sans', sans-serif">Beyaz gürültü<span style="font-size: 12px; font-weight: 600; color: #B9B9FF">Çalıyor · 24:10</span></button>
+      <button type="button" style="height: 76px; border: none; border-radius: 18px; background: #2A2E55; color: #FFFFFF; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 0 14px; font: 700 15px 'Plus Jakarta Sans', sans-serif">Yağmur<span style="font-size: 12px; font-weight: 600; color: #A9ADCF">Doğa sesi</span></button>
+      <button type="button" style="height: 76px; border: none; border-radius: 18px; background: #2A2E55; color: #FFFFFF; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 0 14px; font: 700 15px 'Plus Jakarta Sans', sans-serif">Kalp atışı<span style="font-size: 12px; font-weight: 600; color: #A9ADCF">Rahim sesi</span></button>
+      <button type="button" style="height: 76px; border: none; border-radius: 18px; background: #2A2E55; color: #FFFFFF; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 0 14px; font: 700 15px 'Plus Jakarta Sans', sans-serif">Dandini dandini<span style="font-size: 12px; font-weight: 600; color: #A9ADCF">Geleneksel ninni</span></button>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #A9ADCF"><label for="vol">SES DÜZEYİ (bebek telefonunda)</label><span>%40</span></div>
+      <input id="vol" type="range" min="0" max="100" value="40" style="width: 100%; accent-color: #8C8CFF">
+      <div style="display: flex; gap: 8px">
+        <button type="button" style="flex: 1; height: 36px; border: none; border-radius: 12px; background: #2A2E55; color: #C4C7E3; font: 600 13px 'Plus Jakarta Sans', sans-serif">15 dk</button>
+        <button type="button" aria-pressed="true" style="flex: 1; height: 36px; border: none; border-radius: 12px; background: #FFFFFF; color: #191B33; font: 700 13px 'Plus Jakarta Sans', sans-serif">30 dk</button>
+        <button type="button" style="flex: 1; height: 36px; border: none; border-radius: 12px; background: #2A2E55; color: #C4C7E3; font: 600 13px 'Plus Jakarta Sans', sans-serif">60 dk</button>
+        <button type="button" style="flex: 1; height: 36px; border: none; border-radius: 12px; background: #2A2E55; color: #C4C7E3; font: 600 13px 'Plus Jakarta Sans', sans-serif">Sürekli</button>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: #2E3260"></div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 800">Gece lambası</span><span style="font-size: 13px; color: #A9ADCF">Bebek telefonunun ekranı yumuşak ışık verir</span></span>
+        <button type="button" role="switch" aria-checked="true" aria-label="Gece lambası" style="width: 52px; height: 32px; border: none; border-radius: 999px; background: #5B5BF0; padding: 3px; display: flex; justify-content: flex-end"><span style="width: 26px; height: 26px; border-radius: 50%; background: #FFFFFF"></span></button>
+      </div>
+      <div style="display: flex; gap: 12px" role="radiogroup" aria-label="Işık rengi">
+        <button type="button" aria-label="Kehribar" aria-checked="true" role="radio" style="width: 44px; height: 44px; border-radius: 50%; border: 3px solid #FFFFFF; background: #FFB45E"></button>
+        <button type="button" aria-label="Pembe" role="radio" aria-checked="false" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #FF9FB2"></button>
+        <button type="button" aria-label="Mor" role="radio" aria-checked="false" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #A99CFF"></button>
+        <button type="button" aria-label="Mavi" role="radio" aria-checked="false" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: #7FC8FF"></button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

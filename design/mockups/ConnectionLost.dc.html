@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Bağlantı koptu alarmı</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+a{color:#FFD59E}a:hover{color:#FFFFFF}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1s linear infinite;transform-origin:50% 50%}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #12142B; padding: 60px 24px 34px; display: flex; flex-direction: column; gap: 22px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #FFFFFF">
+  <div style="margin-top: 60px; width: 88px; height: 88px; border-radius: 28px; background: #3A2C12; display: flex; align-items: center; justify-content: center">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#FFC46B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"></path><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8.5 16a5 5 0 0 1 7 0"></path><path d="M12 20h.01"></path><path d="M3 3l18 18"></path></svg>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <h1 style="margin: 0; font-size: 34px; line-height: 1.1; font-weight: 800; letter-spacing: -1px">Bebek telefonuyla bağlantı koptu</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #C4C7E3">45 saniyedir görüntü ve ses gelmiyor. Bebeği şu anda izleyemiyorsunuz.</p>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: #1C1F3D">
+    <svg class="spin" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B9B9FF" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"></path></svg>
+    <span style="font-size: 15px; font-weight: 600">Yeniden bağlanmaya çalışıyoruz…</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <span style="font-size: 13px; font-weight: 700; color: #A9ADCF">BEBEK TELEFONUNDA KONTROL EDİN</span>
+    <div style="display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.4; color: #E1E3F5">
+      <span>• Son pil durumu: %9 — şarjda olmayabilir</span>
+      <span>• Wi-Fi bağlantısı açık mı?</span>
+      <span>• Uygulama kapatılmış olabilir</span>
+    </div>
+  </div>
+
+  <div style="margin-top: auto; display: flex; flex-direction: column; gap: 12px">
+    <button type="button" style="height: 60px; border: none; border-radius: 20px; background: #FFC46B; color: #2A1D06; font: 800 17px 'Plus Jakarta Sans', sans-serif">Tekrar dene</button>
+    <button type="button" style="height: 52px; border: 1.5px solid #2E3260; border-radius: 18px; background: transparent; color: #C4C7E3; font: 700 15px 'Plus Jakarta Sans', sans-serif">Alarmı sustur</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

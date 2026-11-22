@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ebeveyn: oda koduna bağlan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+a{color:#4B4BD8}a:hover{color:#3434B0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FBF8F3; padding: 60px 20px 34px; display: flex; flex-direction: column; gap: 24px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #191B33">
+  <a href="RoleSelect.dc.html" aria-label="Geri" style="width: 44px; height: 44px; border-radius: 14px; background: #F1ECE3; display: flex; align-items: center; justify-content: center">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191B33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+  </a>
+
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 style="margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; letter-spacing: -0.8px">Odaya bağlanın</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #5E6283">Bebek telefonunda görünen 8 haneli kodu girin.</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <label for="code" style="font-size: 13px; font-weight: 700; color: #5E6283">ODA KODU</label>
+    <div style="display: flex; gap: 8px; align-items: center">
+      <div style="display: flex; gap: 5px">
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 1.5px solid #ECE6DB; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800">K</span>
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 1.5px solid #ECE6DB; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800">7</span>
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 1.5px solid #ECE6DB; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800">M</span>
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 1.5px solid #ECE6DB; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800">Q</span>
+      </div>
+      <span style="width: 10px; height: 3px; border-radius: 2px; background: #C9C2B5"></span>
+      <div style="display: flex; gap: 5px">
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 1.5px solid #ECE6DB; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800">T</span>
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 2px solid #5B5BF0; box-sizing: border-box; display: flex; align-items: center; justify-content: center"><span style="width: 2px; height: 24px; background: #5B5BF0"></span></span>
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 1.5px solid #ECE6DB; box-sizing: border-box"></span>
+        <span style="width: 36px; height: 52px; border-radius: 12px; background: #FFFFFF; border: 1.5px solid #ECE6DB; box-sizing: border-box"></span>
+      </div>
+    </div>
+    <input id="code" type="text" value="K7MQT" aria-label="Oda kodu" style="position: absolute; width: 1px; height: 1px; opacity: 0">
+  </div>
+
+  <button type="button" style="height: 52px; border: 1.5px solid #D9D3C7; border-radius: 18px; background: #FFFFFF; color: #191B33; font: 700 15px 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; justify-content: center; gap: 10px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191B33" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M7 12h10"></path></svg>
+    QR kodu okut
+  </button>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <span style="font-size: 13px; font-weight: 700; color: #5E6283">SON BAĞLANDIĞINIZ</span>
+    <a href="ParentLive.dc.html" style="text-decoration: none; color: #191B33; display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 20px; background: #FFFFFF; border: 1.5px solid #ECE6DB">
+      <span style="width: 44px; height: 44px; border-radius: 14px; background: #12142B; display: flex; align-items: center; justify-content: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FBF8F3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18v4a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"></path><circle cx="9" cy="8" r="2"></circle></svg>
+      </span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 15px; font-weight: 700">Bebek odası</span>
+        <span style="font-size: 13px; color: #5E6283">K7MQ-T2H9 · dün 21:40</span>
+      </span>
+      <span style="font-size: 14px; font-weight: 700; color: #4B4BD8">Tekrar bağlan</span>
+    </a>
+  </div>
+
+  <a href="ParentLive.dc.html" style="margin-top: auto; text-decoration: none; height: 60px; border-radius: 20px; background: #5B5BF0; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800">Bağlan</a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

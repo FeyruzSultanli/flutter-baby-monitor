@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Karşılama: izinler</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+a{color:#B9B9FF}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #12142B; padding: 60px 20px 34px; display: flex; flex-direction: column; gap: 22px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #FFFFFF">
+  <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 40px">
+    <h1 style="margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; letter-spacing: -0.8px">Birkaç izin gerekiyor</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #A9ADCF">Her birinin neden gerektiğini yazdık. İstediğiniz zaman ayarlardan değiştirebilirsiniz.</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 20px; background: #1C1F3D">
+      <span style="width: 44px; height: 44px; border-radius: 14px; background: #2A2E55; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5z"></path><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg></span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Kamera</span><span style="font-size: 13px; color: #A9ADCF">Bebeği görebilmeniz için</span></span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #7CEBC6"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7CEBC6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Verildi</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 20px; background: #1C1F3D">
+      <span style="width: 44px; height: 44px; border-radius: 14px; background: #2A2E55; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v4"></path></svg></span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Mikrofon</span><span style="font-size: 13px; color: #A9ADCF">Ağlamayı duymak ve konuşmak için</span></span>
+      <button type="button" style="height: 36px; padding: 0 14px; border: none; border-radius: 12px; background: #5B5BF0; color: #FFFFFF; font: 700 13px 'Plus Jakarta Sans', sans-serif">İzin ver</button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 20px; background: #1C1F3D">
+      <span style="width: 44px; height: 44px; border-radius: 14px; background: #2A2E55; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg></span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Bildirimler</span><span style="font-size: 13px; color: #A9ADCF">Ağlama alarmı için</span></span>
+      <button type="button" style="height: 36px; padding: 0 14px; border: none; border-radius: 12px; background: #5B5BF0; color: #FFFFFF; font: 700 13px 'Plus Jakarta Sans', sans-serif">İzin ver</button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 20px; background: #1C1F3D">
+      <span style="width: 44px; height: 44px; border-radius: 14px; background: #2A2E55; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8.5 16a5 5 0 0 1 7 0"></path><path d="M12 20h.01"></path></svg></span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Yakındaki cihazlar</span><span style="font-size: 13px; color: #A9ADCF">İnternetsiz mod için (isteğe bağlı)</span></span>
+      <button type="button" style="height: 36px; padding: 0 14px; border: 1.5px solid #2E3260; border-radius: 12px; background: transparent; color: #C4C7E3; font: 700 13px 'Plus Jakarta Sans', sans-serif">Sonra</button>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 18px; background: #16304A">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9FD3FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+    <span style="font-size: 13px; line-height: 1.5; color: #CFE7FF">Görüntü ve ses iki telefon arasında şifreli olarak gider. Sunucularımızda saklanmaz.</span>
+  </div>
+
+  <div style="margin-top: auto; display: flex; flex-direction: column; gap: 22px; align-items: center">
+    <div style="display: flex; gap: 8px" aria-label="Sayfa 3 / 3">
+      <span style="width: 8px; height: 8px; border-radius: 999px; background: #3A3E6B"></span>
+      <span style="width: 8px; height: 8px; border-radius: 999px; background: #3A3E6B"></span>
+      <span style="width: 24px; height: 8px; border-radius: 999px; background: #FFFFFF"></span>
+    </div>
+    <a href="RoleSelect.dc.html" style="width: 100%; text-decoration: none; height: 60px; border-radius: 20px; background: #5B5BF0; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800">Hazırım</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
