@@ -15,6 +15,7 @@
 | 5 | D3 + D8 (auth, kurallar, süreli kod, TTL) | ✅ Kod hazır: `d65bc86` (kurallar + 27 emülatör testi), `0d37d40` (uygulama). **Konsol adımları sizde, aşağıda.** |
 | 6 | D2 FCM (uygulama tarafı + Function kodu; deploy Blaze kararından sonra) | ✅ Kod hazır: `1f5a398` (uygulama), `53930a4` (Function; emülatörde tetiklendiği doğrulandı). **Deploy edilmedi.** |
 | 7 | D1-b foreground service | ⏸ **Kullanıcı onayı bekleniyor** (önce yarım günlük cihaz denemesi; bkz. bölüm 5) |
+| 8 | V2.1 (docs/V21_PLAN.md): B74 hata metinleri, B75/B76 teşhis + olası düzeltmeler, yeni arayüz | ✅ Kod `dev`'de (özet: `docs/V21_PROGRESS.md`). **Sıradaki:** `docs/LIVE_DEBUG.md` canlı oturumu (iki telefon) → B75/B76 kesin neden ve gerekirse dB ölçeği kalibrasyonu (A38) |
 
 ### D3 + D8 için konsol adımları (bu sırayla)
 

@@ -538,3 +538,22 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | V4.4 | Bebek cihazı ısı/pil | B 1 saat yayında: 30 dk normal ekran, 30 dk gece modu. | Pil tüketimi ve ısınmayı not edin; gece modunda belirgin şekilde daha az olmalı. | %/saat: |
 | V4.5 | Hareket azaltma | Sistemde "Animasyonları kaldır"/"Hareketi azalt" açık. | Yıldızlar, ay, halkalar, nabız durur; sayfa geçişleri anlık. | ✅/❌ |
 | V4.6 | Mağaza görüntüleri | `flutter run --dart-define=NINNI_DEMO=parentLive` (diğer sahneler: roleSelect, babyPairing, babyLive, babyNight, parentJoin, cryAlert, connectionLost). | Uygulama doğrudan o temiz sahnede açılır; ekran görüntüsü alınabilir. | ✅/❌ |
+
+## 18. Ninni v2.1 — gerçek cihaz hataları ve yeni arayüz
+
+Canlı oturum senaryosu: `docs/LIVE_DEBUG.md` (iki telefon USB'de, Claude logları okur). Aşağıdakiler o oturumda ya da sonra tek başına denenir.
+
+| # | Konu | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| V5.1 | B75 ağlama (iPhone bebek) | iPhone bebek, Android ebeveyn bağlı; 3–4 sn yüksek ses. | 2–3 sn içinde ebeveynde tam ekran alarm. iPhone logu `CRYDIAG … alarm=true write=ok`, Android `cryAlert=true fresh=true`. | ✅/❌ |
+| V5.2 | B75 saat farkı | Android ebeveynin saatini elle 2 dk ileri al, V5.1'i tekrarla. | Alarm yine gelir (en fazla ~5 sn gecikme). | ✅/❌ |
+| V5.3 | Mikrofon testi | Ayarlar → Mikrofonu test et (bebek yayında, ebeveyn bağlıyken ve rol seçmeden). | Canlı dB ve eşik çizgisi; eşik değişince karşı telefonda da değişir. Sessiz/konuşma/bağırma dB'lerini yazın. | dB: |
+| V5.4 | B76 bas-konuş | Android ebeveyn basılı tutup konuşur. | iPhone hoparlöründen (ahize değil) net ses; ebeveynde "Bebek sizi duyuyor" + sesle oynayan dalga. | ✅/❌ |
+| V5.5 | B76 ters yön | iPhone ebeveyn → Android bebek. | Android hoparlöründen ses; iPhone ebeveynde bebek sesi hoparlörden. | ✅/❌ |
+| V5.6 | Bas-konuş izni | Ebeveynde mikrofon iznini reddet, düğmeye bas. | "Bebeğe konuşmak için mikrofon izni gerekiyor" + "Ayarları aç" (sistem ayarlarına gider). | ✅/❌ |
+| V5.7 | Tanı ekranı | Ayarlar → sürüm satırına 5 kez dokun. | Tanı ekranı; değerler saniyede bir değişir; "Kopyala" panoya alır. | ✅/❌ |
+| V5.8 | B74 internet yok | Ebeveyn bağlıyken uçak modu; sonra kapat. Uygulamayı internetsiz açıp kod gir. | Amber "İnternet yok" şeridi; ham "Firebase … network" metni hiç görünmez; internet gelince kendiliğinden yeniden bağlanır; kod girişinde "İnternet bağlantısı yok…" + "Tekrar dene". | ✅/❌ |
+| V5.9 | Ana ekran | İlk açılış (karşılamadan sonra) ve bir bağlantıdan sonra. | Saate göre selam; son oda varsa mor "Bebek odasını izle" tek dokunuşla bağlar; ipuçları 8 sn'de bir değişir. | ✅/❌ |
+| V5.10 | Bebek yayında | 10+ dk yayın, arada bağırma. | Halka gösterge, son 1 saat grafiğinde alarm dakikası kayısı; "Yayında · süre" ilerler; Ebeveyn/Ninni/Işık kutuları doğru. | ✅/❌ |
+| V5.11 | Ebeveyn canlı | Bağlıyken. | "x dk'dır izleniyor", bağlantı kalitesi İyi/Orta/Zayıf (Wi-Fi'yi zayıflatınca değişir), bebek pili, 36 çubuklu dalga sesle oynar, "Bu gece N alarm · son hh:mm". "Bağlantıyı kes" yalnızca sağ üst menüde. | ✅/❌ |
+| V5.12 | Huawei 18:9 | Huawei RNE-L01 (1080×2160) ve iPhone'da tüm ekranlar, TR ve AZ. | Kesilen/taşan metin yok, "…" ile kesilen etiket yok. Karşılaştırma: `design/screens_v21/`. | ✅/❌ |
