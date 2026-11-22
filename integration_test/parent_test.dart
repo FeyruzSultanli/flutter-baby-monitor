@@ -235,11 +235,19 @@ void main() {
 
     // --- Settings: language and theme ------------------------------------------------
     await tester.tap(find.byKey(const Key('settingsButton')));
+    final settingsOpen = await pumpUntil(
+        tester, () => find.text('Türkçe').evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 20));
+    expect(settingsOpen, isTrue, reason: 'settings sheet open');
     await pumpFor(tester, const Duration(seconds: 1));
     // Dropdowns: wait until the opened list shows the option (slow emulators).
-    await tester.tap(find.text('Türkçe'));
-    await pumpUntil(tester, () => find.text('English').evaluate().isNotEmpty,
-        timeout: const Duration(seconds: 10));
+    for (var attempt = 0;
+        attempt < 3 && find.text('English').evaluate().isEmpty;
+        attempt++) {
+      await tester.tap(find.text('Türkçe').first);
+      await pumpUntil(tester, () => find.text('English').evaluate().isNotEmpty,
+          timeout: const Duration(seconds: 10));
+    }
     await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.text('English').last);
     await pumpFor(tester, const Duration(seconds: 1));
