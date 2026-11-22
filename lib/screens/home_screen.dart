@@ -407,14 +407,17 @@ class _HomeScreenState extends State<HomeScreen>
     // Resources that were not released before (B25).
     _noisePollTimer?.cancel();
     _audioSub?.cancel();
-    unawaited(Future(() async {
-      try {
-        await _recorder.stop();
-        await _player.stop();
-      } catch (e) {
-        debugPrint('Audio stream stop on dispose failed: $e');
-      }
-    }));
+    // sound_stream is not registered on iOS (B63).
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(Future(() async {
+        try {
+          await _recorder.stop();
+          await _player.stop();
+        } catch (e) {
+          debugPrint('Audio stream stop on dispose failed: $e');
+        }
+      }));
+    }
     if (_isOfflineMode && defaultTargetPlatform == TargetPlatform.android) {
       unawaited(Future(() async {
         try {
