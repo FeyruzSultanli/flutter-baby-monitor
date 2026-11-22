@@ -183,8 +183,6 @@ class _RecentRoomCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(room.name ?? l10n.defaultRoomName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: p.text)),
                 const SizedBox(height: 2),
                 Text('${RoomCode.format(room.code)} · $when',

@@ -55,10 +55,11 @@ class SegmentedControl<T> extends StatelessWidget {
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
                       label,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: NinniType.bodySm.copyWith(
                         fontSize: 14,
                         fontWeight: value == selected ? FontWeight.w700 : FontWeight.w600,
@@ -66,6 +67,7 @@ class SegmentedControl<T> extends StatelessWidget {
                             ? NinniColors.ink
                             : (p.isNight ? NinniColors.onNightSoft : NinniColors.inkMuted),
                       ),
+                    ),
                     ),
                   ),
                 ),

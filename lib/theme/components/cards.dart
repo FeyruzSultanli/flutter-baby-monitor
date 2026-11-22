@@ -214,8 +214,7 @@ class IconTile extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                     textAlign: TextAlign.center,
                     style: NinniType.caption.copyWith(color: NinniColors.onNight, fontWeight: FontWeight.w700),
                   ),

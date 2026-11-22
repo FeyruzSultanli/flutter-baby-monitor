@@ -80,11 +80,13 @@ class StatusPill extends StatelessWidget {
               ),
               const SizedBox(width: 7),
             ],
+            // V2.1 §4.2: never cut with "…"; shrink instead.
             Flexible(
-              child: Text(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
                 label,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: NinniType.numeric(TextStyle(
                   fontFamily: NinniType.family,
                   fontSize: height < 31 ? 12 : 13,
@@ -92,6 +94,7 @@ class StatusPill extends StatelessWidget {
                   letterSpacing: bold ? 0.4 : 0,
                   color: fg,
                 )),
+              ),
               ),
             ),
           ],

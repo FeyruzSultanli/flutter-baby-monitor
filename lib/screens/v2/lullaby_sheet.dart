@@ -232,8 +232,6 @@ class _TrackTile extends StatelessWidget {
                     style: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: NinniColors.onNight)),
                 const SizedBox(height: 4),
                 Text(subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: NinniType.numeric(NinniType.caption.copyWith(
                         color: selected ? NinniColors.primarySoftOnNight : NinniColors.onNightMuted))),
               ],
