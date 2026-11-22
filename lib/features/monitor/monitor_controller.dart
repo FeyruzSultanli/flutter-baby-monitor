@@ -48,7 +48,22 @@ import '../../models/alert_model.dart';
 import '../../models/video_settings.dart';
 
 /// Fixed states for screenshots (see [MonitorController.debugDemo]).
-enum DemoScene { roleSelect, babyPairing, babyLive, babyNight, parentJoin, parentLive, cryAlert, connectionLost }
+enum DemoScene {
+  roleSelect,
+  babyPairing,
+  babyLive,
+  babyNight,
+  parentJoin,
+  parentLive,
+  cryAlert,
+  connectionLost;
+
+  /// `--dart-define=NINNI_DEMO=parentLive` (empty: normal app).
+  static DemoScene? fromDefine() {
+    const name = String.fromEnvironment('NINNI_DEMO');
+    return DemoScene.values.where((s) => s.name == name).firstOrNull;
+  }
+}
 
 /// All monitoring logic of the app (both roles, online and offline), moved
 /// out of the old 3400-line HomeScreen (V2 phase 2). Screens only read its
@@ -169,6 +184,12 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
 
   bool _listeningNoise = false;
   double _currentDecibel = 0.0;
+  // V2 phase 4 (performance): the live level goes to its own notifier, so
+  // a level change (4-10 times a second) repaints only the meter instead of
+  // rebuilding whole screens. Screens listen to [level].
+  final ValueNotifier<double> _level = ValueNotifier<double>(0);
+  // Parent online: the received audio level, ~10 Hz (sound bars).
+  Timer? _parentLevelTimer;
 
   double _noiseThreshold = 60.0;
   bool _noiseAlert = false;
@@ -680,11 +701,13 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
           (Object e) => debugPrint('Resetting brightness on dispose failed: $e')));
     }
     _currentImageBytesNotifier.dispose();
+    _level.dispose();
     _discoveryStreamController.close();
     _controller?.dispose();
     unawaited(_cryAlarmSound.dispose());
     unawaited(_soothePlayer.dispose());
     _sootheVolumeDebounce?.cancel();
+    _parentLevelTimer?.cancel();
     if (_role == DeviceRole.BABY && _pairingState?.roomCode != null) {
       unawaited(_pairingService?.closeRoom(_pairingState!.roomCode).catchError(
           (Object e) => debugPrint('Closing room on dispose failed: $e')));
@@ -966,6 +989,9 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     if (!mounted) return;
     _cryActive = false;
     _cryAlarmVisible = false;
+    _parentLevelTimer?.cancel();
+    _parentLevelTimer = null;
+    _setLevel(0);
     unawaited(_cryAlarmSound.stop());
     unawaited(_soothePlayer.stop());
     _sootheThreshold.stop();
@@ -1192,6 +1218,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       await _webrtcService!.startAsParent(roomCode, session: session);
       unawaited(_registerPushToken(roomCode));
       _startWatchdog();
+      _startParentLevelPolling();
       unawaited(_startMonitorService());
       if (!mounted) return;
       _messenger?.showSnackBar(
@@ -1518,13 +1545,10 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _lastCryAlertSent = alert;
     _lastCrySentAt = now;
 
-    // Update local UI (Baby side)
-    if (mounted) {
-      setState(() {
-        _currentDecibel = db;
-        _noiseAlert = alert;
-      });
-    }
+    // Update local UI (Baby side): the meter only; screens rebuild only
+    // when the alert state changes.
+    _setLevel(db);
+    if (mounted && alert != _noiseAlert) setState(() => _noiseAlert = alert);
 
     // Send to Parent
     final endpointId = _connectedEndpointId;
@@ -1782,10 +1806,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
            final bool alert = map['alert'] as bool;
            
            final wasAlert = _noiseAlert;
-           setState(() {
-             _currentDecibel = db;
-             _noiseAlert = alert;
-           });
+           _setLevel(db);
+           if (alert != wasAlert) setState(() => _noiseAlert = alert);
            // Offline there is no Firestore alert listener: notify here, at
            // the start of a cry and at most once per cooldown.
            if (alert && !wasAlert && _takeCryNotificationSlot(DateTime.now())) {
@@ -2035,7 +2057,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       setState(() {
         _listeningNoise = false;
         _noiseAlert = false;
-        _currentDecibel = 0.0;
+        _setLevel(0);
       });
     }
   }
@@ -2062,10 +2084,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     final bool alert = _detectCry(db, now);
 
     if (_role == DeviceRole.BABY) {
-      setState(() {
-        _currentDecibel = db;
-        _noiseAlert = false;
-      });
+      _setLevel(db);
       final roomCode = _pairingState?.roomCode;
       
       // Online Mode Logic:
@@ -2100,9 +2119,24 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    setState(() {
-      _currentDecibel = db;
-      _noiseAlert = alert;
+    _setLevel(db);
+    if (alert != _noiseAlert) setState(() => _noiseAlert = alert);
+  }
+
+  void _setLevel(double db) {
+    _currentDecibel = db;
+    if (!_disposing) _level.value = db;
+  }
+
+  /// Parent, online: polls the received audio level (~10 Hz) for the live
+  /// sound bars (V2 §4). The room's cryDb only updates every 5 s (D8).
+  void _startParentLevelPolling() {
+    _parentLevelTimer?.cancel();
+    _parentLevelTimer = Timer.periodic(const Duration(milliseconds: 100), (_) async {
+      if (_disposing || _role != DeviceRole.PARENT || _isOfflineMode) return;
+      final levels = await _webrtcService?.getAudioLevels();
+      final remote = levels?.remote;
+      if (remote != null) _setLevel(webrtcAudioLevelToDb(remote));
     });
   }
 
@@ -2241,12 +2275,12 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         final isFresh =
             updatedAt == null || DateTime.now().difference(updatedAt) < const Duration(seconds: 20);
         final remoteAlert = roomState.cryAlert && isFresh;
-        setState(() {
-          _noiseAlert = remoteAlert;
-          if (roomState.cryDecibel != null) {
-            _currentDecibel = roomState.cryDecibel!;
-          }
-        });
+        if (remoteAlert != _noiseAlert) setState(() => _noiseAlert = remoteAlert);
+        // The live bars use the received audio (10 Hz); the room value only
+        // fills in until it arrives.
+        if (roomState.cryDecibel != null && _parentLevelTimer == null) {
+          _setLevel(roomState.cryDecibel!);
+        }
         _onRemoteCryState(remoteAlert, roomState.cryDecibel);
       }
       }, onError: (Object e) {
@@ -2484,6 +2518,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   ValueListenable<Uint8List?> get offlineFrame => _currentImageBytesNotifier;
 
   double get decibel => _currentDecibel;
+  /// Live sound level (dB); listen to it for meters (repaints only them).
+  ValueListenable<double> get level => _level;
   bool get noiseAlert => _noiseAlert;
   bool get listeningNoise => _listeningNoise;
   double get noiseThreshold => _noiseThreshold;
@@ -2534,6 +2570,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   bool get canTalk =>
       _demo || (!_isOfflineMode && isConnected && (_webrtcService?.canTalk ?? false));
   bool _demo = false;
+  /// Demo / store screenshot mode (no streaming).
+  bool get isDemo => _demo;
 
   List<Map<String, String>> get discoveredEndpoints => List.unmodifiable(_discoveredEndpoints);
   bool get discovering => _discovering;
@@ -2872,7 +2910,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _pairingState = PairingState(roomCode: 'K7MQT2H9', status: ConnectionStatus.CONNECTED, isPaired: true);
         _connectionStatus = ConnectionStatus.CONNECTED;
         _parentEverConnected = true;
-        _currentDecibel = 42;
+        _setLevel(42);
         _nightMode = scene == DemoScene.babyNight;
       case DemoScene.parentJoin:
         _role = DeviceRole.PARENT;
@@ -2894,7 +2932,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _connectionStatus = ConnectionStatus.CONNECTED;
         _remoteBatteryLevel = scene == DemoScene.connectionLost ? 9 : 76;
         _remoteBatteryState = BatteryState.discharging;
-        _currentDecibel = scene == DemoScene.cryAlert ? 74 : 38;
+        _setLevel(scene == DemoScene.cryAlert ? 74 : 38);
         _noiseAlert = scene == DemoScene.cryAlert;
         _lastRecordedAlertTime = DateTime(now.year, now.month, now.day, 1, 12);
         _soothe = SootheState(

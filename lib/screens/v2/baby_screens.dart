@@ -344,6 +344,45 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
   }
 }
 
+/// Pills with the room code on the right (mockup); with large text the
+/// code moves to its own line and the pills wrap (V2 phase 4).
+class _StatusRow extends StatelessWidget {
+  const _StatusRow({required this.pills, this.trailing});
+  final List<Widget> pills;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final large = MediaQuery.textScalerOf(context).scale(10) > 12.5;
+    final code = trailing == null
+        ? null
+        : Text(
+            trailing!,
+            style: NinniType.numeric(NinniType.label
+                .copyWith(letterSpacing: 0, fontWeight: FontWeight.w600, color: NinniColors.onNightMuted)),
+          );
+    if (large) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(spacing: 8, runSpacing: 8, children: pills),
+          if (code != null) ...[const SizedBox(height: 8), code],
+        ],
+      );
+    }
+    return Row(
+      children: [
+        for (var i = 0; i < pills.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Flexible(child: pills[i]),
+        ],
+        const SizedBox(width: 8),
+        if (code != null) Expanded(child: Align(alignment: Alignment.centerRight, child: code)),
+      ],
+    );
+  }
+}
+
 /// Baby phone while broadcasting (mockup BabyLive).
 class BabyLiveScreen extends StatelessWidget {
   const BabyLiveScreen({super.key});
@@ -353,13 +392,8 @@ class BabyLiveScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final c = context.watch<MonitorController>();
     final connected = c.isConnected;
-    final db = c.decibel;
     final threshold = c.noiseThreshold;
-    final level = !c.listeningNoise && !c.isOffline
-        ? l10n.levelOff
-        : db >= threshold
-            ? l10n.levelLoud
-            : (db >= threshold - 12 ? l10n.levelActive : l10n.levelQuiet);
+    final listening = c.listeningNoise || c.isOffline;
     final code = c.roomCode;
 
     Future<void> end() async {
@@ -376,34 +410,21 @@ class BabyLiveScreen extends StatelessWidget {
         child: ScreenFrame(
           gap: 18,
           items: [
-            Row(
-              children: [
+            _StatusRow(
+              pills: [
                 StatusPill(
                   key: Key(connected ? 'linkConnected' : 'linkNotConnected'),
                   label: connected ? l10n.parentConnected : l10n.parentWaiting,
                   tone: connected ? PillTone.mint : PillTone.neutral,
                 ),
-                const SizedBox(width: 8),
                 StatusPill(
                   label: c.batteryCharging
                       ? l10n.batteryCharging.replaceAll('{level}', '${c.batteryLevel}')
                       : l10n.batteryPercent.replaceAll('{level}', '${c.batteryLevel}'),
                   icon: c.batteryCharging ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
                 ),
-                const SizedBox(width: 8),
-                if (code != null)
-                  Expanded(
-                    child: Text(
-                      '${l10n.roomShort} ${RoomCode.format(code)}',
-                      textAlign: TextAlign.end,
-                      maxLines: 1,
-                      overflow: TextOverflow.fade,
-                      softWrap: false,
-                      style: NinniType.numeric(NinniType.label
-                          .copyWith(letterSpacing: 0, fontWeight: FontWeight.w600, color: NinniColors.onNightMuted)),
-                    ),
-                  ),
               ],
+              trailing: code == null ? null : '${l10n.roomShort} ${RoomCode.format(code)}',
             ),
             ClipRRect(
               borderRadius: BorderRadius.circular(NinniRadii.r28),
@@ -436,7 +457,16 @@ class BabyLiveScreen extends StatelessWidget {
             ),
             SectionCard(
               radius: NinniRadii.r24,
-              child: Column(
+              // Only this card follows the live level (V2 phase 4).
+              child: ValueListenableBuilder<double>(
+                valueListenable: c.level,
+                builder: (context, db, _) {
+                  final level = !listening
+                      ? l10n.levelOff
+                      : db >= threshold
+                          ? l10n.levelLoud
+                          : (db >= threshold - 12 ? l10n.levelActive : l10n.levelQuiet);
+                  return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
@@ -486,6 +516,8 @@ class BabyLiveScreen extends StatelessWidget {
                     ],
                   ),
                 ],
+                  );
+                },
               ),
             ),
             NinniButton(
@@ -523,20 +555,16 @@ class BabyLiveScreen extends StatelessWidget {
       ),
     );
 
+    // Night mode replaces the screen: no video preview or meter keeps
+    // drawing underneath (battery/heat on the baby phone, V2 phase 4).
     return NightTheme(
-      child: Stack(
-        children: [
-          screen,
-          if (c.nightMode)
-            Positioned.fill(
-              child: BabyNightView(
-                parentConnected: connected,
-                lightColor: c.nightLightColor,
-                onExit: c.exitNightMode,
-              ),
-            ),
-        ],
-      ),
+      child: c.nightMode
+          ? BabyNightView(
+              parentConnected: connected,
+              lightColor: c.nightLightColor,
+              onExit: c.exitNightMode,
+            )
+          : screen,
     );
   }
 }

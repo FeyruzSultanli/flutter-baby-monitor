@@ -292,12 +292,6 @@ class ParentLiveScreen extends StatelessWidget {
     final code = c.roomCode;
     final battery = c.remoteBatteryLevel;
     final last = c.lastAlertAt;
-    final db = c.decibel;
-    final calmText = c.noiseAlert ? l10n.babyCryingShort : (db >= c.noiseThreshold - 12 ? l10n.babyStirring : l10n.babyCalm);
-    final detail = [
-      '${db.round()} dB',
-      if (last != null) l10n.lastAlarmAt.replaceAll('{time}', DateFormat.Hm().format(last)),
-    ].join(' · ');
 
     return NightTheme(
       child: Scaffold(
@@ -435,24 +429,48 @@ class ParentLiveScreen extends StatelessWidget {
                             padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                RepaintBoundary(
-                                  child: SoundBars(
-                                    db: db,
-                                    color: c.noiseAlert ? NinniColors.apricot : NinniColors.mint,
-                                    active: connected,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
+                                // Only the bars and the level text follow the
+                                // live level (~10 Hz, V2 §4 / phase 4).
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(calmText, style: NinniType.title.copyWith(color: NinniColors.onNight)),
-                                      const SizedBox(height: 2),
-                                      Text(detail,
-                                          style: NinniType.numeric(NinniType.caption.copyWith(
-                                              fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightMuted))),
-                                    ],
+                                  child: ValueListenableBuilder<double>(
+                                    valueListenable: c.level,
+                                    builder: (context, db, _) {
+                                      final calmText = c.noiseAlert
+                                          ? l10n.babyCryingShort
+                                          : (db >= c.noiseThreshold - 12 ? l10n.babyStirring : l10n.babyCalm);
+                                      final detail = [
+                                        '${db.round()} dB',
+                                        if (last != null)
+                                          l10n.lastAlarmAt.replaceAll('{time}', DateFormat.Hm().format(last)),
+                                      ].join(' · ');
+                                      return Row(
+                                        children: [
+                                          RepaintBoundary(
+                                            child: SoundBars(
+                                              db: db,
+                                              color: c.noiseAlert ? NinniColors.apricot : NinniColors.mint,
+                                              active: connected,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Semantics(
+                                              liveRegion: c.noiseAlert,
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(calmText, style: NinniType.title.copyWith(color: NinniColors.onNight)),
+                                                  const SizedBox(height: 2),
+                                                  Text(detail,
+                                                      style: NinniType.numeric(NinniType.caption.copyWith(
+                                                          fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightMuted))),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
                                   ),
                                 ),
                                 TextButton(
