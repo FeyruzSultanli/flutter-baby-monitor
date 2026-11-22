@@ -58,6 +58,15 @@ def alarm_connection():
     return buf
 
 
+def alarm_cry():
+    """Cry alarm: three rising soft chimes, then a pause (loops)."""
+    buf = [0.0] * int(3.0 * RATE)
+    for f, t in [(659.25, 0.0), (783.99, 0.22), (987.77, 0.44)]:
+        mix_into(buf, t, bell(f, 1.4, decay=3.2), 0.75)
+    return buf
+
+
 if __name__ == '__main__':
     random.seed(7)
     write_wav('alarm_connection.wav', alarm_connection())
+    write_wav('alarm_cry.wav', alarm_cry())

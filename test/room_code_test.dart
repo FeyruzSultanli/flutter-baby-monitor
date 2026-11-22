@@ -43,4 +43,20 @@ void main() {
     expect(RoomCode.isValid('123456'), isFalse);
     expect(RoomCode.isValid('abcd2345'), isFalse);
   });
+
+  group('sanitizeInput (V2 code boxes)', () {
+    test('upper-cases and drops separators', () {
+      expect(RoomCode.sanitizeInput('abcd-ef23'), (code: 'ABCDEF23', rejected: false));
+    });
+    test('rejects look-alikes and limits to 8', () {
+      final r = RoomCode.sanitizeInput('A0BCD1EF23XY');
+      expect(r.code, 'ABCDEF23');
+      expect(r.rejected, isTrue);
+    });
+    test('accepts a pasted join link', () {
+      final r = RoomCode.sanitizeInput(RoomCode.joinUri('K7MQT2H9'));
+      expect(r.code, 'K7MQT2H9');
+      expect(RoomCode.joinUri('K7MQT2H9'), 'ninni://join?code=K7MQ-T2H9');
+    });
+  });
 }

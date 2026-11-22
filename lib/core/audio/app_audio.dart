@@ -47,11 +47,12 @@ class AppAudio {
   );
 }
 
-/// Looping alarm with a vibration pattern (connection lost, V2 5.6).
+/// Looping alarm with a vibration pattern (connection lost 5.6, cry alarm).
 class AlarmSound {
-  AlarmSound({this.asset = 'audio/alarm_connection.wav'});
+  AlarmSound({this.asset = 'audio/alarm_connection.wav', this.playerId = 'ninni_alarm'});
 
   final String asset;
+  final String playerId;
   AudioPlayer? _player;
   Timer? _vibrationTimer;
   bool _playing = false;
@@ -63,7 +64,7 @@ class AlarmSound {
     _playing = true;
     await AppAudio.configure();
     try {
-      final player = _player ??= AudioPlayer(playerId: 'ninni_alarm');
+      final player = _player ??= AudioPlayer(playerId: playerId);
       if (defaultTargetPlatform == TargetPlatform.android) {
         await player.setAudioContext(
             AudioContext(android: AppAudio.alarmAndroid, iOS: AudioContextIOS()));

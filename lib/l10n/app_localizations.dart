@@ -11,6 +11,8 @@ class AppLocalizations {
 
   static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
+  static const List<Locale> supportedLocales = [Locale('tr'), Locale('en')];
+
   /// Raw translation tables, exposed only so tests can check TR/EN key parity.
   @visibleForTesting
   static Map<String, Map<String, String>> get debugLocalizedValues => _localizedValues;
@@ -72,7 +74,7 @@ class AppLocalizations {
       'noiseDetected': 'Noise detected',
       'lowBattery': 'Low Battery',
       'babyDeviceLowBattery': 'Baby device battery is low',
-      'alertHistory': 'Alert History',
+      'alertHistory': 'Alarm history',
       'today': 'Today',
       'yesterday': 'Yesterday',
       'noRecordsFound': 'No records found',
@@ -194,6 +196,147 @@ class AppLocalizations {
       'batteryLowBody': 'Battery at {level}%. Plug the baby phone into a charger.',
       'dismiss': 'Dismiss',
       'connectionLostNotification': 'No picture or sound from the baby phone. Open Ninni.',
+      'alarmAfter2s': 'Alarm if crying lasts 2 s',
+      'alarmDuration': 'Time before alarm',
+      'alarmDurationSub': 'If the sound lasts this long',
+      'alarmsLabel': 'alarms',
+      'allow': 'Allow',
+      'androidOnly': '(Android only)',
+      'appTagline': 'Baby Monitor',
+      'autoNightModeShort': 'The baby phone\'s screen goes dark',
+      'babyCalm': 'Baby is calm',
+      'babyCryingShort': 'Baby is crying',
+      'babyStirring': 'Some sound',
+      'babyDevice': 'Baby device',
+      'babyDeviceBatteryShort': 'Baby device {level}%',
+      'babyPairingTitle': 'Enter this code on the parent phone',
+      'babyPairingSubtitle': 'The code is valid for 10 minutes.',
+      'babyPlacementHint': 'Leave the phone on the charger, 1–2 metres from the baby.',
+      'iosKeepOpenHint': 'On iPhone keep Ninni open and use night mode; the camera stops when the screen locks.',
+      'babyShort': 'Baby',
+      'youShort': 'You',
+      'back': 'Back',
+      'batteryCharging': '{level}% · charging',
+      'batteryPercent': '{level}%',
+      'cameraMicReady': 'Camera and microphone are ready',
+      'cameraPreparing': 'Preparing camera…',
+      'clearHistoryTitle': 'Clear history?',
+      'clearHistoryBody': 'All alarm entries on this phone are deleted.',
+      'close': 'Close',
+      'codeExpired': 'The code has expired. Create a new one.',
+      'codeValidFor': 'Code valid for {time} more',
+      'connecting': 'Connecting',
+      'continueLabel': 'Continue',
+      'copied': 'Code copied',
+      'cry': 'Crying',
+      'cryStopped': 'stopped',
+      'cryingForSeconds': 'for {s} seconds',
+      'defaultRoomName': 'Baby room',
+      'disconnectTitle': 'Disconnect?',
+      'disconnectBody': 'You will stop watching and get no more alarms from this room.',
+      'endBroadcast': 'End broadcast',
+      'endBroadcastTitle': 'End the broadcast?',
+      'endBroadcastBody': 'The parent phone disconnects and the room code stops working.',
+      'enterNightMode': 'Switch to night mode',
+      'fullscreen': 'Full screen',
+      'granted': 'Granted',
+      'history': 'History',
+      'hoursShort': '{h} h',
+      'hoursMinutesShort': '{h} h {m} min',
+      'minutesShort': '{m} min',
+      'minutesSecondsShort': '{m} min {s} s',
+      'secondsShort': '{s} s',
+      'imReady': 'I\'m ready',
+      'joinTitle': 'Connect to the room',
+      'joinSubtitle': 'Enter the 8 character code shown on the baby phone.',
+      'last7Days': '7 days',
+      'lastAlarmAt': 'last alarm {time}',
+      'later': 'Later',
+      'letsStart': 'Let\'s start',
+      'levelActive': 'Some sound',
+      'levelLoud': 'Loud',
+      'levelOff': 'Starting…',
+      'levelQuiet': 'Quiet',
+      'licenses': 'Licences',
+      'linkGood': 'Good connection',
+      'live': 'LIVE',
+      'liveView': 'Live view',
+      'longestQuietLabel': 'longest quiet',
+      'newCode': 'New code',
+      'nightExitHint': 'Tap twice to exit',
+      'nightStatusConnected': 'Broadcasting · parent connected',
+      'nightStatusWaiting': 'Broadcasting · waiting for the parent',
+      'noAlertsInRange': 'No alarms in this period. A quiet night!',
+      'noInternet': 'No internet?',
+      'notifyInterval': 'Notification interval',
+      'notifyIntervalSub': 'At most, while crying continues',
+      'perMinute': '1 / min',
+      'now': 'now',
+      'offlineBabyTitle': 'Waiting for a nearby parent phone',
+      'offlineBabyBody': 'No internet needed. On the parent phone choose “With me” and tap “Search nearby”. Bluetooth, Wi-Fi and location must be on.',
+      'offlineModeShort': 'Offline mode',
+      'offlineParentTitle': 'Find the baby phone',
+      'offlineParentBody': 'Both phones nearby, with Bluetooth, Wi-Fi and location on.',
+      'onboardTitle1': 'While your baby sleeps,\nyou can sleep too',
+      'onboardBody1': 'Turn the two phones you have into a baby monitor in seconds.',
+      'onboardTitle2': 'Ready in three steps',
+      'onboardStep1Title': 'Put one phone next to the baby',
+      'onboardStep1Body': 'An old phone works too. Keep it on the charger.',
+      'onboardStep2Title': 'Enter the code',
+      'onboardStep2Body': 'The two phones pair over a secure connection. The code is valid for 10 minutes.',
+      'onboardStep3Title': 'Know at once when the baby cries',
+      'onboardStep3Body': 'Notifications arrive even when the app is closed. Live picture and sound.',
+      'onboardTitle3': 'A few permissions are needed',
+      'onboardBody3': 'We wrote why each one is needed. You can change them any time in the settings.',
+      'openSettings': 'Open settings',
+      'openVideo': 'Open the video',
+      'pageOf': 'Page {n} of {total}',
+      'parentConnected': 'Parent connected',
+      'parentWaiting': 'Waiting for parent',
+      'permCamera': 'Camera',
+      'permCameraWhy': 'So you can see the baby',
+      'permMic': 'Microphone',
+      'permMicWhy': 'To hear crying and to talk',
+      'permNotifications': 'Notifications',
+      'permNotificationsWhy': 'For the cry alarm',
+      'permNearby': 'Nearby devices',
+      'permNearbyWhy': 'For offline mode (optional)',
+      'privacyNote': 'Picture and sound go encrypted between the two phones. They are not stored on our servers.',
+      'quality': 'Quality',
+      'qualitySaver': 'Saver',
+      'qualityBalanced': 'Balanced',
+      'qualitySharp': 'Sharp',
+      'record': 'Record',
+      'stopRecordingShort': 'Stop',
+      'replayIntro': 'Show the intro again',
+      'roleTitle': 'Where will this phone be?',
+      'roleSubtitle': 'Pair two phones: one next to the baby, the other with you.',
+      'roleBabyTitle': 'Next to the baby',
+      'roleBabyBody': 'This phone becomes the camera and microphone. It detects crying and lets you know.',
+      'roleParentTitle': 'With me',
+      'roleParentBody': 'Watch the baby live and get an alert as soon as they cry.',
+      'roomShort': 'Room',
+      'searchNearby': 'Search nearby',
+      'searching': 'Searching for the baby phone…',
+      'sectionAbout': 'About',
+      'sectionAlarm': 'Alarm',
+      'sectionApp': 'App',
+      'sectionVideo': 'Picture',
+      'sensitivity': 'Sensitivity',
+      'shareCodeText': 'Ninni room code: {code}',
+      'shortNoise': 'Short noise',
+      'skip': 'Skip',
+      'snooze5': 'Snooze 5 min',
+      'soundLevel': 'Sound level',
+      'switchCamera': 'Switch camera',
+      'switchShort': 'Flip',
+      'themeAuto': 'Automatic',
+      'themeLight': 'Light',
+      'themeDark': 'Dark',
+      'thresholdValue': 'Threshold {db} dB',
+      'tonight': 'Tonight',
+      'totalCryLabel': 'total crying',
+      'waitingForParent': 'Waiting for the parent phone',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -251,7 +394,7 @@ class AppLocalizations {
       'noiseDetected': 'Gürültü algılandı',
       'lowBattery': 'Pil Düşük',
       'babyDeviceLowBattery': 'Bebek cihazının şarjı azaldı',
-      'alertHistory': 'Alarm Geçmişi',
+      'alertHistory': 'Alarm geçmişi',
       'today': 'Bugün',
       'yesterday': 'Dün',
       'noRecordsFound': 'Kayıt bulunamadı',
@@ -289,7 +432,7 @@ class AppLocalizations {
       'joinRoom': 'Odaya Katıl',
       'stopRecording': 'Kaydı Durdur',
       'startRecording': 'Kayıt Başlat',
-      'disconnect': 'Bağlantıyı Kes',
+      'disconnect': 'Bağlantıyı kes',
       'startCamera': 'Kamerayı Aç',
       'stopCamera': 'Kamerayı Kapat',
       'createRoom': 'Oda Oluştur',
@@ -375,6 +518,147 @@ class AppLocalizations {
       'batteryLowBody': 'Pil %{level}. Bebek telefonunu şarja takın.',
       'dismiss': 'Kapat',
       'connectionLostNotification': 'Bebek telefonundan görüntü ve ses gelmiyor. Ninni\'yi açın.',
+      'alarmAfter2s': 'Ağlama 2 sn sürerse alarm',
+      'alarmDuration': 'Alarm için süre',
+      'alarmDurationSub': 'Ses bu kadar sürerse',
+      'alarmsLabel': 'alarm',
+      'allow': 'İzin ver',
+      'androidOnly': '(yalnızca Android)',
+      'appTagline': 'Bebek Monitörü',
+      'autoNightModeShort': 'Bebek telefonunun ekranı kararır',
+      'babyCalm': 'Bebek sakin',
+      'babyCryingShort': 'Bebek ağlıyor',
+      'babyStirring': 'Ses var',
+      'babyDevice': 'Bebek cihazı',
+      'babyDeviceBatteryShort': 'Bebek cihazı %{level}',
+      'babyPairingTitle': 'Bu kodu ebeveyn telefonuna girin',
+      'babyPairingSubtitle': 'Kod 10 dakika geçerlidir.',
+      'babyPlacementHint': 'Telefonu şarja takılı ve bebeğe 1–2 metre uzakta bırakın.',
+      'iosKeepOpenHint': 'iPhone\'da Ninni\'yi açık bırakın ve gece modunu kullanın; ekran kilitlenince kamera durur.',
+      'babyShort': 'Bebek',
+      'youShort': 'Siz',
+      'back': 'Geri',
+      'batteryCharging': '%{level} · şarjda',
+      'batteryPercent': '%{level}',
+      'cameraMicReady': 'Kamera ve mikrofon hazır',
+      'cameraPreparing': 'Kamera hazırlanıyor…',
+      'clearHistoryTitle': 'Geçmiş silinsin mi?',
+      'clearHistoryBody': 'Bu telefondaki tüm alarm kayıtları silinir.',
+      'close': 'Kapat',
+      'codeExpired': 'Kodun süresi doldu. Yeni bir kod oluşturun.',
+      'codeValidFor': 'Kod {time} dakika daha geçerli',
+      'connecting': 'Bağlanıyor',
+      'continueLabel': 'Devam',
+      'copied': 'Kod kopyalandı',
+      'cry': 'Ağlama',
+      'cryStopped': 'durdu',
+      'cryingForSeconds': '{s} saniyedir',
+      'defaultRoomName': 'Bebek odası',
+      'disconnectTitle': 'Bağlantı kesilsin mi?',
+      'disconnectBody': 'İzleme durur ve bu odadan alarm almazsınız.',
+      'endBroadcast': 'Yayını bitir',
+      'endBroadcastTitle': 'Yayın bitirilsin mi?',
+      'endBroadcastBody': 'Ebeveyn telefonunun bağlantısı kesilir ve oda kodu geçersiz olur.',
+      'enterNightMode': 'Gece moduna geç',
+      'fullscreen': 'Tam ekran',
+      'granted': 'Verildi',
+      'history': 'Geçmiş',
+      'hoursShort': '{h} sa',
+      'hoursMinutesShort': '{h} sa {m} dk',
+      'minutesShort': '{m} dk',
+      'minutesSecondsShort': '{m} dk {s} sn',
+      'secondsShort': '{s} sn',
+      'imReady': 'Hazırım',
+      'joinTitle': 'Odaya bağlanın',
+      'joinSubtitle': 'Bebek telefonunda görünen 8 haneli kodu girin.',
+      'last7Days': '7 gün',
+      'lastAlarmAt': 'son alarm {time}',
+      'later': 'Sonra',
+      'letsStart': 'Başlayalım',
+      'levelActive': 'Hareketli',
+      'levelLoud': 'Yüksek',
+      'levelOff': 'Başlıyor…',
+      'levelQuiet': 'Sessiz',
+      'licenses': 'Lisanslar',
+      'linkGood': 'Bağlantı iyi',
+      'live': 'CANLI',
+      'liveView': 'Canlı görüntü',
+      'longestQuietLabel': 'en uzun sessiz',
+      'newCode': 'Yeni kod',
+      'nightExitHint': 'Çıkmak için iki kez dokunun',
+      'nightStatusConnected': 'Yayın sürüyor · ebeveyn bağlı',
+      'nightStatusWaiting': 'Yayın sürüyor · ebeveyn bekleniyor',
+      'noAlertsInRange': 'Bu aralıkta alarm yok. Sakin bir gece!',
+      'noInternet': 'İnternet yok mu?',
+      'notifyInterval': 'Bildirim aralığı',
+      'notifyIntervalSub': 'Ağlama sürerken en fazla',
+      'perMinute': '1 / dk',
+      'now': 'şimdi',
+      'offlineBabyTitle': 'Yakındaki ebeveyn telefonu bekleniyor',
+      'offlineBabyBody': 'İnternet gerekmez. Ebeveyn telefonunda “Benim yanımda”yı seçip “Yakındaki cihazı ara”ya dokunun. Bluetooth, Wi-Fi ve konum açık olmalı.',
+      'offlineModeShort': 'İnternetsiz mod',
+      'offlineParentTitle': 'Bebek telefonunu bulun',
+      'offlineParentBody': 'İki telefon yakın olsun; Bluetooth, Wi-Fi ve konum açık olmalı.',
+      'onboardTitle1': 'Bebeğiniz uyurken,\nsiz de rahat uyuyun',
+      'onboardBody1': 'Elinizdeki iki telefonu birkaç saniyede bebek monitörüne dönüştürün.',
+      'onboardTitle2': 'Üç adımda hazır',
+      'onboardStep1Title': 'Bir telefonu bebeğin yanına koyun',
+      'onboardStep1Body': 'Eski bir telefon da olur. Şarja takılı kalsın.',
+      'onboardStep2Title': 'Kodu girin',
+      'onboardStep2Body': 'İki telefon güvenli bir bağlantıyla eşleşir. Kod 10 dakika geçerlidir.',
+      'onboardStep3Title': 'Ağladığında hemen haberiniz olsun',
+      'onboardStep3Body': 'Uygulama kapalıyken bile bildirim gelir. Görüntü ve ses canlı.',
+      'onboardTitle3': 'Birkaç izin gerekiyor',
+      'onboardBody3': 'Her birinin neden gerektiğini yazdık. İstediğiniz zaman ayarlardan değiştirebilirsiniz.',
+      'openSettings': 'Ayarları aç',
+      'openVideo': 'Görüntüyü aç',
+      'pageOf': 'Sayfa {n} / {total}',
+      'parentConnected': 'Ebeveyn bağlı',
+      'parentWaiting': 'Ebeveyn bekleniyor',
+      'permCamera': 'Kamera',
+      'permCameraWhy': 'Bebeği görebilmeniz için',
+      'permMic': 'Mikrofon',
+      'permMicWhy': 'Ağlamayı duymak ve konuşmak için',
+      'permNotifications': 'Bildirimler',
+      'permNotificationsWhy': 'Ağlama alarmı için',
+      'permNearby': 'Yakındaki cihazlar',
+      'permNearbyWhy': 'İnternetsiz mod için (isteğe bağlı)',
+      'privacyNote': 'Görüntü ve ses iki telefon arasında şifreli olarak gider. Sunucularımızda saklanmaz.',
+      'quality': 'Kalite',
+      'qualitySaver': 'Tasarruf',
+      'qualityBalanced': 'Dengeli',
+      'qualitySharp': 'Net',
+      'record': 'Kaydet',
+      'stopRecordingShort': 'Durdur',
+      'replayIntro': 'Tanıtımı tekrar göster',
+      'roleTitle': 'Bu telefon nerede duracak?',
+      'roleSubtitle': 'İki telefonu eşleştirin: biri bebeğin yanında, diğeri sizde.',
+      'roleBabyTitle': 'Bebeğin yanında',
+      'roleBabyBody': 'Bu telefon kamera ve mikrofon olur. Ağlamayı algılar, size haber verir.',
+      'roleParentTitle': 'Benim yanımda',
+      'roleParentBody': 'Bebeği canlı izleyin, ağladığında anında bildirim alın.',
+      'roomShort': 'Oda',
+      'searchNearby': 'Yakındaki cihazı ara',
+      'searching': 'Bebek telefonu aranıyor…',
+      'sectionAbout': 'Hakkında',
+      'sectionAlarm': 'Alarm',
+      'sectionApp': 'Uygulama',
+      'sectionVideo': 'Görüntü',
+      'sensitivity': 'Hassasiyet',
+      'shareCodeText': 'Ninni oda kodu: {code}',
+      'shortNoise': 'Kısa gürültü',
+      'skip': 'Geç',
+      'snooze5': '5 dk sessize al',
+      'soundLevel': 'Ses seviyesi',
+      'switchCamera': 'Kamerayı çevir',
+      'switchShort': 'Çevir',
+      'themeAuto': 'Otomatik',
+      'themeLight': 'Açık',
+      'themeDark': 'Koyu',
+      'thresholdValue': 'Eşik {db} dB',
+      'tonight': 'Bu gece',
+      'totalCryLabel': 'toplam ağlama',
+      'waitingForParent': 'Ebeveyn telefonu bekleniyor',
     },
   };
 
@@ -560,13 +844,155 @@ class AppLocalizations {
   String get batteryLowBody => _t('batteryLowBody');
   String get dismiss => _t('dismiss');
   String get connectionLostNotification => _t('connectionLostNotification');
+  String get alarmAfter2s => _t('alarmAfter2s');
+  String get alarmDuration => _t('alarmDuration');
+  String get alarmDurationSub => _t('alarmDurationSub');
+  String get alarmsLabel => _t('alarmsLabel');
+  String get allow => _t('allow');
+  String get androidOnly => _t('androidOnly');
+  String get appTagline => _t('appTagline');
+  String get autoNightModeShort => _t('autoNightModeShort');
+  String get babyCalm => _t('babyCalm');
+  String get babyCryingShort => _t('babyCryingShort');
+  String get babyStirring => _t('babyStirring');
+  String get babyDevice => _t('babyDevice');
+  String get babyDeviceBatteryShort => _t('babyDeviceBatteryShort');
+  String get babyPairingTitle => _t('babyPairingTitle');
+  String get babyPairingSubtitle => _t('babyPairingSubtitle');
+  String get babyPlacementHint => _t('babyPlacementHint');
+  String get iosKeepOpenHint => _t('iosKeepOpenHint');
+  String get babyShort => _t('babyShort');
+  String get youShort => _t('youShort');
+  String get back => _t('back');
+  String get batteryCharging => _t('batteryCharging');
+  String get batteryPercent => _t('batteryPercent');
+  String get cameraMicReady => _t('cameraMicReady');
+  String get cameraPreparing => _t('cameraPreparing');
+  String get clearHistoryTitle => _t('clearHistoryTitle');
+  String get clearHistoryBody => _t('clearHistoryBody');
+  String get close => _t('close');
+  String get codeExpired => _t('codeExpired');
+  String get codeValidFor => _t('codeValidFor');
+  String get connecting => _t('connecting');
+  String get continueLabel => _t('continueLabel');
+  String get copied => _t('copied');
+  String get cry => _t('cry');
+  String get cryStopped => _t('cryStopped');
+  String get cryingForSeconds => _t('cryingForSeconds');
+  String get defaultRoomName => _t('defaultRoomName');
+  String get disconnectTitle => _t('disconnectTitle');
+  String get disconnectBody => _t('disconnectBody');
+  String get endBroadcast => _t('endBroadcast');
+  String get endBroadcastTitle => _t('endBroadcastTitle');
+  String get endBroadcastBody => _t('endBroadcastBody');
+  String get enterNightMode => _t('enterNightMode');
+  String get fullscreen => _t('fullscreen');
+  String get granted => _t('granted');
+  String get history => _t('history');
+  String get hoursShort => _t('hoursShort');
+  String get hoursMinutesShort => _t('hoursMinutesShort');
+  String get minutesShort => _t('minutesShort');
+  String get minutesSecondsShort => _t('minutesSecondsShort');
+  String get secondsShort => _t('secondsShort');
+  String get imReady => _t('imReady');
+  String get joinTitle => _t('joinTitle');
+  String get joinSubtitle => _t('joinSubtitle');
+  String get last7Days => _t('last7Days');
+  String get lastAlarmAt => _t('lastAlarmAt');
+  String get later => _t('later');
+  String get letsStart => _t('letsStart');
+  String get levelActive => _t('levelActive');
+  String get levelLoud => _t('levelLoud');
+  String get levelOff => _t('levelOff');
+  String get levelQuiet => _t('levelQuiet');
+  String get licenses => _t('licenses');
+  String get linkGood => _t('linkGood');
+  String get live => _t('live');
+  String get liveView => _t('liveView');
+  String get longestQuietLabel => _t('longestQuietLabel');
+  String get newCode => _t('newCode');
+  String get nightExitHint => _t('nightExitHint');
+  String get nightStatusConnected => _t('nightStatusConnected');
+  String get nightStatusWaiting => _t('nightStatusWaiting');
+  String get noAlertsInRange => _t('noAlertsInRange');
+  String get noInternet => _t('noInternet');
+  String get notifyInterval => _t('notifyInterval');
+  String get notifyIntervalSub => _t('notifyIntervalSub');
+  String get perMinute => _t('perMinute');
+  String get now => _t('now');
+  String get offlineBabyTitle => _t('offlineBabyTitle');
+  String get offlineBabyBody => _t('offlineBabyBody');
+  String get offlineModeShort => _t('offlineModeShort');
+  String get offlineParentTitle => _t('offlineParentTitle');
+  String get offlineParentBody => _t('offlineParentBody');
+  String get onboardTitle1 => _t('onboardTitle1');
+  String get onboardBody1 => _t('onboardBody1');
+  String get onboardTitle2 => _t('onboardTitle2');
+  String get onboardStep1Title => _t('onboardStep1Title');
+  String get onboardStep1Body => _t('onboardStep1Body');
+  String get onboardStep2Title => _t('onboardStep2Title');
+  String get onboardStep2Body => _t('onboardStep2Body');
+  String get onboardStep3Title => _t('onboardStep3Title');
+  String get onboardStep3Body => _t('onboardStep3Body');
+  String get onboardTitle3 => _t('onboardTitle3');
+  String get onboardBody3 => _t('onboardBody3');
+  String get openSettings => _t('openSettings');
+  String get openVideo => _t('openVideo');
+  String get pageOf => _t('pageOf');
+  String get parentConnected => _t('parentConnected');
+  String get parentWaiting => _t('parentWaiting');
+  String get permCamera => _t('permCamera');
+  String get permCameraWhy => _t('permCameraWhy');
+  String get permMic => _t('permMic');
+  String get permMicWhy => _t('permMicWhy');
+  String get permNotifications => _t('permNotifications');
+  String get permNotificationsWhy => _t('permNotificationsWhy');
+  String get permNearby => _t('permNearby');
+  String get permNearbyWhy => _t('permNearbyWhy');
+  String get privacyNote => _t('privacyNote');
+  String get quality => _t('quality');
+  String get qualitySaver => _t('qualitySaver');
+  String get qualityBalanced => _t('qualityBalanced');
+  String get qualitySharp => _t('qualitySharp');
+  String get record => _t('record');
+  String get stopRecordingShort => _t('stopRecordingShort');
+  String get replayIntro => _t('replayIntro');
+  String get roleTitle => _t('roleTitle');
+  String get roleSubtitle => _t('roleSubtitle');
+  String get roleBabyTitle => _t('roleBabyTitle');
+  String get roleBabyBody => _t('roleBabyBody');
+  String get roleParentTitle => _t('roleParentTitle');
+  String get roleParentBody => _t('roleParentBody');
+  String get roomShort => _t('roomShort');
+  String get searchNearby => _t('searchNearby');
+  String get searching => _t('searching');
+  String get sectionAbout => _t('sectionAbout');
+  String get sectionAlarm => _t('sectionAlarm');
+  String get sectionApp => _t('sectionApp');
+  String get sectionVideo => _t('sectionVideo');
+  String get sensitivity => _t('sensitivity');
+  String get shareCodeText => _t('shareCodeText');
+  String get shortNoise => _t('shortNoise');
+  String get skip => _t('skip');
+  String get snooze5 => _t('snooze5');
+  String get soundLevel => _t('soundLevel');
+  String get switchCamera => _t('switchCamera');
+  String get switchShort => _t('switchShort');
+  String get themeAuto => _t('themeAuto');
+  String get themeLight => _t('themeLight');
+  String get themeDark => _t('themeDark');
+  String get thresholdValue => _t('thresholdValue');
+  String get tonight => _t('tonight');
+  String get totalCryLabel => _t('totalCryLabel');
+  String get waitingForParent => _t('waitingForParent');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) => ['en', 'tr'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      AppLocalizations.supportedLocales.any((l) => l.languageCode == locale.languageCode);
 
   @override
   Future<AppLocalizations> load(Locale locale) async {

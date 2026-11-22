@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'providers/theme_provider.dart';
-import 'providers/language_provider.dart';
+
+import 'app_keys.dart';
 import 'l10n/app_localizations.dart';
-import 'screens/home_screen.dart';
+import 'providers/language_provider.dart';
+import 'providers/theme_provider.dart';
+import 'screens/v2/monitor_shell.dart';
+import 'theme/app_theme.dart';
 
 class BebekMonitorApp extends StatelessWidget {
   const BebekMonitorApp({super.key});
@@ -15,9 +18,13 @@ class BebekMonitorApp extends StatelessWidget {
     final languageProvider = context.watch<LanguageProvider>();
 
     return MaterialApp(
-      title: 'Bebek Monitor',
+      title: 'Ninni',
       debugShowCheckedModeBanner: false,
+      navigatorKey: rootNavigatorKey,
+      scaffoldMessengerKey: rootMessengerKey,
       themeMode: themeProvider.mode,
+      theme: NinniTheme.light,
+      darkTheme: NinniTheme.night,
       locale: languageProvider.locale,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -25,63 +32,10 @@ class BebekMonitorApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('en'),
-        Locale('tr'),
-      ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF5C6BC0), // Soft Indigo
-          secondary: const Color(0xFF26A69A), // Soft Teal for accents
-          surface: const Color(0xFFF5F7FA), // Very light grey-blue background
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Color(0xFF2C3E50),
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-          iconTheme: IconThemeData(color: Color(0xFF2C3E50)),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 4,
-          shadowColor: Colors.black.withValues(alpha: 0.1),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF5C6BC0),
-          brightness: Brightness.dark,
-          surface: const Color(0xFF121212),
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
-        cardTheme: CardThemeData(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-      ),
-      home: const HomeScreen(),
+      supportedLocales: AppLocalizations.supportedLocales,
+      // Parent alarms (cry, connection lost) cover every route.
+      builder: (context, child) => MonitorOverlays(child: child ?? const SizedBox.shrink()),
+      home: const AppRoot(),
     );
   }
 }

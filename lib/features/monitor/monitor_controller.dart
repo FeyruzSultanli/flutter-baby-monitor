@@ -1,85 +1,107 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:battery_plus/battery_plus.dart';
 import 'package:camera/camera.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:vibration/vibration.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import 'package:image/image.dart' as img;
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:battery_plus/battery_plus.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'package:image/image.dart' as img;
+import '../../app_keys.dart';
+import '../../core/alert_history_service.dart';
+import '../../core/audio/app_audio.dart';
+import '../../core/audio/audio_level.dart';
+import '../../core/audio/cry_detector.dart';
+import '../../core/audio/offline_audio.dart';
+import '../../core/audio/pcm_microphone.dart';
+import '../../core/auth/auth_service.dart';
+import '../../core/debug/debug_hooks.dart';
+import '../../core/enums/connection_status.dart';
+import '../../core/enums/device_role.dart';
+import '../../core/monitor/battery_alert.dart';
+import '../../core/monitor/connection_watchdog.dart';
+import '../../core/offline/offline_payload.dart';
+import '../../core/pairing/pairing_service.dart';
+import '../../core/pairing/pairing_state.dart';
+import '../../core/pairing/room_code.dart';
+import '../../core/recording/video_recorder_service.dart';
+import '../../core/services/hybrid_notification_manager.dart';
+import '../../core/services/monitor_foreground_service.dart';
+import '../../core/webrtc/firestore_signaling.dart';
+import '../../core/webrtc/reconnect_backoff.dart';
+import '../../core/webrtc/signaling_interface.dart';
+import '../../core/webrtc/signaling_messages.dart';
+import '../../core/webrtc/webrtc_service.dart';
+import '../../l10n/app_localizations.dart';
+import '../../models/alert_model.dart';
+import '../../models/video_settings.dart';
 
-import '../l10n/app_localizations.dart';
-import '../core/recording/video_recorder_service.dart';
-import '../core/enums/connection_status.dart';
-import '../core/enums/device_role.dart';
-import '../core/feature_flags.dart';
-import '../core/debug/debug_hooks.dart';
-import '../core/audio/app_audio.dart';
-import '../core/audio/audio_level.dart';
-import '../core/monitor/battery_alert.dart';
-import '../core/monitor/connection_watchdog.dart';
-import '../core/services/monitor_foreground_service.dart';
-import '../core/audio/cry_detector.dart';
-import '../core/audio/offline_audio.dart';
-import '../core/audio/pcm_microphone.dart';
-import '../core/offline/offline_payload.dart';
-import '../core/pairing/pairing_service.dart';
-import '../core/pairing/pairing_state.dart';
-import '../core/pairing/room_code.dart';
-import '../core/auth/auth_service.dart';
-import '../core/webrtc/signaling_interface.dart';
-import '../core/webrtc/firestore_signaling.dart';
-import '../models/alert_model.dart';
-import '../core/alert_history_service.dart';
-import 'alert_history_screen.dart';
-import 'video_gallery_screen.dart';
-import '../core/webrtc/reconnect_backoff.dart';
-import '../core/webrtc/signaling_messages.dart';
-import '../core/webrtc/webrtc_service.dart';
-import '../core/services/hybrid_notification_manager.dart';
-import '../widgets/camera_preview_card.dart';
-import '../widgets/connection_lost_view.dart';
-import '../widgets/fullscreen_view.dart';
-import '../widgets/night_mode_overlay.dart';
-import '../widgets/noise_level_bar.dart';
-import '../widgets/settings_sheet.dart';
-import '../models/video_settings.dart';
-import 'multi_camera_screen.dart';
+/// Fixed states for screenshots (see [MonitorController.debugDemo]).
+enum DemoScene { roleSelect, babyPairing, babyLive, babyNight, parentJoin, parentLive, cryAlert, connectionLost }
 
-enum _MenuAction {
-  babyMode,
-  parentMode,
-  multiCameraMode,
-  createRoomCode,
-  joinRoomCode,
-}
+/// All monitoring logic of the app (both roles, online and offline), moved
+/// out of the old 3400-line HomeScreen (V2 phase 2). Screens only read its
+/// state and call its actions; it has no widgets of its own.
+///
+/// The body is the former `_HomeScreenState` logic, kept as close to the
+/// original as possible (B08 sessions, B70 standby microphone, D3 rooms…).
+/// `setState`/`mounted` below are small shims so that code stays readable.
+class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
+  MonitorController({required Locale Function() locale}) : _locale = locale {
+    _init();
+  }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Locale Function() _locale;
+  AppLocalizations get l10n => AppLocalizations(_locale());
+  ScaffoldMessengerState? get _messenger => rootMessengerKey.currentState;
+  BuildContext? get _dialogContext => rootNavigatorKey.currentContext;
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+  bool get mounted => !_disposing;
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  /// Shim for the ported code: run [fn], then notify the screens.
+  @protected
+  void setState(VoidCallback fn) {
+    fn();
+    if (!_disposing) notifyListeners();
+  }
+
+  // Role is null until the user picks one on the role screen (V2 §3.2).
+  bool _roleChosen = false;
+
+  // Parent: full-screen cry alarm (V2 §3.8, 5.8).
+  bool _cryActive = false;
+  bool _cryAlarmVisible = false;
+  DateTime? _cryStartedAt;
+  double? _cryPeakDb;
+  DateTime? _crySnoozedUntil;
+  final AlarmSound _cryAlarmSound =
+      AlarmSound(asset: 'audio/alarm_cry.wav', playerId: 'ninni_cry_alarm');
+
+  // Baby: a parent was connected at least once in this broadcast (pairing
+  // screen -> live screen).
+  bool _parentEverConnected = false;
+
+  // Offline parent: endpoints found by discovery (shown on the join screen).
+  bool _discovering = false;
+
+  // Baby: when the current room was created (code countdown, 10 min claim).
+  DateTime? _roomCreatedAt;
+
   List<CameraDescription> _cameras = [];
   CameraController? _controller;
   CameraLensDirection _currentLens = CameraLensDirection.back;
 
   bool _initializing = false;
   bool _hasCamPermission = false;
-  bool _previewPaused = false;
   String? _message;
   DeviceRole _role = DeviceRole.BABY;
 
@@ -89,7 +111,6 @@ class _HomeScreenState extends State<HomeScreen>
   ConnectionStatus _connectionStatus = ConnectionStatus.DISCONNECTED;
   String? _pairingError;
   bool _pairingBusy = false;
-  final TextEditingController _parentRoomController = TextEditingController();
   bool _firebaseReady = false;
   VideoSettings _videoSettings = const VideoSettings();
   
@@ -150,16 +171,12 @@ class _HomeScreenState extends State<HomeScreen>
   StreamSubscription<String>? _pushTokenSub;
   bool _notificationPermissionWarned = false;
 
-  bool _isFullscreen = false;
-  bool _fullscreenCryOverlay = false;
 
   bool _keepScreenOn = false;
   bool _nightMode = false;
   // Enter night mode automatically once a parent connects (baby device, D1-a).
   bool _autoNightMode = false;
 
-  void Function(void Function())? _bottomSheetSetState;
-  BuildContext? _bottomSheetContext;
   bool _disposing = false;
   StreamSubscription<PairingState>? _roomSub;
   bool _lastCryAlertSent = false;
@@ -174,7 +191,6 @@ class _HomeScreenState extends State<HomeScreen>
   DateTime? _lastCrySentAt;
   DateTime? _lastRecordedAlertTime;
 
-  late final AnimationController _alertController;
 
   // Battery
   final Battery _battery = Battery();
@@ -210,18 +226,10 @@ class _HomeScreenState extends State<HomeScreen>
   bool _backgroundListening = true;
   AppLifecycleState _lifecycle = AppLifecycleState.resumed;
 
-  @override
-  void initState() {
-    super.initState();
+  /// Former initState. The camera starts only when the baby role is chosen.
+  void _init() {
     WidgetsBinding.instance.addObserver(this);
     unawaited(_loadPreferences());
-    _alertController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-      lowerBound: 0.85,
-      upperBound: 1.1,
-    )..repeat(reverse: true);
-    
     _pushTokenSub = HybridNotificationManager().onPushTokenRefresh.listen((token) {
       final roomCode = _pairingState?.roomCode;
       if (_role == DeviceRole.PARENT && _viewerSession != null && roomCode != null) {
@@ -231,13 +239,12 @@ class _HomeScreenState extends State<HomeScreen>
     _recorderService.onOfflineLimitReached = () {
       unawaited(_stopOfflineRecordingAtLimit());
     };
-    _initCoreServices();
+    _coreReady = _initCoreServices();
     _initBatteryMonitoring();
-    // Camera setup (CAMERA permission prompt) first, then audio services
-    // (RECORD_AUDIO prompt). Running both at once can make Android drop one
-    // of the concurrent permission requests (B12).
-    unawaited(_setup().whenComplete(_initAudioServices));
   }
+
+  /// Completes when Firebase/WebRTC services are set up (or failed).
+  Future<void> _coreReady = Future.value();
 
   Future<void> _initBatteryMonitoring() async {
     // Keep the subscription so dispose() can cancel it, and never call
@@ -317,7 +324,6 @@ class _HomeScreenState extends State<HomeScreen>
       // Low battery: one alert document per episode, so the Cloud Function
       // can push it while the parent app is closed.
       if (_babyBatteryPush.update(level: _batteryLevel, charging: charging) && mounted) {
-        final l10n = AppLocalizations.of(context);
         unawaited(HybridNotificationManager()
             .sendAlert(
               l10n.batteryLowTitle,
@@ -339,9 +345,17 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final listening = prefs.getBool(_backgroundListeningKey);
-      if (listening != null && mounted) {
-        setState(() => _backgroundListening = listening);
-      }
+      final autoNight = prefs.getBool(_autoNightKey);
+      final threshold = prefs.getDouble(_thresholdKey);
+      if (!mounted) return;
+      setState(() {
+        if (listening != null) _backgroundListening = listening;
+        if (autoNight != null) _autoNightMode = autoNight;
+        if (threshold != null) {
+          _noiseThreshold = threshold;
+          _cryDetector.threshold = threshold;
+        }
+      });
     } catch (e) {
       debugPrint('Loading preferences failed: $e');
     }
@@ -382,7 +396,6 @@ class _HomeScreenState extends State<HomeScreen>
     if (!MonitorForegroundService.isSupported || !mounted) return;
     final isBaby = _role == DeviceRole.BABY;
     if (!isBaby && !_backgroundListening) return;
-    final l10n = AppLocalizations.of(context);
     if (isBaby) {
       // Android 13+: without notification permission the service still
       // runs, but its notification is hidden.
@@ -441,10 +454,8 @@ class _HomeScreenState extends State<HomeScreen>
     });
     if (lost) {
       debugPrint('Connection watchdog: connection lost');
-      if (_isFullscreen) _exitFullscreen();
       unawaited(HapticFeedback.heavyImpact());
       if (!_connectionAlarmSilenced) unawaited(_connectionAlarm.start());
-      final l10n = AppLocalizations.of(context);
       unawaited(HybridNotificationManager().showConnectionLost(
           title: l10n.connectionLostTitle, body: l10n.connectionLostNotification));
       // Connected but no media: the peer is stuck, start a new session.
@@ -483,7 +494,6 @@ class _HomeScreenState extends State<HomeScreen>
       _showBatteryWarning = true;
       unawaited(HapticFeedback.mediumImpact());
       if (!_inForeground && mounted) {
-        final l10n = AppLocalizations.of(context);
         unawaited(HybridNotificationManager().showBatteryLow(
             title: l10n.batteryLowTitle,
             body: l10n.batteryLowBody.replaceAll('{level}', '$level')));
@@ -491,17 +501,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _initAudioServices() async {
-    // Offline audio (OfflineAudio platform channel) is Android-only. Ask for
-    // the microphone at startup, as the previous audio plugin did, so the
-    // first-launch prompts stay the same (camera, then microphone).
-    if (defaultTargetPlatform != TargetPlatform.android) return;
-    try {
-      await Permission.microphone.request();
-    } catch (e) {
-      debugPrint('Microphone permission request failed: $e');
-    }
-  }
 
   Future<void> _setup() async {
     if (_initializing) return;
@@ -515,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _message = '${AppLocalizations.of(context).camerasReadError}$e';
+          _message = '${l10n.camerasReadError}$e';
           _initializing = false;
         });
       }
@@ -534,7 +533,6 @@ class _HomeScreenState extends State<HomeScreen>
     _controller = null;
     if (mounted) {
       setState(() {
-        _previewPaused = false;
       });
     }
     try {
@@ -545,6 +543,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _restoreCameraIfIdle() async {
+    // V2: the camera package preview is only used by the offline broadcast
+    // (online the WebRTC renderer shows the camera).
+    if (!_isOfflineMode || _pairingState == null) return;
     if (!mounted || _initializing) return;
     if (_role != DeviceRole.BABY) return;
     if (_webrtcService?.localRenderer.srcObject != null) return;
@@ -558,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
     if (_cameras.isEmpty) {
       if (mounted) {
-        setState(() => _message = AppLocalizations.of(context).noCameraFound);
+        setState(() => _message = l10n.noCameraFound);
       }
       return;
     }
@@ -584,7 +585,6 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
       setState(() {
         _controller = newController;
-        _previewPaused = false;
         _message = null;
         _currentLens = selected.lensDirection;
         _hasCamPermission = true;
@@ -600,7 +600,7 @@ class _HomeScreenState extends State<HomeScreen>
       await newController.dispose();
       if (!mounted) return;
       setState(() {
-        _message = '${AppLocalizations.of(context).cameraInitError}$e';
+        _message = '${l10n.cameraInitError}$e';
       });
     }
   }
@@ -654,107 +654,17 @@ class _HomeScreenState extends State<HomeScreen>
     _currentImageBytesNotifier.dispose();
     _discoveryStreamController.close();
     _controller?.dispose();
-    _alertController.dispose();
+    unawaited(_cryAlarmSound.dispose());
     if (_role == DeviceRole.BABY && _pairingState?.roomCode != null) {
       unawaited(_pairingService?.closeRoom(_pairingState!.roomCode).catchError(
           (Object e) => debugPrint('Closing room on dispose failed: $e')));
     }
-    _parentRoomController.dispose();
     _roomSub?.cancel();
     _webrtcService?.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
 
-  List<PopupMenuEntry<_MenuAction>> _buildMenuItems() {
-    final l10n = AppLocalizations.of(context);
-    final items = <PopupMenuEntry<_MenuAction>>[
-      PopupMenuItem(
-        value: _MenuAction.babyMode,
-        child: Text(l10n.babyMode),
-      ),
-      PopupMenuItem(
-        value: _MenuAction.parentMode,
-        child: Text(l10n.parentMode),
-      ),
-      if (kMultiCameraEnabled)
-        PopupMenuItem(
-          value: _MenuAction.multiCameraMode,
-          child: Text(l10n.multiCameraMode),
-        ),
-      const PopupMenuDivider(),
-    ];
-
-    if (_role == DeviceRole.BABY) {
-      items.add(
-        PopupMenuItem(
-          value: _MenuAction.createRoomCode,
-          child: Text(_isOfflineMode ? l10n.startBroadcastOffline : l10n.createRoomCode),
-        ),
-      );
-    } else {
-      items.add(
-        PopupMenuItem(
-          value: _MenuAction.joinRoomCode,
-          child: Text(_isOfflineMode ? l10n.searchDeviceOffline : l10n.enterRoomCode),
-        ),
-      );
-    }
-
-    return items;
-  }
-
-  void _onMenuActionSelected(_MenuAction action) {
-    switch (action) {
-      case _MenuAction.babyMode:
-        _switchRole(DeviceRole.BABY);
-        break;
-      case _MenuAction.parentMode:
-        _switchRole(DeviceRole.PARENT);
-        break;
-      case _MenuAction.multiCameraMode:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const MultiCameraScreen()),
-        );
-        break;
-      case _MenuAction.createRoomCode:
-        if (_isOfflineMode) {
-          _startAdvertising();
-        } else {
-          _createRoomCode();
-          _showPairingSheet(forBaby: true);
-        }
-        break;
-      case _MenuAction.joinRoomCode:
-        if (_isOfflineMode) {
-          _startDiscovery();
-        } else {
-          _showPairingSheet(forBaby: false);
-        }
-        break;
-    }
-  }
-
-  Future<void> _switchRole(DeviceRole role) async {
-    if (_role == role) return;
-    final previousRoom = _pairingState?.roomCode;
-    await _resetPairing(
-      deleteRoom: _role == DeviceRole.BABY && previousRoom != null,
-      restoreCamera: role == DeviceRole.BABY,
-    );
-    if (!mounted) return;
-    setState(() {
-      _role = role;
-    });
-    if (role == DeviceRole.PARENT) {
-      unawaited(_ensureNotificationPermission());
-      await _disposeCameraController();
-    } else {
-      unawaited(_restoreCameraIfIdle());
-      unawaited(_requestBatteryOptimization());
-    }
-  }
 
   void _handleConnectionStatus(ConnectionStatus status) {
     if (!mounted || _disposing) return;
@@ -773,8 +683,10 @@ class _HomeScreenState extends State<HomeScreen>
         );
       }
     });
-    _refreshBottomSheet();
     if (status == ConnectionStatus.CONNECTED) {
+      if (_role == DeviceRole.BABY && !_parentEverConnected) {
+        setState(() => _parentEverConnected = true);
+      }
       _rejoinBackoff.reset();
       _rejoinTimer?.cancel();
       _maybeEnterAutoNightMode();
@@ -813,11 +725,11 @@ class _HomeScreenState extends State<HomeScreen>
       // The room is gone (closed by the baby or expired): stop retrying.
       _viewerSession = null;
       _stopWatchdog();
-      if (mounted) _handlePairingError(AppLocalizations.of(context).roomClosed);
+      if (mounted) _handlePairingError(l10n.roomClosed);
     } on AnonymousAuthDisabledException {
       // Retrying cannot help until sign-in is enabled in the console (B60).
       _viewerSession = null;
-      if (mounted) _handlePairingError(AppLocalizations.of(context).anonymousAuthDisabled);
+      if (mounted) _handlePairingError(l10n.anonymousAuthDisabled);
     } catch (e) {
       debugPrint('Rejoin failed: $e');
       if (token == _joinToken) _scheduleRejoin();
@@ -840,8 +752,7 @@ class _HomeScreenState extends State<HomeScreen>
         );
       }
     });
-    _refreshBottomSheet();
-    ScaffoldMessenger.of(context).showSnackBar(
+    _messenger?.showSnackBar(
       SnackBar(content: Text(message)),
     );
   }
@@ -889,7 +800,7 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() {
           _firebaseReady = false;
           _pairingError =
-              AppLocalizations.of(context).firebaseConfigMissing;
+              l10n.firebaseConfigMissing;
         });
         return;
       }
@@ -925,7 +836,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
       setState(() {
         _firebaseReady = false;
-        _pairingError = '${AppLocalizations.of(context).pairingInitError}$e';
+        _pairingError = '${l10n.pairingInitError}$e';
       });
     }
   }
@@ -1019,17 +930,22 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
     if (!mounted) return;
+    _cryActive = false;
+    _cryAlarmVisible = false;
+    unawaited(_cryAlarmSound.stop());
     setState(() {
       _pairingState = null;
       _pairingError = null;
       _connectionStatus = ConnectionStatus.DISCONNECTED;
       _pairingBusy = false;
+      _parentEverConnected = false;
+      _discovering = false;
+      _roomCreatedAt = null;
     });
     _lastCryAlertSent = false;
     _lastCrySentAt = null;
     _lastCryNotificationAt = null;
     _cryDetector.reset();
-    _refreshBottomSheet();
   }
 
   /// Applies a new cry threshold. Local changes are sent to the other device
@@ -1087,15 +1003,14 @@ class _HomeScreenState extends State<HomeScreen>
     await WakelockPlus.enable(); // Keep screen on for Online Mode
     if (_role != DeviceRole.BABY || _pairingService == null || _webrtcService == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        _messenger?.showSnackBar(
           SnackBar(
             content:
-                Text(AppLocalizations.of(context).roomCreationErrorFirebase),
+                Text(l10n.roomCreationErrorFirebase),
           ),
         );
       }
-      _refreshBottomSheet();
-      return;
+        return;
     }
     setState(() {
       _pairingBusy = true;
@@ -1124,6 +1039,7 @@ class _HomeScreenState extends State<HomeScreen>
         );
         _connectionStatus = ConnectionStatus.CONNECTING;
       });
+      _roomCreatedAt = DateTime.now();
       _listenRoomUpdates(newCode);
       _startRoomHeartbeat(newCode);
       await _webrtcService!.startAsBaby(newCode, facingMode: facingMode);
@@ -1135,14 +1051,13 @@ class _HomeScreenState extends State<HomeScreen>
       await _startNoiseMonitoring();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).roomCode}: ${RoomCode.format(newCode)}')),
+      _messenger?.showSnackBar(
+        SnackBar(content: Text('${l10n.roomCode}: ${RoomCode.format(newCode)}')),
       );
       // iOS stops the camera as soon as the app leaves the foreground, so
       // suggest night mode (screen stays on, black) for the baby phone.
       if (defaultTargetPlatform == TargetPlatform.iOS) {
-        final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        _messenger?.showSnackBar(
           SnackBar(
             duration: const Duration(seconds: 8),
             // With an action a SnackBar persists by default and would cover
@@ -1163,7 +1078,7 @@ class _HomeScreenState extends State<HomeScreen>
         _pairingError = message;
         _connectionStatus = ConnectionStatus.FAILED;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      _messenger?.showSnackBar(
         SnackBar(content: Text(message)),
       );
     } finally {
@@ -1172,7 +1087,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
       await _restoreCameraIfIdle();
     }
-    _refreshBottomSheet();
   }
 
   Future<void> _joinRoomWithCode([String? code]) async {
@@ -1180,24 +1094,22 @@ class _HomeScreenState extends State<HomeScreen>
     if (_role != DeviceRole.PARENT) return;
     if (_pairingService == null || _webrtcService == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        _messenger?.showSnackBar(
           SnackBar(
-              content: Text(AppLocalizations.of(context).firebaseConfigMissing)),
+              content: Text(l10n.firebaseConfigMissing)),
         );
       }
-      _refreshBottomSheet();
-      return;
+        return;
     }
-    final roomCode = RoomCode.normalize(code ?? _parentRoomController.text);
+    final roomCode = RoomCode.normalize(code ?? '');
     if (roomCode.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).enterRoomCodeSubtitle)),
+      _messenger?.showSnackBar(
+        SnackBar(content: Text(l10n.enterRoomCodeSubtitle)),
       );
-      _refreshBottomSheet();
-      return;
+        return;
     }
 
-    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _pairingBusy = true;
       _pairingError = null;
@@ -1209,8 +1121,6 @@ class _HomeScreenState extends State<HomeScreen>
       _connectionStatus = ConnectionStatus.CONNECTING;
     });
     // Sheet açıksa hemen kapat, kullanıcıyı ana ekrana getir.
-    unawaited(Navigator.of(context).maybePop());
-    _refreshBottomSheet();
 
     try {
       // Each join is a new viewer session; the baby answers it with a fresh
@@ -1228,19 +1138,23 @@ class _HomeScreenState extends State<HomeScreen>
       _startWatchdog();
       unawaited(_startMonitorService());
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).waitingForConnection}: $roomCode')),
+      _messenger?.showSnackBar(
+        SnackBar(content: Text('${l10n.waitingForConnection}: $roomCode')),
       );
     } catch (e) {
       if (!mounted) return;
       // A code that cannot be joined is final: no automatic rejoin.
-      if (e is RoomUnavailableException) _viewerSession = null;
+      // V2: a failed first join goes back to the join screen.
+      _viewerSession = null;
+      _stopWatchdog();
+      unawaited(MonitorForegroundService.instance.stop());
       final message = _pairingErrorText(e);
       setState(() {
         _pairingError = message;
         _connectionStatus = ConnectionStatus.FAILED;
+        _pairingState = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      _messenger?.showSnackBar(
         SnackBar(content: Text(message)),
       );
     } finally {
@@ -1248,7 +1162,6 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() => _pairingBusy = false);
       }
     }
-    _refreshBottomSheet();
   }
 
   Future<void> _requestBatteryOptimization() async {
@@ -1260,10 +1173,11 @@ class _HomeScreenState extends State<HomeScreen>
 
     // Show dialog to explain why we need this
     if (!mounted) return;
-    final l10n = AppLocalizations.of(context);
     
+    final dialogContext = _dialogContext;
+    if (dialogContext == null) return;
     final bool? shouldRequest = await showDialog<bool>(
-      context: context,
+      context: dialogContext,
       builder: (context) => AlertDialog(
         title: Text(l10n.batteryOptimization),
         content: Text(l10n.ignoreBatteryOptimizations),
@@ -1335,13 +1249,13 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (!allGranted) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        _messenger?.showSnackBar(
           SnackBar(
             duration: const Duration(seconds: 8),
             persist: false,
-            content: Text(AppLocalizations.of(context).permissionDenied),
+            content: Text(l10n.permissionDenied),
             action: SnackBarAction(
-              label: AppLocalizations.of(context).settings,
+              label: l10n.settings,
               onPressed: () => openAppSettings(),
             ),
           ),
@@ -1356,8 +1270,8 @@ class _HomeScreenState extends State<HomeScreen>
   /// Android; on other platforms show a message instead of crashing (B46).
   bool _ensureOfflineSupported() {
     if (Platform.isAndroid) return true;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context).offlineAndroidOnly)),
+    _messenger?.showSnackBar(
+      SnackBar(content: Text(l10n.offlineAndroidOnly)),
     );
     return false;
   }
@@ -1384,14 +1298,14 @@ class _HomeScreenState extends State<HomeScreen>
       if (a) {
         setState(() {
           _pairingState = PairingState(
-            roomCode: AppLocalizations.of(context).startBroadcastOffline,
+            roomCode: l10n.startBroadcastOffline,
             status: ConnectionStatus.CONNECTING,
             facingMode: 'environment',
           );
           _connectionStatus = ConnectionStatus.CONNECTING;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).waitingForConnection)),
+        _messenger?.showSnackBar(
+          SnackBar(content: Text(l10n.waitingForConnection)),
         );
         // Initialize camera if not already
         if (_controller == null || !_controller!.value.isInitialized) {
@@ -1405,14 +1319,13 @@ class _HomeScreenState extends State<HomeScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _pairingError = 'P2P ${AppLocalizations.of(context).error}: $e';
+        _pairingError = 'P2P ${l10n.error}: $e';
       });
     } finally {
       if (mounted) {
         setState(() => _pairingBusy = false);
       }
     }
-    _refreshBottomSheet();
   }
 
   void _startImageStream() {
@@ -1623,7 +1536,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     _discoveredEndpoints.clear();
     _discoveryStreamController.add(_discoveredEndpoints);
-    _showDeviceSelectionDialog();
+    setState(() => _discovering = true);
 
     try {
       final androidInfo = await DeviceInfoPlugin().androidInfo;
@@ -1636,83 +1549,25 @@ class _HomeScreenState extends State<HomeScreen>
           if (!_discoveredEndpoints.any((e) => e['id'] == id)) {
             _discoveredEndpoints.add({'id': id, 'name': name});
             _discoveryStreamController.add(List.from(_discoveredEndpoints));
+            _notify();
           }
         },
         onEndpointLost: (id) {
           _discoveredEndpoints.removeWhere((e) => e['id'] == id);
           _discoveryStreamController.add(List.from(_discoveredEndpoints));
+          _notify();
         },
         serviceId: "com.example.bebek_monitor",
       );
       
       if (a) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).searchDeviceOffline)),
+        _messenger?.showSnackBar(
+          SnackBar(content: Text(l10n.searchDeviceOffline)),
         );
       }
     } catch (e) {
       debugPrint("Discovery error: $e");
     }
-  }
-
-  void _showDeviceSelectionDialog() {
-    final l10n = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(l10n.searchDeviceOffline),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 300,
-            child: StreamBuilder<List<Map<String, String>>>(
-              stream: _discoveryStreamController.stream,
-              initialData: _discoveredEndpoints,
-              builder: (context, snapshot) {
-                final devices = snapshot.data ?? [];
-                if (devices.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(height: 16),
-                        Text(l10n.loading),
-                      ],
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) {
-                    final device = devices[index];
-                    return ListTile(
-                      leading: const Icon(Icons.phone_android),
-                      title: Text(device['name'] ?? l10n.unknownDevice),
-                      subtitle: Text(device['id'] ?? ""),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        _connectToEndpoint(device['id']!, device['name']!);
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await Nearby().stopDiscovery();
-                Navigator.of(context).pop();
-              },
-              child: Text(l10n.cancel),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _connectToEndpoint(String id, String name) async {
@@ -1727,8 +1582,8 @@ class _HomeScreenState extends State<HomeScreen>
       onDisconnected: _onDisconnected,
     );
     
-    ScaffoldMessenger.of(context).showSnackBar(
-       SnackBar(content: Text('$name: ${AppLocalizations.of(context).waitingForConnection}')),
+    _messenger?.showSnackBar(
+       SnackBar(content: Text('$name: ${l10n.waitingForConnection}')),
     );
   }
 
@@ -1750,13 +1605,14 @@ class _HomeScreenState extends State<HomeScreen>
         _connectedEndpointId = id;
         _connectionStatus = ConnectionStatus.CONNECTED;
         _pairingState = PairingState(
-          roomCode: "${AppLocalizations.of(context).connected} (Offline)",
+          roomCode: "${l10n.connected} (Offline)",
           status: ConnectionStatus.CONNECTED,
           facingMode: 'environment',
         );
       });
       
       if (_role == DeviceRole.BABY) {
+        _parentEverConnected = true;
         _startImageStream();
         _startAudioStream();
         _maybeEnterAutoNightMode();
@@ -1781,7 +1637,6 @@ class _HomeScreenState extends State<HomeScreen>
         _connectionStatus = ConnectionStatus.FAILED;
       });
     }
-    _refreshBottomSheet();
   }
 
   void _onDisconnected(String id) {
@@ -1806,7 +1661,6 @@ class _HomeScreenState extends State<HomeScreen>
           (Object e) => debugPrint('Offline player stop failed: $e')));
       _isPlayerRunning = false;
     }
-    _refreshBottomSheet();
   }
 
   void _onPayloadReceived(Uint8List bytes) {
@@ -1856,36 +1710,20 @@ class _HomeScreenState extends State<HomeScreen>
            final double db = (map['db'] as num).toDouble();
            final bool alert = map['alert'] as bool;
            
+           final wasAlert = _noiseAlert;
            setState(() {
              _currentDecibel = db;
              _noiseAlert = alert;
            });
-           
-           if (alert && !_fullscreenCryOverlay) {
-              _recordAlertIfNeeded(db);
-              if (_takeCryNotificationSlot(DateTime.now())) {
-                HybridNotificationManager().showLocalNotification(
-                  title: AppLocalizations.of(context).babyCryAlert,
-                  body: '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB'
-                );
-              }
-              setState(() {
-                _fullscreenCryOverlay = true;
-              });
-              try {
-                Vibration.vibrate(duration: 1000);
-              } catch (_) {}
-              Timer(const Duration(seconds: 2), () {
-                if (!mounted) return;
-                setState(() {
-                  _fullscreenCryOverlay = false;
-                });
-              });
-           } else if (!alert) {
-             setState(() {
-               _fullscreenCryOverlay = false;
-             });
+           // Offline there is no Firestore alert listener: notify here, at
+           // the start of a cry and at most once per cooldown.
+           if (alert && !wasAlert && _takeCryNotificationSlot(DateTime.now())) {
+             unawaited(HybridNotificationManager().showLocalNotification(
+               title: l10n.babyCryAlert,
+               body: '${l10n.noiseLevel}: ${db.toStringAsFixed(1)} dB',
+             ));
            }
+           _onRemoteCryState(alert, db);
         }
       } catch (e) {
         debugPrint("Error parsing payload: $e");
@@ -1969,8 +1807,8 @@ class _HomeScreenState extends State<HomeScreen>
     
     if (_role == DeviceRole.BABY) {
       _restartStreamWithNewSettings();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).videoSettingsUpdated}: ${settings.fps} FPS, ${settings.quality}')),
+      _messenger?.showSnackBar(
+        SnackBar(content: Text('${l10n.videoSettingsUpdated}: ${settings.fps} FPS, ${settings.quality}')),
       );
     }
   }
@@ -1992,23 +1830,6 @@ class _HomeScreenState extends State<HomeScreen>
     await _controller?.stopImageStream();
     _isStreaming = false;
     _startImageStream();
-  }
-
-  Future<void> _togglePreview() async {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-    try {
-      if (_previewPaused) {
-        await _controller!.resumePreview();
-      } else {
-        await _controller!.pausePreview();
-      }
-      setState(() => _previewPaused = !_previewPaused);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('${AppLocalizations.of(context).error}: $e')));
-      }
-    }
   }
 
   Future<void> _switchCamera({CameraLensDirection? target, bool remoteRequest = false}) async {
@@ -2055,8 +1876,8 @@ class _HomeScreenState extends State<HomeScreen>
         });
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.of(context).error}: $e')),
+        _messenger?.showSnackBar(
+          SnackBar(content: Text('${l10n.error}: $e')),
         );
       }
       return;
@@ -2079,8 +1900,8 @@ class _HomeScreenState extends State<HomeScreen>
             (Object e) => debugPrint('setFacing failed: $e')));
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.of(context).error}: $e')),
+        _messenger?.showSnackBar(
+          SnackBar(content: Text('${l10n.error}: $e')),
         );
       }
       return;
@@ -2154,7 +1975,7 @@ class _HomeScreenState extends State<HomeScreen>
         now.difference(_lastRecordedAlertTime!) > _cryNotificationCooldown) {
       _lastRecordedAlertTime = now;
       if (!mounted) return;
-      final message = AppLocalizations.of(context).babyCryAlert;
+      final message = l10n.babyCryAlert;
       await AlertHistoryService().addAlert(AlertModel(
         timestamp: now,
         message: message,
@@ -2197,8 +2018,8 @@ class _HomeScreenState extends State<HomeScreen>
 
         if (alert && _takeCryNotificationSlot(now)) {
           unawaited(HybridNotificationManager().sendAlert(
-            AppLocalizations.of(context).babyCryAlert,
-            '${AppLocalizations.of(context).noiseLevel}: ${db.toStringAsFixed(1)} dB',
+            l10n.babyCryAlert,
+            '${l10n.noiseLevel}: ${db.toStringAsFixed(1)} dB',
             db: db,
           ).catchError((Object e) => debugPrint('Sending cry alert failed: $e')));
         }
@@ -2210,53 +2031,6 @@ class _HomeScreenState extends State<HomeScreen>
       _currentDecibel = db;
       _noiseAlert = alert;
     });
-
-    if (_role == DeviceRole.PARENT &&
-        _isFullscreen &&
-        alert &&
-        !_fullscreenCryOverlay) {
-      setState(() {
-        _fullscreenCryOverlay = true;
-      });
-
-      try {
-        Vibration.vibrate(duration: 1000);
-      } catch (_) {}
-
-      Timer(const Duration(seconds: 2), () {
-        if (!mounted) return;
-        setState(() {
-          _fullscreenCryOverlay = false;
-        });
-      });
-    }
-  }
-
-  String _connectionStatusLabel() {
-    final l10n = AppLocalizations.of(context);
-    switch (_connectionStatus) {
-      case ConnectionStatus.DISCONNECTED:
-        return l10n.disconnected;
-      case ConnectionStatus.CONNECTING:
-        return l10n.waitingForConnection;
-      case ConnectionStatus.CONNECTED:
-        return l10n.connected;
-      case ConnectionStatus.FAILED:
-        return l10n.error;
-    }
-  }
-
-  Color _connectionStatusColor(ColorScheme scheme) {
-    switch (_connectionStatus) {
-      case ConnectionStatus.CONNECTED:
-        return scheme.primary;
-      case ConnectionStatus.CONNECTING:
-        return scheme.tertiary;
-      case ConnectionStatus.FAILED:
-        return scheme.error;
-      case ConnectionStatus.DISCONNECTED:
-        return scheme.outline;
-    }
   }
 
   Future<void> _setKeepScreenOn(bool value) async {
@@ -2268,13 +2042,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _toggleNightMode() {
-    if (_nightMode) {
-      unawaited(_exitNightMode());
-    } else {
-      unawaited(_enterNightMode());
-    }
-  }
 
   /// Night mode (D1-a): black full-screen layer, minimum app brightness and a
   /// wakelock, while streaming continues underneath. Baby device only.
@@ -2391,29 +2158,9 @@ class _HomeScreenState extends State<HomeScreen>
             _currentDecibel = roomState.cryDecibel!;
           }
         });
-        if (remoteAlert && !_fullscreenCryOverlay) {
-          _recordAlertIfNeeded(roomState.cryDecibel);
-          setState(() {
-            _fullscreenCryOverlay = true;
-          });
-          try {
-            Vibration.vibrate(duration: 1000);
-          } catch (_) {}
-          Timer(const Duration(seconds: 2), () {
-            if (!mounted) return;
-            setState(() {
-              _fullscreenCryOverlay = false;
-            });
-          });
-        }
-        if (!remoteAlert) {
-          setState(() {
-            _fullscreenCryOverlay = false;
-          });
-        }
+        _onRemoteCryState(remoteAlert, roomState.cryDecibel);
       }
-      _refreshBottomSheet();
-    }, onError: (Object e) {
+      }, onError: (Object e) {
       // e.g. Firestore permission or network errors (B23)
       debugPrint('Room listener error: $e');
       if (!mounted) return;
@@ -2426,32 +2173,16 @@ class _HomeScreenState extends State<HomeScreen>
           _rejoinTimer?.cancel();
           _stopWatchdog();
         }
-        _handlePairingError(AppLocalizations.of(context).roomClosed);
+        _handlePairingError(l10n.roomClosed);
         return;
       }
-      _handlePairingError('${AppLocalizations.of(context).error}: $e');
+      _handlePairingError('${l10n.error}: $e');
     });
   }
 
-  void _enterFullscreen() {
-    unawaited(_exitNightMode());
-    setState(() {
-      _isFullscreen = true;
-    });
-  }
-
-  void _exitFullscreen() {
-    setState(() {
-      _isFullscreen = false;
-      _fullscreenCryOverlay = false;
-    });
-  }
-
-  String _formatRoomCode(String code) => RoomCode.format(code);
 
   /// User-facing text for room create/join errors (D3).
   String _pairingErrorText(Object e) {
-    final l10n = AppLocalizations.of(context);
     if (e is RoomUnavailableException) return l10n.roomUnavailable;
     if (e is AnonymousAuthDisabledException) return l10n.anonymousAuthDisabled;
     if (e is PairingTimeoutException) return l10n.noServerResponse;
@@ -2469,7 +2200,7 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
     if (!mounted) return;
-    final locale = Localizations.localeOf(context).languageCode;
+    final locale = _locale().languageCode;
     try {
       await pairing.setViewerPushToken(roomCode, pushToken, locale);
       debugPrint('Push: FCM token stored in room $roomCode');
@@ -2484,8 +2215,7 @@ class _HomeScreenState extends State<HomeScreen>
     final granted = await HybridNotificationManager().requestPermission();
     if (granted || !mounted || _notificationPermissionWarned) return;
     _notificationPermissionWarned = true;
-    final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
+    _messenger?.showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 8),
         persist: false,
@@ -2505,333 +2235,6 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  void _refreshBottomSheet() {
-    final fn = _bottomSheetSetState;
-    // The closing sheet can rebuild during its exit animation and register
-    // its setState again after whenComplete cleared it; once it is disposed
-    // that setState must not be called (B61).
-    if (fn == null || !(_bottomSheetContext?.mounted ?? false)) {
-      _bottomSheetSetState = null;
-      _bottomSheetContext = null;
-      return;
-    }
-    fn(() {});
-  }
-
-  Widget _buildConnectionBadge(ColorScheme scheme) {
-    final color = _connectionStatusColor(scheme);
-    return Container(
-      key: const Key('connectionBadge'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.wifi_tethering, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            '${AppLocalizations.of(context).connectionStatus}: ${_connectionStatusLabel()}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _babyPairingContent(ColorScheme scheme, double gap) {
-    final roomCode = _pairingState?.roomCode;
-    final hasStream = (_webrtcService?.localRenderer.srcObject != null) || _isStreaming;
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${l10n.babyMode} - ${l10n.roomCode}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    roomCode != null
-                        ? '${l10n.roomCode}: ${_formatRoomCode(roomCode)}'
-                        : '${l10n.createRoomCode}.',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  if (roomCode != null && !(_pairingState?.isPaired ?? false)) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.roomCodeValidHint,
-                      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: _pairingBusy || (!_firebaseReady && !_isOfflineMode)
-                  ? null
-                  : (_isOfflineMode ? _startAdvertising : _createRoomCode),
-              icon: _pairingBusy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.qr_code_2_outlined),
-              label: Text(_pairingBusy
-                  ? l10n.loading
-                  : (_isOfflineMode ? l10n.startBroadcastOffline : l10n.createRoomCode)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildConnectionBadge(scheme),
-        if (_pairingError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _pairingError!,
-            style: TextStyle(color: scheme.error),
-          ),
-        ],
-        SizedBox(height: gap),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                !_firebaseReady
-                    ? l10n.firebaseConfigMissing
-                    : roomCode == null
-                        ? '${l10n.createRoomCode}.'
-                        : '${l10n.roomCode}: ${_formatRoomCode(roomCode)}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              if (roomCode != null)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      hasStream
-                          ? Icons.wifi_tethering
-                          : Icons.hourglass_top_outlined,
-                      color: hasStream ? scheme.primary : scheme.outline,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        hasStream
-                            ? l10n.connected
-                            : l10n.waitingForConnection,
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-        if (roomCode != null) ...[
-          SizedBox(height: gap),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed:
-                  _pairingBusy ? null : () => _resetPairing(deleteRoom: true),
-              icon: const Icon(Icons.stop_circle_outlined),
-              label: Text(l10n.stop),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _parentPairingContent(ColorScheme scheme, double gap) {
-    final roomCode = _pairingState?.roomCode;
-    final hasRemote = _webrtcService?.remoteRenderer.srcObject != null;
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${l10n.parentMode} - ${l10n.enterRoomCode}',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 6),
-        if (!_isOfflineMode) ...[
-          TextField(
-            key: const Key('roomCodeField'),
-            controller: _parentRoomController,
-            keyboardType: TextInputType.visiblePassword, // letters + digits, no autocorrect
-            textCapitalization: TextCapitalization.characters,
-            autocorrect: false,
-            enableSuggestions: false,
-            maxLength: RoomCode.length + 1, // with the dash
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\- ]')),
-            ],
-            onSubmitted: (value) => _joinRoomWithCode(value),
-            decoration: InputDecoration(
-              labelText: l10n.roomCode,
-              hintText: 'ABCD-EF23',
-              counterText: '',
-            ),
-            enabled: _firebaseReady,
-          ),
-          SizedBox(height: gap),
-        ],
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                key: const Key('joinRoomButton'),
-                onPressed: _pairingBusy || (!_firebaseReady && !_isOfflineMode)
-                    ? null
-                    : (_isOfflineMode ? _startDiscovery : _joinRoomWithCode),
-                icon: _pairingBusy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.link_outlined),
-                label: Text(_pairingBusy
-                    ? l10n.loading
-                    : (_isOfflineMode ? l10n.searchDeviceOffline : l10n.connect)),
-              ),
-            ),
-            const SizedBox(width: 10),
-            FilledButton.tonalIcon(
-              onPressed: _pairingBusy
-                  ? null
-                  : () {
-                      _resetPairing(deleteRoom: false);
-                    },
-              icon: const Icon(Icons.close),
-              label: Text(l10n.cancel),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            _buildConnectionBadge(scheme),
-            if (roomCode != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text('${l10n.roomCode}: ${_formatRoomCode(roomCode)}'),
-              ),
-          ],
-        ),
-        if (_pairingError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _pairingError!,
-            style: TextStyle(color: scheme.error),
-          ),
-        ],
-        SizedBox(height: gap),
-        Container(
-          height: 220,
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
-          ),
-          child: _isOfflineMode && _currentImageBytes != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.memory(
-                    _currentImageBytes!,
-                    gaplessPlayback: true,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                  ),
-                )
-              : !_firebaseReady && !_isOfflineMode
-                  ? Center(
-                      child: Text(l10n.firebaseConfigMissing),
-                    )
-                  : hasRemote
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: RTCVideoView(
-                            _webrtcService!.remoteRenderer,
-                            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                          ),
-                        )
-                      : Center(
-                          child: Text(
-                            _connectionStatus == ConnectionStatus.CONNECTED
-                                ? l10n.waitingForConnection
-                                : '${l10n.connected}: ${_connectionStatusLabel()}',
-                          ),
-                        ),
-        ),
-      ],
-    );
-  }
-
-  void _showPairingSheet({required bool forBaby}) {
-    final scheme = Theme.of(context).colorScheme;
-    final size = MediaQuery.of(context).size;
-    final gap = size.height < 720 ? 10.0 : 14.0;
-
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (ctx) {
-        final bottomPadding = MediaQuery.of(ctx).viewInsets.bottom;
-        return StatefulBuilder(
-          builder: (ctx, modalSetState) {
-            _bottomSheetSetState = modalSetState;
-            _bottomSheetContext = ctx;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding + 20),
-              child: SingleChildScrollView(
-                child: forBaby
-                    ? _babyPairingContent(scheme, gap)
-                    : _parentPairingContent(scheme, gap),
-              ),
-            );
-          },
-        );
-      },
-    ).whenComplete(() {
-      _bottomSheetSetState = null;
-      _bottomSheetContext = null;
-    });
-  }
-
   Future<void> _toggleRecording() async {
     try {
       if (_recorderService.isRecording) {
@@ -2839,8 +2242,8 @@ class _HomeScreenState extends State<HomeScreen>
         await _recorderService.stopAny();
         if (mounted) {
           setState(() {});
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${AppLocalizations.of(context).videoGallery} ${AppLocalizations.of(context).recordings}')),
+          _messenger?.showSnackBar(
+            SnackBar(content: Text('${l10n.videoGallery} ${l10n.recordings}')),
           );
         }
       } else {
@@ -2857,9 +2260,8 @@ class _HomeScreenState extends State<HomeScreen>
         if (_isOfflineMode) {
           await _recorderService.startOfflineRecording();
           if (mounted) {
-            final l10n = AppLocalizations.of(context);
             final seconds = VideoRecorderService.offlineMaxDuration.inSeconds;
-            ScaffoldMessenger.of(context).showSnackBar(
+            _messenger?.showSnackBar(
               SnackBar(content: Text('${l10n.offlineRecordingInfo}: $seconds s')),
             );
           }
@@ -2869,8 +2271,8 @@ class _HomeScreenState extends State<HomeScreen>
             await _recorderService.startWebRTCRecording(stream);
           } else {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(AppLocalizations.of(context).noRecordsFound)),
+              _messenger?.showSnackBar(
+                SnackBar(content: Text(l10n.noRecordsFound)),
               );
             }
             return;
@@ -2881,8 +2283,8 @@ class _HomeScreenState extends State<HomeScreen>
     } catch (e) {
       debugPrint('Recording error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.of(context).error}: $e')),
+        _messenger?.showSnackBar(
+          SnackBar(content: Text('${l10n.error}: $e')),
         );
       }
     }
@@ -2898,761 +2300,350 @@ class _HomeScreenState extends State<HomeScreen>
     }
     if (!mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context).offlineRecordingLimitReached)),
+    _messenger?.showSnackBar(
+      SnackBar(content: Text(l10n.offlineRecordingLimitReached)),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final bool isBaby = _role == DeviceRole.BABY;
-    final hasCameraPreview = _controller != null && _controller!.value.isInitialized;
-    final RTCVideoRenderer? previewRenderer =
-        isBaby ? _webrtcService?.localRenderer : _webrtcService?.remoteRenderer;
-    final hasWebRtcPreview = previewRenderer?.srcObject != null;
-    final hasOfflinePreview = _currentImageBytes != null;
-    final canShowPreview = hasCameraPreview || hasWebRtcPreview || hasOfflinePreview;
-    final scheme = Theme.of(context).colorScheme;
+  // ---------------------------------------------------------------------------
+  // V2: parent cry alarm (full screen, §3.8) and snooze (5.8)
+  // ---------------------------------------------------------------------------
 
-    if (_isFullscreen) {
-      return ValueListenableBuilder<Uint8List?>(
-        valueListenable: _currentImageBytesNotifier,
-        builder: (context, imageBytes, child) {
-          return FullscreenView(
-            canShowPreview: canShowPreview,
-            controller: _controller,
-            webrtcRenderer: previewRenderer,
-            mirrorWebRtc: isBaby && _currentLens == CameraLensDirection.front,
-            overlayActive: _fullscreenCryOverlay,
-            onExit: _exitFullscreen,
-            offlineImage: imageBytes,
-            isRecording: _recorderService.isRecording,
-            onRecordToggle: _toggleRecording,
-          );
-        },
+  /// Parent: cry state from the baby (room field or Nearby status). A new cry
+  /// opens the full-screen alarm with sound and vibration unless snoozed; the
+  /// screen stays until the parent reacts, the sound stops with the cry.
+  void _onRemoteCryState(bool alert, double? db) {
+    if (_role != DeviceRole.PARENT) return;
+    final now = DateTime.now();
+    if (alert && !_cryActive) {
+      _cryActive = true;
+      _cryStartedAt = now;
+      _cryPeakDb = db;
+      unawaited(_recordAlertIfNeeded(db));
+      final snoozed = _crySnoozedUntil != null && now.isBefore(_crySnoozedUntil!);
+      if (!snoozed) {
+        _cryAlarmVisible = true;
+        unawaited(HapticFeedback.heavyImpact());
+        unawaited(_cryAlarmSound.start());
+      }
+      _notify();
+    } else if (alert && _cryActive) {
+      if (db != null && db > (_cryPeakDb ?? 0)) {
+        _cryPeakDb = db;
+        _notify();
+      }
+    } else if (!alert && _cryActive) {
+      _cryActive = false;
+      unawaited(_cryAlarmSound.stop());
+      final started = _cryStartedAt;
+      if (started != null) {
+        unawaited(AlertHistoryService()
+            .finishLastAlert(now.difference(started))
+            .catchError((Object e) => debugPrint('Alert duration not saved: $e')));
+      }
+      _notify();
+    }
+  }
+
+  void _notify() {
+    if (!_disposing) notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API for the screens
+  // ---------------------------------------------------------------------------
+
+  /// Null until the user chose a role (role screen).
+  DeviceRole? get role => _roleChosen ? _role : null;
+  bool get isBaby => _role == DeviceRole.BABY;
+  bool get isOffline => _isOfflineMode;
+  static bool get offlineSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  ConnectionStatus get connectionStatus => _connectionStatus;
+  bool get isConnected => _connectionStatus == ConnectionStatus.CONNECTED;
+  PairingState? get pairingState => _pairingState;
+  /// Online room code (null offline or before a room exists).
+  String? get roomCode => _isOfflineMode ? null : _pairingState?.roomCode;
+  /// Broadcasting (baby) or joined (parent).
+  bool get isActive => _pairingState != null;
+  bool get pairingBusy => _pairingBusy;
+  String? get pairingError => _pairingError;
+  bool get firebaseReady => _firebaseReady;
+  bool get parentEverConnected => _parentEverConnected;
+
+  CameraController? get cameraController => _controller;
+  bool get cameraInitializing => _initializing;
+  bool get hasCameraPermission => _hasCamPermission;
+  String? get cameraMessage => _message;
+  bool get frontCamera => _currentLens == CameraLensDirection.front;
+  RTCVideoRenderer? get localRenderer => _webrtcService?.localRenderer;
+  RTCVideoRenderer? get remoteRenderer => _webrtcService?.remoteRenderer;
+  bool get hasLocalVideo => _webrtcService?.localRenderer.srcObject != null;
+  bool get hasRemoteVideo => _webrtcService?.remoteRenderer.srcObject != null;
+  ValueListenable<Uint8List?> get offlineFrame => _currentImageBytesNotifier;
+
+  double get decibel => _currentDecibel;
+  bool get noiseAlert => _noiseAlert;
+  bool get listeningNoise => _listeningNoise;
+  double get noiseThreshold => _noiseThreshold;
+
+  int get batteryLevel => _batteryLevel;
+  bool get batteryCharging => _isCharging(_batteryState);
+  int? get remoteBatteryLevel => _remoteBatteryLevel;
+  bool get remoteBatteryCharging => _remoteBatteryState == BatteryState.charging;
+  bool get showBatteryWarning => _showBatteryWarning && _role == DeviceRole.PARENT;
+
+  bool get isRecording => _recorderService.isRecording;
+  bool get nightMode => _nightMode;
+  bool get autoNightMode => _autoNightMode;
+  bool get keepScreenOn => _keepScreenOn;
+  bool get backgroundListening => _backgroundListening;
+  VideoSettings get videoSettings => _videoSettings;
+
+  bool get connectionLost => _connectionLost && _role == DeviceRole.PARENT;
+  DateTime? get connectionLostSince => _connectionLostSince;
+  bool get connectionAlarmSilenced => _connectionAlarmSilenced;
+
+  bool get cryAlarmVisible => _cryAlarmVisible && _role == DeviceRole.PARENT;
+  bool get babyCrying => _cryActive;
+  DateTime? get cryStartedAt => _cryStartedAt;
+  double? get cryPeakDb => _cryPeakDb;
+  DateTime? get crySnoozedUntil {
+    final until = _crySnoozedUntil;
+    return (until != null && DateTime.now().isBefore(until)) ? until : null;
+  }
+  /// Time of the last cry alarm in this session (parent live card).
+  DateTime? get lastAlertAt => _lastRecordedAlertTime;
+
+  DateTime? get roomCreatedAt => _roomCreatedAt;
+
+  /// Room name given on the baby phone (V2 5.2); null until set.
+  String? get roomName => null;
+
+  /// Night light color on the baby phone (V2 5.5); null when off.
+  Color? get nightLightColor => null;
+
+  List<Map<String, String>> get discoveredEndpoints => List.unmodifiable(_discoveredEndpoints);
+  bool get discovering => _discovering;
+
+  /// Role screen: this phone becomes the baby or the parent device.
+  Future<void> selectRole(DeviceRole role) async {
+    if (_roleChosen && _role == role) return;
+    if (_roleChosen) {
+      await _resetPairing(
+        deleteRoom: _role == DeviceRole.BABY && _pairingState != null,
+        restoreCamera: false,
       );
     }
-
-    return Scaffold(
-      backgroundColor: _nightMode ? Colors.black : scheme.surface,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _buildCustomAppBar(scheme),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildModeToggle(scheme),
-                          const SizedBox(height: 20),
-                          _buildVideoMonitor(
-                            context,
-                            scheme,
-                            canShowPreview,
-                            hasCameraPreview,
-                            hasWebRtcPreview,
-                            previewRenderer,
-                            isBaby,
-                          ),
-                          const SizedBox(height: 20),
-                          _buildStatusSection(scheme),
-                          const SizedBox(height: 20),
-                          _buildControlGrid(scheme, isBaby, canShowPreview),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Night mode: opaque black layer; double tap / back exits (D1-a)
-          if (_nightMode)
-            Positioned.fill(
-              child: NightModeOverlay(
-                status: _connectionStatus,
-                onExit: () => unawaited(_exitNightMode()),
-              ),
-            ),
-          // Parent: connection lost alarm (V2 5.6)
-          if (_connectionLost && _role == DeviceRole.PARENT && _connectionLostSince != null)
-            Positioned.fill(
-              child: ConnectionLostView(
-                lostSince: _connectionLostSince!,
-                alarmSilenced: _connectionAlarmSilenced,
-                lastBatteryLevel: _remoteBatteryLevel,
-                onRetry: _retryConnection,
-                onSilence: _silenceConnectionAlarm,
-                onDisconnect: () => unawaited(_resetPairing()),
-              ),
-            ),
-        ],
-      ),
-    );
+    setState(() {
+      _role = role;
+      _roleChosen = true;
+      _parentEverConnected = false;
+      _pairingError = null;
+    });
+    if (role == DeviceRole.PARENT) {
+      unawaited(_ensureNotificationPermission());
+      await _disposeCameraController();
+      return;
+    }
+    // Baby: camera, then microphone (one prompt at a time, B12), then start.
+    await _requestBabyPermissions();
+    await _coreReady;
+    if (!mounted || _role != DeviceRole.BABY || !_roleChosen) return;
+    await startBroadcast();
+    unawaited(_requestBatteryOptimization());
   }
 
-  Widget _buildCustomAppBar(ColorScheme scheme) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.child_care, color: scheme.primary),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Text(
-                    l10n.appTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.video_library_rounded),
-                tooltip: l10n.videoGallery,
-                visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const VideoGalleryScreen()),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.history),
-                tooltip: l10n.alertHistory,
-                visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AlertHistoryScreen()),
-                  );
-                },
-              ),
-              IconButton(
-                key: const Key('settingsButton'),
-                icon: const Icon(Icons.settings_outlined),
-                tooltip: l10n.settings,
-                visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    showDragHandle: true,
-                    builder: (_) => SettingsSheet(
-                      noiseThreshold: _noiseThreshold,
-                      keepScreenOn: _keepScreenOn,
-                      isOfflineMode: _isOfflineMode,
-                      videoSettings: _videoSettings,
-                      onVideoSettingsChanged: _updateVideoSettings,
-                      onNoiseThresholdChanged: _setNoiseThreshold,
-                      onKeepScreenOnChanged: _setKeepScreenOn,
-                      autoNightMode: _autoNightMode,
-                      onAutoNightModeChanged: (v) {
-                        setState(() => _autoNightMode = v);
-                      },
-                      backgroundListening: _backgroundListening,
-                      onBackgroundListeningChanged: _role == DeviceRole.PARENT
-                          ? (v) => unawaited(_setBackgroundListening(v))
-                          : null,
-                      onOfflineModeChanged: (val) async {
-                        Navigator.pop(context);
-                        setState(() {
-                          _isOfflineMode = val;
-                        });
-                        await _resetPairing();
-                        await _initCoreServices();
-                      },
-                    ),
-                  );
-                },
-              ),
-              PopupMenuButton<_MenuAction>(
-                key: const Key('mainMenuButton'),
-                onSelected: _onMenuActionSelected,
-                itemBuilder: (context) => _buildMenuItems(),
-                icon: const Icon(Icons.more_vert_rounded),
-              ),
-            ],
-          ),
-        ],
-      ),
+  /// Back to the role screen (ends a broadcast / leaves the room).
+  Future<void> leaveRole() async {
+    await _resetPairing(
+      deleteRoom: _role == DeviceRole.BABY && _pairingState != null,
+      restoreCamera: false,
     );
+    await _disposeCameraController();
+    setState(() {
+      _roleChosen = false;
+      _parentEverConnected = false;
+      _pairingError = null;
+    });
   }
 
-  Widget _buildModeToggle(ColorScheme scheme) {
-    final l10n = AppLocalizations.of(context);
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _switchRole(DeviceRole.BABY),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: _role == DeviceRole.BABY ? scheme.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: _role == DeviceRole.BABY
-                      ? [
-                          BoxShadow(
-                            color: scheme.primary.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          )
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    l10n.babyMode,
-                    style: TextStyle(
-                      color: _role == DeviceRole.BABY ? scheme.onPrimary : scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _switchRole(DeviceRole.PARENT),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: _role == DeviceRole.PARENT ? scheme.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: _role == DeviceRole.PARENT
-                      ? [
-                          BoxShadow(
-                            color: scheme.primary.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          )
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    l10n.parentMode,
-                    style: TextStyle(
-                      color: _role == DeviceRole.PARENT ? scheme.onPrimary : scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> setOfflineMode(bool value) async {
+    if (value == _isOfflineMode) return;
+    if (value && !offlineSupported) return;
+    setState(() => _isOfflineMode = value);
+    await _resetPairing(restoreCamera: false);
+    _coreReady = _initCoreServices();
+    await _coreReady;
   }
 
-  Widget _buildVideoMonitor(
-    BuildContext context,
-    ColorScheme scheme,
-    bool canShowPreview,
-    bool hasCameraPreview,
-    bool hasWebRtcPreview,
-    RTCVideoRenderer? previewRenderer,
-    bool isBaby,
-  ) {
-    return Container(
-      height: 300,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Video Feed
-            if (canShowPreview)
-              ValueListenableBuilder<Uint8List?>(
-                valueListenable: _currentImageBytesNotifier,
-                builder: (context, imageBytes, child) {
-                  return CameraPreviewCard(
-                    controller: _controller,
-                    initializing: _initializing,
-                    hasPermission: _hasCamPermission,
-                    message: _message,
-                    webrtcRenderer: previewRenderer,
-                    mirrorWebRtc: isBaby && _currentLens == CameraLensDirection.front,
-                    offlineImage: imageBytes,
-                    isRecording: _recorderService.isRecording,
-                    onRecordToggle: _toggleRecording,
-                  );
-                },
-              )
-            else
-              Container(
-                color: scheme.surfaceContainerHighest,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isBaby ? Icons.videocam_off_outlined : Icons.signal_wifi_off,
-                      size: 48,
-                      color: scheme.outline,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      isBaby
-                          ? AppLocalizations.of(context).cameraOff
-                          : AppLocalizations.of(context).waitingForConnection,
-                      style: TextStyle(color: scheme.outline),
-                    ),
-                  ],
-                ),
-              ),
-
-            // Overlays
-            if (canShowPreview) ...[
-              // Top Controls
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Row(
-                  children: [
-                    if (isBaby)
-                      _buildOverlayButton(
-                        icon: Icons.cameraswitch_rounded,
-                        onTap: () => _switchCamera(),
-                      ),
-                    const SizedBox(width: 8),
-                    _buildOverlayButton(
-                      icon: Icons.fullscreen_rounded,
-                      onTap: _enterFullscreen,
-                    ),
-                  ],
-                ),
-              ),
-              
-              if (isBaby)
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: _buildOverlayButton(
-                    key: const Key('nightModeButton'),
-                    icon: _nightMode ? Icons.dark_mode : Icons.dark_mode_outlined,
-                    onTap: _toggleNightMode,
-                    active: _nightMode,
-                  ),
-                ),
-
-              // Recording Indicator
-              if (_recorderService.isRecording)
-                Positioned(
-                  bottom: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'KAYIT',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-
-            // Cry Alert Overlay
-            if (_noiseAlert)
-              Container(
-                color: Colors.red.withValues(alpha: 0.3),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: scheme.error,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: scheme.onError),
-                        const SizedBox(width: 8),
-                        Text(
-                          AppLocalizations.of(context).babyCrying.toUpperCase(),
-                          style: TextStyle(
-                            color: scheme.onError,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+  /// Baby: (re)creates the room code online or starts advertising offline.
+  Future<void> startBroadcast() async {
+    if (_isOfflineMode) {
+      await _startAdvertising();
+    } else {
+      await _createRoomCode();
+    }
   }
 
-  Widget _buildOverlayButton({
-    Key? key,
-    required IconData icon,
-    required VoidCallback onTap,
-    bool active = false,
-  }) {
-    return GestureDetector(
-      key: key,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.black.withValues(alpha: 0.4),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: active ? Colors.black : Colors.white,
-          size: 20,
-        ),
-      ),
-    );
+  Future<void> joinRoom(String code) async {
+    await _coreReady;
+    await _joinRoomWithCode(code);
   }
 
-  Widget _buildStatusSection(ColorScheme scheme) {
-    final l10n = AppLocalizations.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          if (_showBatteryWarning && _role == DeviceRole.PARENT) ...[
-            _buildBatteryWarning(),
-            const SizedBox(height: 16),
-          ],
-          Row(
-            children: [
-              Icon(Icons.wifi, color: _connectionStatusColor(scheme)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.connectionStatus,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      _connectionStatusLabel(),
-                      key: const Key('connectionStatusText'),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _connectionStatusColor(scheme),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_pairingState?.roomCode != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        l10n.roomCode,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: scheme.primary,
-                        ),
-                      ),
-                      Text(
-                        _pairingState!.roomCode,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: scheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          NoiseLevelBar(
-            currentDb: _currentDecibel,
-            thresholdDb: _noiseThreshold,
-            listening: _listeningNoise,
-          ),
-          if (_remoteBatteryLevel != null) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(
-                  _remoteBatteryState == BatteryState.charging 
-                      ? Icons.battery_charging_full 
-                      : Icons.battery_std, 
-                  color: scheme.primary
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.babyDeviceBattery,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        '%$_remoteBatteryLevel${_remoteBatteryState == BatteryState.charging ? ' (${l10n.charging})' : ''}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: scheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
+  Future<void> startDiscovery() async {
+    setState(() => _discovering = true);
+    await _startDiscovery();
   }
 
-  /// Parent: low battery of the baby phone (V2 5.7). Amber, as in the plan.
-  Widget _buildBatteryWarning() {
-    final l10n = AppLocalizations.of(context);
-    const amber = Color(0xFFFFC46B);
-    const onAmber = Color(0xFF2A1D06);
-    return Container(
-      key: const Key('batteryWarning'),
-      padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
-      decoration: BoxDecoration(color: amber, borderRadius: BorderRadius.circular(18)),
-      child: Row(
-        children: [
-          const Icon(Icons.battery_alert_rounded, color: onAmber),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.batteryLowTitle,
-                    style: const TextStyle(color: onAmber, fontWeight: FontWeight.w800)),
-                Text(
-                  l10n.batteryLowBody.replaceAll('{level}', '${_remoteBatteryLevel ?? '?'}'),
-                  style: const TextStyle(color: onAmber, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: l10n.dismiss,
-            color: onAmber,
-            icon: const Icon(Icons.close_rounded),
-            onPressed: () => setState(() => _showBatteryWarning = false),
-          ),
-        ],
-      ),
-    );
+  Future<void> stopDiscovery() async {
+    setState(() => _discovering = false);
+    if (!offlineSupported) return;
+    try {
+      await Nearby().stopDiscovery();
+    } catch (e) {
+      debugPrint('Stopping discovery failed: $e');
+    }
   }
 
-  Widget _buildControlGrid(ColorScheme scheme, bool isBaby, bool canShowPreview) {
-    final l10n = AppLocalizations.of(context);
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.5,
-      children: [
-        if (isBaby) ...[
-          _buildControlCard(
-            scheme,
-            icon: Icons.qr_code_2_rounded,
-            label: _isOfflineMode ? l10n.startBroadcast : l10n.createRoom,
-            onTap: () {
-              if (_isOfflineMode) {
-                _startAdvertising();
-              } else {
-                _createRoomCode();
-                _showPairingSheet(forBaby: true);
-              }
-            },
-            color: scheme.primary,
-          ),
-          _buildControlCard(
-            scheme,
-            icon: canShowPreview ? Icons.videocam_off_outlined : Icons.videocam_outlined,
-            label: canShowPreview ? l10n.stopCamera : l10n.startCamera,
-            onTap: canShowPreview ? _togglePreview : _setup,
-            color: scheme.secondary,
-          ),
-        ] else ...[
-          _buildControlCard(
-            scheme,
-            icon: Icons.link_rounded,
-            label: _isOfflineMode ? l10n.findBroadcast : l10n.joinRoom,
-            onTap: () {
-              if (_isOfflineMode) {
-                _startDiscovery();
-              } else {
-                _showPairingSheet(forBaby: false);
-              }
-            },
-            color: scheme.primary,
-          ),
-          _buildControlCard(
-            scheme,
-            key: const Key('recordButton'),
-            icon: _recorderService.isRecording ? Icons.stop_circle_outlined : Icons.fiber_manual_record_outlined,
-            label: _recorderService.isRecording ? l10n.stopRecording : l10n.startRecording,
-            onTap: _toggleRecording,
-            color: Colors.redAccent,
-          ),
-        ],
-        // Online/offline switch: offline (Nearby Connections) is Android only.
-        if (defaultTargetPlatform == TargetPlatform.android)
-        _buildControlCard(
-          scheme,
-          key: const Key('modeToggleButton'),
-          icon: _isOfflineMode ? Icons.wifi_off_rounded : Icons.wifi_rounded,
-          label: _isOfflineMode ? l10n.offlineMode : l10n.onlineMode,
-          onTap: () async {
-             setState(() {
-               _isOfflineMode = !_isOfflineMode;
-             });
-             await _resetPairing();
-             await _initCoreServices();
-          },
-          color: Colors.orange,
-          isOutlined: true,
-        ),
-        _buildControlCard(
-          scheme,
-          key: const Key('disconnectButton'),
-          icon: Icons.stop_circle_outlined,
-          label: l10n.disconnect,
-          onTap: () => _resetPairing(deleteRoom: isBaby),
-          color: scheme.error,
-          isOutlined: true,
-        ),
-      ],
-    );
+  Future<void> connectToEndpoint(String id, String name) async {
+    setState(() => _discovering = false);
+    await _connectToEndpoint(id, name);
   }
 
-  Widget _buildControlCard(
-    ColorScheme scheme, {
-    Key? key,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    required Color color,
-    bool isOutlined = false,
-  }) {
-    return Material(
-      key: key,
-      color: isOutlined ? Colors.transparent : color.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isOutlined ? BorderSide(color: color.withValues(alpha: 0.5)) : BorderSide.none,
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  /// Parent: leave the room (back to the join screen). Baby: see [leaveRole].
+  Future<void> disconnect() => _resetPairing(deleteRoom: _role == DeviceRole.BABY, restoreCamera: false);
+
+  Future<void> switchCamera() => _switchCamera();
+  Future<void> toggleRecording() => _toggleRecording();
+  Future<void> enterNightMode() => _enterNightMode();
+  Future<void> exitNightMode() => _exitNightMode();
+  void setNoiseThreshold(double value) {
+    _setNoiseThreshold(value);
+    unawaited(_savePref((p) => p.setDouble(_thresholdKey, value)));
   }
 
+  Future<void> setVideoSettings(VideoSettings settings) => _updateVideoSettings(settings);
+
+  void setAutoNightMode(bool value) {
+    setState(() => _autoNightMode = value);
+    unawaited(_savePref((p) => p.setBool(_autoNightKey, value)));
+  }
+
+  Future<void> setKeepScreenOn(bool value) => _setKeepScreenOn(value);
+  Future<void> setBackgroundListening(bool value) => _setBackgroundListening(value);
+  void retryConnection() => _retryConnection();
+  void silenceConnectionAlarm() => _silenceConnectionAlarm();
+  void dismissBatteryWarning() => setState(() => _showBatteryWarning = false);
+
+  /// Cry alarm "Tamam" / "Görüntüyü aç".
+  void acknowledgeCryAlarm() {
+    _cryAlarmVisible = false;
+    unawaited(_cryAlarmSound.stop());
+    _notify();
+  }
+
+  /// Cry alarm "5 dk sessize al" (V2 5.8): no alarm screen or sound until
+  /// then; history and notifications continue.
+  void snoozeCryAlarm([Duration duration = const Duration(minutes: 5)]) {
+    _crySnoozedUntil = DateTime.now().add(duration);
+    acknowledgeCryAlarm();
+  }
+
+  void cancelCrySnooze() {
+    _crySnoozedUntil = null;
+    _notify();
+  }
+
+  // Demo scenes ---------------------------------------------------------------
+
+  /// Puts the controller into a fixed state for store screenshots and
+  /// design checks (V2 phase 4). No streaming, no network: only the fields
+  /// the screens read. Used by tool/screenshots_test.dart and, in builds
+  /// with `--dart-define=NINNI_DEMO=<scene>`, by the app itself.
+  @visibleForTesting
+  void debugDemo(DemoScene scene) {
+    final now = DateTime.now();
+    _roleChosen = scene != DemoScene.roleSelect;
+    _isOfflineMode = false;
+    _pairingError = null;
+    _pairingBusy = false;
+    _batteryLevel = 76;
+    _batteryState = BatteryState.charging;
+    _noiseThreshold = 65;
+    _cryDetector.threshold = 65;
+    _listeningNoise = true;
+    _cryActive = false;
+    _cryAlarmVisible = false;
+    _connectionLost = false;
+    _firebaseReady = true;
+    switch (scene) {
+      case DemoScene.roleSelect:
+        _pairingState = null;
+      case DemoScene.babyPairing:
+        _role = DeviceRole.BABY;
+        _pairingState = PairingState(roomCode: 'K7MQT2H9', status: ConnectionStatus.CONNECTING);
+        _roomCreatedAt = now.subtract(const Duration(seconds: 18));
+        _connectionStatus = ConnectionStatus.CONNECTING;
+        _parentEverConnected = false;
+      case DemoScene.babyLive:
+      case DemoScene.babyNight:
+        _role = DeviceRole.BABY;
+        _pairingState = PairingState(roomCode: 'K7MQT2H9', status: ConnectionStatus.CONNECTED, isPaired: true);
+        _connectionStatus = ConnectionStatus.CONNECTED;
+        _parentEverConnected = true;
+        _currentDecibel = 42;
+        _nightMode = scene == DemoScene.babyNight;
+      case DemoScene.parentJoin:
+        _role = DeviceRole.PARENT;
+        _pairingState = null;
+        _connectionStatus = ConnectionStatus.DISCONNECTED;
+      case DemoScene.parentLive:
+      case DemoScene.cryAlert:
+      case DemoScene.connectionLost:
+        _role = DeviceRole.PARENT;
+        _pairingState = PairingState(roomCode: 'K7MQT2H9', status: ConnectionStatus.CONNECTED, isPaired: true);
+        _connectionStatus = ConnectionStatus.CONNECTED;
+        _remoteBatteryLevel = scene == DemoScene.connectionLost ? 9 : 76;
+        _remoteBatteryState = BatteryState.discharging;
+        _currentDecibel = scene == DemoScene.cryAlert ? 74 : 38;
+        _noiseAlert = scene == DemoScene.cryAlert;
+        _lastRecordedAlertTime = DateTime(now.year, now.month, now.day, 1, 12);
+        if (scene == DemoScene.cryAlert) {
+          _cryActive = true;
+          _cryAlarmVisible = true;
+          _cryStartedAt = now.subtract(const Duration(seconds: 6));
+          _cryPeakDb = 74;
+        }
+        if (scene == DemoScene.connectionLost) {
+          _connectionLost = true;
+          _connectionLostSince = now.subtract(const Duration(seconds: 45));
+        }
+    }
+    _notify();
+  }
+
+  // Preferences --------------------------------------------------------------
+
+  static const String _autoNightKey = 'autoNightMode';
+  static const String _thresholdKey = 'noiseThreshold';
+
+  Future<void> _savePref(Future<bool> Function(SharedPreferences p) write) async {
+    try {
+      await write(await SharedPreferences.getInstance());
+    } catch (e) {
+      debugPrint('Saving preference failed: $e');
+    }
+  }
+
+  Future<void> _requestBabyPermissions() async {
+    try {
+      await Permission.camera.request();
+      await Permission.microphone.request();
+    } catch (e) {
+      debugPrint('Permission request failed: $e');
+    }
+  }
 }
 
 // Top-level function for running heavy image processing in an isolate

@@ -124,6 +124,20 @@ class AlertHistoryService {
     return _pendingWrite;
   }
 
+  /// Sets the duration of the newest entry once the cry ended (V2 5.9).
+  /// Entries are recorded at most once per minute, so a long cry adds the
+  /// whole duration to the entry of its start.
+  Future<void> finishLastAlert(Duration duration) async {
+    await loadAlerts();
+    if (_alerts.isEmpty) return;
+    final last = _alerts.first;
+    final seconds = duration.inSeconds.clamp(0, 24 * 3600);
+    final previous = last.durationSeconds ?? 0;
+    // Keep the longer value (several short cries inside one entry window).
+    _alerts[0] = last.copyWith(durationSeconds: seconds > previous ? seconds : previous);
+    await _saveAlerts();
+  }
+
   Future<void> clearHistory() async {
     await loadAlerts();
     _alerts.clear();

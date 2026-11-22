@@ -10,6 +10,7 @@ import 'app.dart';
 import 'core/services/hybrid_notification_manager.dart';
 import 'core/auth/auth_service.dart';
 import 'core/firebase/emulator_config.dart';
+import 'features/monitor/monitor_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,11 +39,14 @@ Future<void> main() async {
     debugPrint('Notification init failed: $e');
   }
 
+  final language = LanguageProvider();
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ChangeNotifierProvider.value(value: language),
+        // All monitoring logic (V2: moved out of the old HomeScreen).
+        ChangeNotifierProvider(create: (_) => MonitorController(locale: () => language.locale)),
       ],
       child: const BebekMonitorApp(),
     ),
