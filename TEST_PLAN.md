@@ -1,5 +1,97 @@
 # TEST_PLAN.md — 2 Android telefonla manuel test
 
+## ★ Önce bunu okuyun: emülatörde ne test edildi, telefonda ne kaldı
+
+Otonom oturumda (22.11.2026) iki Android emülatöründe ve iki iOS simülatöründe otomatik uçtan uca testler çalıştırıldı (`scripts/run_e2e.py`, Firebase Emulator Suite; sonuçlar `test-results/`). Her madde için:
+
+- **Emülatör:** ✅ otomatik testte geçti · ❌ başarısız · — emülatörde test edilmedi ya da edilemez (Nearby, gerçek ses, arka plan, sistem diyalogları).
+- **Gerçek cihaz:** **Evet** = telefonda mutlaka bakılmalı (aşağıdaki kısa listede) · Hayır = emülatör sonucu yeterli, vaktiniz olursa bakın.
+
+### Telefonda yapılacak en kısa liste (≈ 1,5 saat, 2 Android + varsa 1 iPhone)
+
+| # | Test | Kapsadığı maddeler | Neden emülatör yetmiyor |
+|---|---|---|---|
+| G1 | Temiz kurulum: izin diyalogları, pil optimizasyonu, ebeveynde bildirim izni | 1.1, 1.6, 12.36 | Testlerde izinler `adb pm grant` ile verildi; diyaloglar hiç görünmedi. |
+| G2 | Bebek Wi-Fi, ebeveyn **mobil veri**: bağlan, 5 dk izle | 2B.1, 2B.3 | İki emülatör aynı makinede, NAT/TURN sorunu oluşmuyor (B07). |
+| G3 | Offline: yayın, arama, bağlan, ses, sessizlik, uzaklaşma, 20 sn kayıt | 3.1–3.3, 3.7, 3.9, 12.3 | Nearby Connections emülatörde çalışmıyor. |
+| G4 | Function deploy edildikten sonra: ebeveyn arka planda / kilitli / kapalı → push | 12.39–12.42, 5.3–5.5 | Emülatörde Function çalıştı ama gerçek FCM gönderilmedi (DECISIONS A3). |
+| G5 | Gerçek ağlama sesiyle eşik ayarı ve online/offline dB farkı | 12.13, 12.17, 5.9 | Testlerde ses seviyesi `DebugHooks.fakeNoiseDb` ile taklit edildi. |
+| G6 | Gecikme ve ses kalitesi | 4.1, 4.3 | Emülatörde kamera/mikrofon sanal. |
+| G7 | 30 dk gece modunda yayın, bebek ekranı kapalıyken davranış | 10.1, 12.11, 5.10 | Pil, ısı, Doze ve ekran kapanması emülatörde gerçekçi değil. |
+| G8 | Kaydı oynatma, paylaşma, sistem galerisinde görme | 7.1, 7.6, 7.8 | Testte yalnızca başlat/durdur ve galeri açılışı doğrulandı. |
+| G9 | iPhone (varsa): açılış, kamera görüntüsü, ses, bildirim | Bölüm 13 | Simülatörde kamera yok, push için APNs gerekiyor. |
+
+### Madde madde emülatör sonucu
+
+| Madde | Emülatör | Gerçek cihaz | Not |
+|---|---|---|---|
+| 1.1 | — | **Evet** (G1) | İzinler komutla verildi |
+| 1.2 | ✅ | Hayır | Sanal kamera ile yayın yapıldı |
+| 1.3–1.5 | — | **Evet** (G3) | Offline izinleri |
+| 1.6 | — | **Evet** (G1) | Testte pil optimizasyonu listesine komutla eklendi |
+| 2A.1, 2A.2 | ✅ | Hayır | Kod oluşturma, katılma, "Bağlı" durumu |
+| 2A.3 | — | Hayır | Kamera değiştirme test edilmedi |
+| 2A.4 | ✅ | Hayır | Bebek kesince oda siliniyor |
+| 2B.1–2B.3 | — | **Evet** (G2) | |
+| 3.1–3.10 | — | **Evet** (G3: 3.1–3.3, 3.7, 3.9) | Nearby emülatörde yok |
+| 4.1–4.4 | — | **Evet** (G6: 4.1, 4.3) | |
+| 5.1 | ✅ | Hayır | Sahte ağlama: 70 sn'de 2 alarm (60 sn sınırı) |
+| 5.2 | — | Hayır | |
+| 5.3–5.5 | — | **Evet** (G4) | |
+| 5.6 | — | Hayır | |
+| 5.7 | — | Hayır (G3 ile birlikte bakılabilir) | Offline |
+| 5.8 | ✅ | Hayır | 1 sn'lik ses alarm vermedi |
+| 5.9 | — | **Evet** (G5) | |
+| 5.10 | — | **Evet** (G7) | |
+| 6.1 | — | Hayır | Bebek tarafında ağ kesintisi test edilmedi |
+| 6.2 | ✅ | Hayır | Ebeveynde uçak modu → kendiliğinden yeniden bağlandı |
+| 6.3 | — | Hayır | |
+| 6.4 | ✅ | Hayır | Çıkıp aynı kodla tekrar katılma |
+| 6.5, 6.6 | — | Hayır | |
+| 7.1 | ✅ | **Evet** (G8) | Başlat/durdur çökmüyor; dosyanın oynatılması doğrulanmadı |
+| 7.2–7.5 | — | Hayır | |
+| 7.6 | — | **Evet** (G8) | |
+| 7.7 | — | Hayır | |
+| 7.8 | — | **Evet** (G8) | |
+| 8.1 | ✅ | Hayır | Geçmişte 2 kayıt, uygulama dilinde |
+| 8.2, 8.3 | — | Hayır | |
+| 9.1, 9.2 | — | Hayır | |
+| 9.3 | ✅ | Hayır | Koyu tema |
+| 9.4 | ✅ | Hayır | TR → EN → TR geçişi |
+| 9.5 | — | Hayır | |
+| 10.1–10.3 | — | **Evet** (G7: 10.1) | |
+| 11.x | Yukarıdaki maddelere bağlı | | |
+| 12.1 | — | Hayır | |
+| 12.2–12.5 | — | **Evet** (G3: 12.3) | Offline kayıt |
+| 12.6 | — | Hayır (G1 ile birlikte) | |
+| 12.7, 12.8 | ✅ | Hayır | Gece modu katmanı, çift dokunuşla çıkış |
+| 12.9, 12.10 | — | Hayır | |
+| 12.11 | — | **Evet** (G7) | |
+| 12.12 | — | Hayır | |
+| 12.13 | — | **Evet** (G5) | |
+| 12.14, 12.15 | ✅ | Hayır | Alarm gecikmesi ~2,5–2,7 sn |
+| 12.16 | ✅ | Hayır | Eşik 80 ebeveynden bebeğe geçti |
+| 12.17 | — | **Evet** (G5) | |
+| 12.18 | — | Hayır | Offline |
+| 12.19 | ✅ | Hayır | |
+| 12.20, 12.21 | — | Hayır | |
+| 12.22 | ✅ | Hayır | |
+| 12.23 | — | Hayır | |
+| 12.24 | ✅ (kısmen) | Hayır | Oda siliniyor; ebeveynin "odayı kapattı" mesajı ayrıca test edilmedi |
+| 12.25 | — | Hayır | |
+| 12.26–12.28 | ✅ | Hayır | Biçim, küçük harf, yanlış kod |
+| 12.29 | — | Hayır | |
+| 12.30 | ✅ | Hayır | Süre artık **12 sa** (B58) |
+| 12.31–12.34 | ✅ | Hayır | Kurallar emülatörde yüklüydü; süresi geçmiş kod ve üçüncü cihaz reddedildi |
+| 12.35 | — | Hayır | |
+| 12.36 | — | **Evet** (G1) | |
+| 12.37 | — | Hayır (G4 ile birlikte) | |
+| 12.38 | ✅ | Hayır | Token ve dil odaya yazıldı |
+| 12.39–12.42 | ✅ Function / — push | **Evet** (G4) | Function emülatörde çalıştı, başlık/gövde doğru; gerçek push gönderilmedi |
+| 12.43 | ✅ | Hayır | 60 sn sınırı |
+
+---
+
 İki cihaz kullanılıyor:
 - **B (Bebek):** kamera ve mikrofonu yayınlayan telefon.
 - **E (Ebeveyn):** izleyen telefon.
@@ -264,7 +356,7 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 12.27 | D3 | E: kodu küçük harfle ve tiresiz girin (ör. `abcdef23`). | Bağlanır (büyük harfe çevrilir, tire yok sayılır). | ✅/❌ |
 | 12.28 | D3 | E: yanlış bir kod girin. | "Kod hatalı, süresi dolmuş veya başka bir cihazla eşleşmiş" mesajı; otomatik yeniden deneme yok. | ✅/❌ |
 | 12.29 | D3 | Anonymous giriş kapalıyken (ilk kurulumda, konsolda açmadan) kod oluşturmayı deneyin. | "Bu uygulama için giriş açık değil (Firebase: Anonim giriş)" mesajı. *(İsteğe bağlı)* | ✅/❌ |
-| 12.30 | D8 | Yayın sırasında Firebase konsolunda odayı açın. | `expiresAt` ≈ şimdi + 24 sa; adaylar ve alarmlarda da `expiresAt` var; `cryUpdated` ~5 sn'de bir değişiyor. | ✅/❌ |
+| 12.30 | D8 | Yayın sırasında Firebase konsolunda odayı açın. | `expiresAt` ≈ şimdi + 12 sa (B58); adaylar ve alarmlarda da `expiresAt` var; `cryUpdated` ~5 sn'de bir değişiyor. | ✅/❌ |
 | 12.31 | D3 | Konsolda odanın `ownerUid` ve (E bağlanınca) `viewerUid` alanları dolu. | İki farklı uid. | ✅/❌ |
 | 12.32 | D3 kurallar yayınlandıktan sonra | 12.26 + 12.27'yi tekrarlayın, sonra 10 dk bekleyen bir kodla katılmayı deneyin. | Normal akış çalışır; 10 dk'dan eski, kullanılmamış kod "geçersiz/süresi dolmuş" verir. | ✅/❌ |
 | 12.33 | D3 | Üçüncü bir telefonla (veya E'de uygulama verisini silip) aynı kodla katılmayı deneyin. | Reddedilir; B ile E'nin bağlantısı etkilenmez. | ✅/❌ |
@@ -283,3 +375,18 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 12.41 | D2 | E uygulamasını son uygulamalardan kapatın (zorla durdurmayın), 12.39. | Bildirim gelir. | ✅/❌ |
 | 12.42 | D2 | E ön planda, 12.39. | **Tek** bildirim görünür (Firestore + FCM aynı etiketle birleşir); iki kez ses çalarsa not edin. | ✅/❌ + not: |
 | 12.43 | D2 | 2 dk sürekli ağlama. | En fazla ~2–3 push (60 sn bekleme). | Push sayısı: ___ |
+
+## 13. iPhone (G9)
+
+> Kurulum adımları: REPORT.md → "iOS: sizin yapmanız gerekenler". Simülatörde kamera yok (BLOCKERS 1) ve push için APNs anahtarı gerekiyor; bu yüzden aşağıdakiler yalnızca gerçek iPhone'da doğrulanabilir.
+
+| # | Adımlar | Beklenen | Emülatör | Sonuç |
+|---|---|---|---|---|
+| 13.1 | Uygulamayı ilk kez açın. | Çökmeden açılır (B63). Kamera/mikrofon izin metinleri telefon dilinde (TR/EN). | ✅ simülatörde açılıyor | ✅/❌ |
+| 13.2 | iPhone bebek, Android ebeveyn: online bağlanın. | Android'de iPhone kamerasının görüntüsü ve sesi gelir. | ✅ yalnızca ses (simülatörde kamera yok) | ✅/❌ |
+| 13.3 | Android bebek, iPhone ebeveyn. | iPhone'da görüntü ve ses gelir. | Karma test: REPORT.md | ✅/❌ |
+| 13.4 | iPhone bebekken oda oluşturun. | "iPhone'da kamera arka planda çalışmaz, gece modunu kullanın" uyarısı ve "Gece modu" düğmesi. | — | ✅/❌ |
+| 13.5 | iPhone bebek yayındayken ekranı kilitleyin veya uygulamadan çıkın. | Görüntü durur (iOS kısıtı); ses arka plan moduyla bir süre sürebilir. Ne olduğunu not edin. | — | not: |
+| 13.6 | Ayarlar → Offline. | Anahtar yok; "Offline mod yalnızca Android'de" açıklaması var (A7). | ✅ | ✅/❌ |
+| 13.7 | APNs anahtarı yüklendikten ve Function deploy edildikten sonra: iPhone ebeveyn arka planda, Android bebekte ağlama. | iPhone'a push gelir. | — (simülatörde FCM token yok) | ✅/❌ + gecikme: |
+| 13.8 | Ebeveynde kayıt başlatıp durdurun, galeriyi açın, Fotoğraflar'a kaydedin. | Fotoğraf izni sorulur, kayıt Fotoğraflar'da görünür. | — | ✅/❌ |
