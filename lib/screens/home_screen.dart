@@ -2217,10 +2217,15 @@ class _HomeScreenState extends State<HomeScreen>
     final pairing = _pairingService;
     if (pairing == null || _isOfflineMode) return;
     final pushToken = token ?? await HybridNotificationManager().getPushToken();
-    if (pushToken == null || !mounted) return;
+    if (pushToken == null) {
+      debugPrint('Push: no FCM token, push notifications will not arrive');
+      return;
+    }
+    if (!mounted) return;
     final locale = Localizations.localeOf(context).languageCode;
     try {
       await pairing.setViewerPushToken(roomCode, pushToken, locale);
+      debugPrint('Push: FCM token stored in room $roomCode');
     } catch (e) {
       debugPrint('Storing push token failed: $e');
     }

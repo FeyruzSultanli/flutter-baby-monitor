@@ -4,6 +4,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'push_registration.dart';
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Cry alerts are FCM *notification* messages: Android shows them itself
@@ -160,6 +162,11 @@ class NotificationService {
 
   Future<String?> getFCMToken() async {
     try {
+      // iOS: an FCM token needs the APNs token first (B69).
+      if (defaultTargetPlatform == TargetPlatform.iOS &&
+          await PushRegistration.ensureApnsToken() == null) {
+        return null;
+      }
       return await _firebaseMessaging.getToken();
     } catch (e) {
       debugPrint('FCM token unavailable: $e');
