@@ -64,6 +64,15 @@
 - **Durum:** Flutter 3.44, `flutter build ios --simulator` ile arm64 + x86_64 istiyor, ama Flutter.framework'ün simülatör sürümü yalnızca arm64 ("does not contain architectures arm64 x86_64").
 - **Seçim:** Belirli bir simülatöre yapılan derlemeler (`flutter test -d <udid>`, `flutter run`) ya da tek bir simülatör hedefiyle `xcodebuild` kullanılıyor; ikisi de sorunsuz. Gerçek cihaz derlemesi bundan etkilenmez.
 
+### A13 — Eylem düğmeli uyarılar 8 sn sonra kapanıyor (B67)
+- **Seçenekler:** (a) Flutter'ın yeni varsayılanı: kullanıcı kaydırana kadar kalır; (b) eski davranış: belirli bir süre sonra kapanır.
+- **Seçim:** (b), 8 sn. Uyarıyı okuyup "Ayarlar"a dokunmaya yetecek kadar uzun.
+- **Neden:** Kod bu varsayılan değişmeden önce yazılmıştı ve iOS ipucuna açıkça `duration: 8 s` verilmişti, yani amaç kendiliğinden kapanmasıydı. Kalıcı uyarı alttaki kontrolleri örtüyor. Geri almak için `persist: false` satırlarını silmek yeterli.
+
+### A14 — Karma test (Android bebek ↔ iOS ebeveyn) ağ kesintisini atlıyor
+- **Seçim:** `--platform mixed` iki tarafa da `E2E_SKIP_NETWORK_DROP=true` veriyor.
+- **Neden:** Ağ kesintisi adımı iki cihazın eş zamanlı ilerlemesine bağlı. iOS simülatöründe uçak modu yok (simülatör Mac'in ağını kullanıyor). Bu adım Android ↔ Android koşusunda test ediliyor.
+
 ## Cavid'in kararı bekleniyor
 
 - **`sound_stream` GPL-3.0 lisanslı:** Offline modda ses akışı için kullanılan bu paket GPL-3.0. Uygulama App Store/Play'de dağıtılırsa GPL yükümlülükleri (kaynak kodun açılması) doğar; App Store ile GPL uyumu da tartışmalı. Seçenekler:
