@@ -58,7 +58,9 @@ class _NinniButtonState extends State<NinniButton> {
     final p = NinniPalette.of(context);
     final primary = widget.variant == NinniButtonVariant.primary;
     final height = widget.height ??
-        (primary ? NinniSpace.primaryButtonHeight : NinniSpace.secondaryButtonHeight);
+        (primary
+            ? NinniSpace.primaryButtonHeight
+            : NinniSpace.secondaryButtonHeight);
     final radius = primary ? NinniRadii.r20 : NinniRadii.r18;
 
     Color bg;
@@ -123,7 +125,8 @@ class _NinniButtonState extends State<NinniButton> {
             ],
           );
 
-    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     return Semantics(
       button: true,
       enabled: _enabled,
@@ -141,7 +144,9 @@ class _NinniButtonState extends State<NinniButton> {
             color: bg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(radius),
-              side: border == null ? BorderSide.none : BorderSide(color: border, width: 1.5),
+              side: border == null
+                  ? BorderSide.none
+                  : BorderSide(color: border, width: 1.5),
             ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
@@ -153,8 +158,10 @@ class _NinniButtonState extends State<NinniButton> {
                   : null,
               onHighlightChanged: _setPressed,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                child: Center(widthFactor: widget.expand ? null : 1, child: child),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                child:
+                    Center(widthFactor: widget.expand ? null : 1, child: child),
               ),
             ),
           ),
@@ -188,27 +195,45 @@ class NinniIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = NinniPalette.of(context);
+    void tap() {
+      HapticFeedback.selectionClick();
+      onPressed!();
+    }
+
+    // The visual square stays [size] (mockups: 40-44); the tap target is at
+    // least 48 (Android) / 44 (iOS) (V2 phase 4).
+    final hit = size < 48 ? 48.0 : size;
     return Tooltip(
       message: tooltip,
       excludeFromSemantics: true,
       child: Semantics(
         button: true,
+        enabled: onPressed != null,
         label: tooltip,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Material(
-            color: background ?? p.surfaceAlt,
-            borderRadius: BorderRadius.circular(radius),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onPressed == null
-                  ? null
-                  : () {
-                      HapticFeedback.selectionClick();
-                      onPressed!();
-                    },
-              child: Icon(icon, size: 22, color: foreground ?? p.text),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onPressed == null ? null : tap,
+          child: SizedBox(
+            width: hit,
+            height: hit,
+            child: Center(
+              // One semantics node for the whole 48 px target (the outer
+              // GestureDetector carries the tap action).
+              child: ExcludeSemantics(
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: Material(
+                    color: background ?? p.surfaceAlt,
+                    borderRadius: BorderRadius.circular(radius),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: onPressed == null ? null : tap,
+                      child: Icon(icon, size: 22, color: foreground ?? p.text),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),

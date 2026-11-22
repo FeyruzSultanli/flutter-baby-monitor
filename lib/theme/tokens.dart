@@ -50,14 +50,14 @@ abstract final class NinniColors {
   static const apricotSoftOnNight = Color(0xFFFFB494);
   static const apricotRing = Color(0xFFFF9D76);
   /// Apricot as text on light surfaces.
-  static const apricotText = Color(0xFFC2531F);
+  static const apricotText = Color(0xFFA8461B);
   /// Border of the destructive button on night screens.
   static const apricotLineOnNight = Color(0xFF3A2A3A);
 
   // Connected / OK
   static const mint = Color(0xFF3DD6A3);
   static const mintOnNight = Color(0xFF7CEBC6);
-  static const mintText = Color(0xFF12936B);
+  static const mintText = Color(0xFF0B7A57);
   static const mintPillOnNight = Color(0xFF123B33);
   /// Dimmed mint dot (night mode).
   static const mintDim = Color(0xFF2E8F70);

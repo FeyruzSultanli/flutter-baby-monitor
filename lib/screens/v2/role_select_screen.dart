@@ -26,7 +26,13 @@ class RoleSelectScreen extends StatelessWidget {
         items: [
           Row(
             children: [
-              NinniWordmark(color: p.text),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: NinniWordmark(color: p.text),
+                ),
+              ),
               const Spacer(),
               NinniIconButton(
                 key: const Key('settingsButton'),

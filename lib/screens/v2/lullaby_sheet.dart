@@ -87,25 +87,32 @@ class _LullabySheetState extends State<LullabySheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GridView.count(
-            crossAxisCount: 2,
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 2.1,
-            children: [
-              for (final t in SootheTrack.values)
-                _TrackTile(
-                  key: Key('soothe_${t.id}'),
-                  title: title(t),
-                  subtitle: subtitle(t),
-                  selected: playing == t,
-                  onTap: () => playing == t ? c.stopSoothe() : c.playSoothe(t),
-                ),
-            ],
-          ),
+          // Two tiles per row that grow with the text size (no fixed aspect
+          // ratio: large text must not overflow, V2 phase 4).
+          for (var row = 0; row < SootheTrack.values.length; row += 2) ...[
+            if (row > 0) const SizedBox(height: 10),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = row; i < row + 2; i++) ...[
+                    if (i > row) const SizedBox(width: 10),
+                    Expanded(
+                      child: _TrackTile(
+                        key: Key('soothe_${SootheTrack.values[i].id}'),
+                        title: title(SootheTrack.values[i]),
+                        subtitle: subtitle(SootheTrack.values[i]),
+                        selected: playing == SootheTrack.values[i],
+                        onTap: () => playing == SootheTrack.values[i]
+                            ? c.stopSoothe()
+                            : c.playSoothe(SootheTrack.values[i]),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Row(
             children: [
@@ -214,15 +221,14 @@ class _TrackTile extends StatelessWidget {
             HapticFeedback.selectionClick();
             onTap();
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 76),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: NinniColors.onNight)),
                 const SizedBox(height: 4),
                 Text(subtitle,

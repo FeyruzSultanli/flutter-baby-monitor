@@ -199,6 +199,8 @@ class _CodeBoxesState extends State<CodeBoxes> with TickerProviderStateMixin {
 
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
+        // The hidden text field is the accessible control.
+        excludeFromSemantics: true,
         onTap: () => _focus.requestFocus(),
         child: Stack(
           alignment: Alignment.center,
