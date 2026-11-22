@@ -73,39 +73,56 @@
 - **Seçim:** `--platform mixed` iki tarafa da `E2E_SKIP_NETWORK_DROP=true` veriyor.
 - **Neden:** Ağ kesintisi adımı iki cihazın eş zamanlı ilerlemesine bağlı. iOS simülatöründe uçak modu yok (simülatör Mac'in ağını kullanıyor). Bu adım Android ↔ Android koşusunda test ediliyor.
 
-### A15 — `sound_stream` (GPL-3.0) yerine kendi Android platform kanalımız
-- **Karar (Cavid):** GPL paketi değiştirilecek. İş `fix/audio-license` branch'inde yapılacak, `dev`'e dokunulmayacak.
-- **Seçenekler:**
-  - (a) `record` (BSD-3) ile mikrofon + ayrı bir PCM oynatıcı paketi. `flutter_sound` MPL-2.0 (zayıf copyleft); diğer PCM oynatıcılar küçük, tek kişilik projeler.
-  - (b) Android'e özel kısa bir platform kanalı (`AudioRecord` + `AudioTrack`).
-- **Seçim:** (b): `android/.../OfflineAudio.kt` + `lib/core/audio/offline_audio.dart`.
-- **Neden:**
-  - Yeni bağımlılık ve lisans riski yok.
-  - Offline mod zaten yalnızca Android'de.
-  - Ses biçimi eskisiyle birebir aynı: 16 kHz, mono, PCM16 little-endian, mikrofon kaynağı `MIC`, parça boyutu `getMinBufferSize` örnek (aynı Nearby paket hızı ve dB penceresi). Oynatma medya akışında, ses modu `MODE_NORMAL`.
-  - iOS'ta `AppDelegate`'teki geçici çözüm (A11) kalktı, çünkü iOS'a artık ses eklentisi girmiyor.
-- **Davranış farkları:**
-  - Mikrofon izni eskiden eklentinin `initialize` çağrısında soruluyordu. Artık açılışta aynı noktada `permission_handler` ile soruluyor (kamera, sonra mikrofon). Böylece B12 sırası korunuyor.
-  - `AudioTrack.write` UI thread'inde değil, ayrı bir thread'de çalışıyor (eskiden ana thread'i bloklayabiliyordu).
+### A15 — `sound_stream` (GPL-3.0) yerine `record` (BSD-3) + kendi küçük oynatıcımız
+- **Karar (Cavid):** Değiştir; MIT/BSD/Apache lisanslı bir paket, Android ve iOS'ta çalışsın, iPhone bebek modunda da ağlama algılansın. `fix/audio-license`'taki ilk sürüm (yalnızca Android platform kanalı) cherry-pick ile `dev`'e alındı ve bu karara göre genişletildi.
+- **Mikrofon:** `record` 7.2.0 (BSD-3-Clause, alt paketleri de BSD-3).
+  - Biçim: 16 kHz, mono, PCM16 little-endian (`PcmMicrophone`).
+  - Android: kaynak `MIC`, Bluetooth SCO kapalı (eski davranış).
+  - iOS: eklenti kaydında ses motoru açmıyor (B63 riski yok); durdurunca ses oturumunu kapatmıyor (WebRTC'yi bozmuyor).
+- **Oynatıcı (offline ebeveyn, yalnızca Android):**
+  - Kendi kısa `AudioTrack` kanalımız (`OfflineAudio.kt`): medya akışı, `MODE_NORMAL`, yazmalar ayrı thread'de.
+  - Lisanslı bir PCM oynatıcı paketi yerine bu seçildi. Offline yalnızca Android'de; `flutter_sound` ise MPL-2.0.
+- **iPhone (ve Android) bebekte ağlama algılama:** Ölçüm sonucu (iOS simülatörü, `integration_test/webrtc_audio_level_test.dart`): WebRTC, ebeveyn bağlı değilken mikrofonu hiç açmıyor; ses seviyesi tam 0. Bağlıyken gerçek değerler geliyor. Bu yüzden:
+  - **Ebeveyn yokken (bekleme):** `record` ile ölçülüyor; her 250 ms'de bir son parçaların en yüksek dB'i, aynı dB ölçeği.
+  - **Görüşmede:** WebRTC'nin `audioLevel`'ı (eskisi gibi).
+  - **Geçiş:** İkisi asla aynı anda mikrofonu tutmuyor. `WebRTCService.beforeBabyCall`, görüşme kurulmadan önce `record`'u durduruyor; `onBabyStandby`, bekleme peer'ı kurulunca başlatıyor. iOS'ta geçiş simülatörde doğrulandı: `record` durduktan sonra WebRTC yine ses yakalıyor.
+  - **Bağlantı koparsa** (ebeveyn uygulamayı kapattı, ICE failed): Bebek bozuk peer'ı kapatıp beklemeye geçiyor, mikrofon `record`'a dönüyor. Bu sayede ağlama algılanmaya ve push gönderilmeye devam ediyor. Eskiden bozuk peer açık kalıyordu; ICE restart olmadığı için zaten kurtarılamıyordu. Ebeveyn yeni bir oturumla geri gelince yeni offer gidiyor (B08 protokolü aynı).
+  - **Zaman sınırları:** Mikrofonun başlatılması 5 sn, durdurulması 3 sn ile sınırlı; görüşme öncesi bekleme 8 sn. Yanıt vermeyen bir mikrofon görüşmeyi kilitleyemez.
+  - **Simülatör:** iOS simülatöründe (debug) bekleme ölçeri kapalı, çünkü iki simülatörlü E2E'de CoreAudio riski var (BLOCKERS 4). E2E sahte ses kancası kullanıyor.
 - **Doğrulama:**
-  - Unit testler (kanal mesajları, PCM → dB, Nearby çerçevesi).
-  - Emülatörde smoke test (`integration_test/offline_audio_smoke_test.dart`): mikrofon parçaları, yeniden başlatma, oynatıcı.
-  - İki telefonla offline ses testi gerekiyor (TEST_PLAN 3.11).
-- **Geri alma:** `fix/audio-license` branch'ini merge etmemek yeterli.
+  - Unit testler.
+  - Android emülatörü ve iOS simülatöründe `integration_test/audio_smoke_test.dart`.
+  - iOS simülatöründe `webrtc_audio_level_test.dart`.
+  - Telefon: TEST_PLAN G-AI (AI-8, AI-10, P3) ve offline için 3.11 (2. Android gerekli).
 
-### A16 — Lisans taraması (`pubspec.lock`, 158 paket)
-- **Yöntem:** Her paketin pub önbelleğindeki LICENSE dosyası okundu.
-- **Sonuç (`sound_stream` kaldırıldıktan sonra):** BSD-3-Clause 103 (+8 Flutter SDK paketi), MIT 37, Apache-2.0 4, BSD-2-Clause 4, MPL-2.0 2. **GPL/LGPL/AGPL lisanslı paket kalmadı.**
-- **Kaldırılan:** `sound_stream` 0.4.2: GPL-3.0.
-- **MPL-2.0 olanlar:** `dbus` 0.7.15 ve `upower` 0.7.0. `battery_plus`'ın Linux tarafı için dolaylı bağımlılık; Android/iOS uygulamasında kullanılmıyorlar. Tarayıcı bunları "GPL" diye işaretledi, çünkü MPL metni GPL/LGPL'den "ikincil lisans" olarak bahsediyor. MPL dosya düzeyinde copyleft: değiştirilmeden kullanıldıkça sorun yok.
-- **Taranmayanlar:** Yerel SDK'lar (Google Play Services / Nearby, Firebase, libwebrtc) Dart paketi değil, bu taramaya girmedi. Bunlar BSD/Apache ya da Google'ın kendi koşulları altında, GPL değil.
+### A16 — Lisans taraması (`pubspec.lock`, 165 paket)
+- **Sonuç:** BSD-3-Clause 110 (+8 Flutter SDK paketi), MIT 37, Apache-2.0 4, BSD-2-Clause 4, MPL-2.0 2. **GPL/LGPL/AGPL lisanslı paket yok.**
+- **Kaldırılan:** `sound_stream` 0.4.2 (GPL-3.0).
+- **Eklenen:** `record` 7.2.0 ve `record_*` alt paketleri, hepsi BSD-3-Clause.
+- **MPL-2.0 olanlar:** `dbus` 0.7.15 ve `upower` 0.7.0. `battery_plus`'ın Linux tarafı için dolaylı bağımlılık; Android/iOS'ta kullanılmıyorlar. Tarayıcı bunları "GPL" diye işaretledi, çünkü MPL metni GPL'den "ikincil lisans" olarak bahsediyor. Değiştirilmeden kullanıldıkça sorun yok.
+- **Kapsam dışı:** Yerel SDK'lar (Google Play Services / Nearby, Firebase, libwebrtc) Dart paketi değil, taranmadı. Hiçbiri GPL değil.
+
+### A17 — iOS imzalama, push entitlement'ı ve APNs kaydı
+- **İmzalama:** Runner hedefinde Debug/Release/Profile için `CODE_SIGN_STYLE = Automatic`. Team'i Cavid Xcode'da seçecek.
+- **Entitlements:**
+  - `ios/Runner/Runner.entitlements` içinde `aps-environment = development`, üç yapılandırmada da `CODE_SIGN_ENTITLEMENTS`.
+  - Tek dosya kullanılıyor. Otomatik imzalamada Xcode, App Store/TestFlight için arşivlerken bunu `production`'a çeviriyor.
+  - Ayrı bir "Release = production" dosyası, Xcode'dan geliştirme profiliyle release çalıştırmayı bozardı.
+  - Background Modes (`audio`, `remote-notification`) Info.plist'te; tüm yapılandırmalar için geçerli.
+- **Bundle ID:** Xcode'da ve `GoogleService-Info.plist`'te ikisi de `com.feyruz.bebekmonitorclean`. Plist'e dokunulmadı.
+- **APNs kaydı (B69):**
+  - firebase_messaging, uygulamanın "açılış bitti" bildiriminde APNs'e kaydoluyor. UIScene geçişinden sonra eklentiler bu bildirimden sonra kaydediliyor; bu yüzden kayıt büyük olasılıkla hiç yapılmıyor.
+  - Çözüm: Dart, FCM token istemeden önce `PushRegistration.ensureApnsToken()` ile kaydı kendisi istiyor (AppDelegate'teki `bebek_monitor/push` kanalı) ve APNs token'ını 10 sn'ye kadar bekliyor. Token'ı Firebase'in app delegate proxy'si alıyor.
+  - Eklenti token'ı zaten almışsa bu adım atlanıyor.
+  - Simülatör APNs'e yanıt vermediği için bu zincir yalnızca gerçek iPhone'da doğrulanabilir (TEST_PLAN P1–P3). Loglar: `Push: FCM token stored in room` ya da `APNs token not available ... (registration: ...)`.
 
 ## Cavid'in kararı bekleniyor
 
-- **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN G2) sonucuna göre karar verilecek.
+- **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.
 - **7. adım (D1-b foreground service):** Telefon test sonuçlarından sonra.
 
 ## Karara bağlananlar
 
 - **`sound_stream` GPL-3.0:** Değiştir (A15).
 - **Android ↔ iOS offline:** Şimdilik yok. PLAN_NEXT.md §6'da "sonra" olarak duruyor.
+- **Function bölgesi:** Firestore `eur3` → `europe-west1`. Blaze, Anonymous giriş ve APNs anahtarı tamam (Cavid, 22.11). Firestore kuralları telefon testinden sonra yayınlanacak.

@@ -471,7 +471,7 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Dosya:** `ios/Runner/AppDelegate.swift`, `home_screen.dart` `_initAudioServices` / `_stopAudioStream`.
 - **Sorun:** `SwiftSoundStreamPlugin.init` → `attachPlayer` → `AVAudioEngine.mainMixerNode`. iOS 26.5 ve 27 simülatörlerinde CoreAudio RPC zaman aşımı yüzünden `abort`. Gerçek cihazda da, kullanılmadığı halde ses donanımını açılışta alıyor.
 - **Durum:** Düzeltildi (`4a28326`): eklenti iOS'ta kaydedilmiyor; Dart tarafı onu yalnızca Android'de çağırıyor (DECISIONS A11). Gerçek iPhone'da doğrulanmalı.
-- **Not:** `fix/audio-license` branch'inde `sound_stream` tamamen kaldırıldı (B68); orada bu geçici çözüm de kalktı.
+- **Not:** `sound_stream` tamamen kaldırıldı (B68); bu geçici çözüm de kalktı.
 
 ### B64 — Uzak ICE adayları answer uygulanmadan geliyor ve kayboluyor (Yüksek)
 - **Dosya:** `webrtc_service.dart` (aday dinleyicileri).
@@ -501,13 +501,37 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 
 ### B68 — Offline ses paketi `sound_stream` GPL-3.0 lisanslı (Yüksek, yayın engeli)
 - **Dosya:** `pubspec.yaml`, `home_screen.dart` (offline ses).
-- **Sorun:** GPL-3.0 bir paket, uygulama mağazada dağıtılırsa tüm uygulamanın kaynak kodunun GPL ile açılmasını gerektirir; App Store koşullarıyla da uyumu tartışmalı.
-- **Karar:** Cavid: değiştir (DECISIONS A15).
-- **Durum:** `fix/audio-license` branch'inde düzeltildi, `dev`'e merge edilmedi.
-  - Yerine kendi Android platform kanalımız geldi (`OfflineAudio.kt` + `offline_audio.dart`); ses biçimi aynı.
-  - iOS'taki geçici çözüm (A11) kaldırıldı.
-  - `pubspec.lock`'ta GPL/LGPL/AGPL lisanslı paket kalmadı (A16).
-  - Doğrulama: unit testler ve emülatörde mikrofon/oynatıcı smoke testi geçti. **İki telefonla offline ses testi gerekiyor** (TEST_PLAN 3.11).
+- **Sorun:** GPL-3.0 bir paket, uygulama dağıtılırsa tüm kodun GPL ile açılmasını gerektirir; App Store koşullarıyla da uyumu tartışmalı.
+- **Durum:** Düzeltildi (`dev`, DECISIONS A15).
+  - Mikrofon: `record` (BSD-3), Android ve iOS.
+  - Offline oynatıcı: kendi `AudioTrack` kanalımız.
+  - iOS'taki geçici çözüm (A11) kalktı.
+  - GPL/LGPL/AGPL lisanslı paket kalmadı (A16).
+  - Doğrulama: unit testler; emülatörde ve simülatörde mikrofon smoke testi. Offline ses için 2 Android gerekiyor (TEST_PLAN 3.11).
+
+### B69 — iOS: APNs kaydı yapılmıyor, ebeveyn iPhone'a push gitmez (Yüksek, iOS)
+- **Dosya:** `ios/Runner/AppDelegate.swift`, `notification_service.dart`, `ios/Runner/Runner.entitlements`.
+- **Sorun:**
+  1. `aps-environment` entitlement'ı yoktu, yani iOS APNs token vermez.
+  2. firebase_messaging, APNs kaydını uygulamanın açılış bildiriminde yapıyor. UIScene geçişinden beri eklentiler o bildirimden sonra kaydediliyor; kayıt büyük olasılıkla hiç yapılmıyor.
+  3. `getToken()` APNs token'ı yokken hata veriyor; uygulama bunu yutuyor ve odaya token yazılmıyor. E2E'de `fcm_token_stored_in_room=false` (iOS) bununla uyumlu.
+- **Durum:** Düzeltildi:
+  - Entitlements dosyası eklendi.
+  - Dart, FCM token'dan önce APNs kaydını AppDelegate kanalıyla istiyor ve token'ı 10 sn bekliyor.
+  - Loglar eklendi (`Push: ...`).
+  - Simülatör APNs'e yanıt vermiyor; **iPhone'da doğrulanmalı** (TEST_PLAN P1–P3).
+
+### B70 — Bebek telefonu, ebeveyn bağlı değilken ağlamayı algılamıyor (Yüksek)
+- **Dosya:** `webrtc_service.dart`, `home_screen.dart`.
+- **Sorun:**
+  - B08'deki "bekleme peer'ı ses seviyesini ölçüyor" varsayımı yanlış çıktı. WebRTC, görüşme kurulmadan mikrofonu açmıyor; iOS simülatöründe ölçülen ses seviyesi tam 0, bağlanınca gerçek değerler geliyor.
+  - Ebeveyn uygulamayı kapatınca (ICE failed) bebek de bozuk peer'da kalıyordu.
+  - Sonuç: ebeveyn bağlı değilken ağlama algılanmıyor ve push hiç tetiklenmiyordu. Bu, D2'nin asıl senaryosu.
+- **Durum:** Düzeltildi (DECISIONS A15):
+  - Beklemede `record` ile kendi ölçerimiz çalışıyor; görüşmede WebRTC seviyesi kullanılıyor. İkisi aynı anda mikrofonu tutmuyor.
+  - Bağlantı koparsa bebek beklemeye dönüyor.
+  - iOS'ta mikrofon devri simülatörde doğrulandı.
+  - Telefonda AI-8, AI-10 ve P3 ile doğrulanmalı.
 
 ---
 

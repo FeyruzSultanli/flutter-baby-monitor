@@ -39,3 +39,26 @@
   2. Koşu 9: menü seçimi loglandı ("Oda Kodu Oluştur/Yenile" tıklandı). Koşu bitmeden, süre sınırı ve kullanıcı talimatı nedeniyle durduruldu.
   3. Aynı test kodu Android ↔ Android'de (API 35) ve karma koşuda geçti.
 - **Sizden:** Gerek yok. İsterseniz emülatörleri başlatıp `python3 scripts/run_e2e.py --platform ios` ile tekrar koşun (yalnızca iki simülatör açıkken, ~6 dk). Koşu 8'deki gecikme yeniden görülürse yeni bir bug olarak ele alınmalı.
+
+## 6. iOS push zinciri simülatörde doğrulanamıyor
+- **Durum:** APNs kayıt isteği gidiyor (`registration=pending`), ama simülatör 15 sn içinde ne token ne hata döndürüyor. Bu yüzden APNs → FCM → oda zinciri (B69) ancak gerçek iPhone'da doğrulanabilir.
+- **Denenenler:**
+  1. `aps-environment` entitlement'ı eklendi; simülatör derlemesine gömüldüğü doğrulandı.
+  2. Eklentinin kendi kaydı ve uygulamanın kayıt çağrısı ayrı ayrı denendi; ikisinde de token gelmedi.
+  3. AppDelegate'e kayıt sonucunu döndüren bir tanı kanalı eklendi: sonuç "pending" kaldı.
+- **Sizden:** TEST_PLAN G-AI P1–P3 sırasında `iphone_run.log`'da `Push: FCM token stored in room` satırını arayın. Yoksa `APNs token not available ... (registration: ...)` satırını bana gönderin.
+
+## 7. iOS simülatöründe ses testinin bir koşusu açılışta takıldı
+- **Durum:** `webrtc_audio_level_test` 4 koşudan 1'inde ilk adımdan önce takıldı; çökme raporu yok. Diğer 3 koşu geçti.
+- **Önlem:** Mikrofon başlatma 5 sn, durdurma 3 sn ile sınırlandı; görüşme öncesi bekleme 8 sn. Yanıt vermeyen bir mikrofon görüşmeyi kilitleyemez.
+- **Sizden:** Gerek yok. iPhone'da AI-7/AI-8'de görüntü 10 sn içinde gelmezse logu gönderin.
+
+## 8. B70 sonrası Android E2E regresyon koşusu yarıda durduruldu
+- **Durum:** Bebeğin bağlantı kopunca beklemeye dönmesi (B70) değiştiği için Android ↔ Android E2E tekrar koşuldu. Koşu, kullanıcı talimatıyla bitmeden durduruldu.
+- **O ana kadar sonuç: 43 kontrolün hiçbiri başarısız değil.**
+  - Eşleşme, WebRTC, yanlış/süresi geçmiş kod, üçüncü cihaz: ✅
+  - Ağlama alarmı (2,4 sn; 10 sn'de 1, 50 sn'de 1, 70 sn'de 2 alarm), alarm geçmişi, Function önizlemesi: ✅
+  - Eşik senkronu, çıkıp yeniden katılma, **uçak modundan otomatik dönüş**: ✅ (B70'in değiştirdiği yol)
+  - Dil ve tema: ✅
+- **Koşulamayanlar:** kayıt, galeri, gece modu, ebeveynin son ayrılışı, bebeğin odayı silmesi. Bunlar B68–B70'te değişmedi; önceki tam koşuda (`test-results/20261122-133651-android`) geçmişti.
+- **Sizden:** Gerek yok. İsterseniz `scripts/firebase_emulators.sh` açıkken `python3 scripts/run_e2e.py` ile tamamlayın (~7 dk).

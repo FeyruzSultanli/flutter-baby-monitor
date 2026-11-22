@@ -1,4 +1,74 @@
-# TEST_PLAN.md — 2 Android telefonla manuel test
+# TEST_PLAN.md — telefonla manuel test
+
+## G-AI — 1 Android + 1 iPhone kısa listesi (önce bunu yapın, ≈ 2 saat)
+
+**Kısaltmalar:** A = Android telefon, I = iPhone. "A→I" = A bebek, I ebeveyn; "I→A" = I bebek, A ebeveyn.
+
+### Hazırlık (bir kez)
+
+1. **Kurulum (iki telefon da USB ile Mac'e bağlı).** Cihaz kimliklerini öğrenin:
+
+   ```bash
+   flutter devices
+   ```
+
+   ```bash
+   cd /Users/feyruz/Desktop/baby_monitor_app && flutter run -d <ANDROID_ID> 2>&1 | tee android_run.log
+   ```
+
+   ```bash
+   cd /Users/feyruz/Desktop/baby_monitor_app && flutter run --profile -d <IPHONE_ID> 2>&1 | tee iphone_run.log
+   ```
+
+   - iPhone'da `--profile` kullanın: debug derlemesi iOS'ta kablo çıkınca ya da ana ekrandan açılınca çalışmaz.
+   - İlk kurulumda iPhone'da Ayarlar → Genel → VPN ve Cihaz Yönetimi → geliştirici sertifikasına güvenin.
+   - Geliştirici Modu açık olmalı.
+2. **Log toplama.** Her testte açık tutun.
+   - Android'de filtreli canlı log için, `<ANDROID_ID>` `adb devices`'taki seri numarası:
+
+     ```bash
+     adb -s <ANDROID_ID> logcat -v time | grep -iE "flutter|webrtc|OfflineAudio|record|nearby|FirebaseMessaging|Push:|FATAL|AndroidRuntime"
+     ```
+
+   - Android'de tam log (sonradan arama için):
+
+     ```bash
+     adb -s <ANDROID_ID> logcat -v time > android_logcat.txt
+     ```
+
+   - iPhone: `flutter run` çıktısı `iphone_run.log`'a yazılıyor (Dart logları, `Push:` satırları). Yerel loglar için **Xcode → Window → Devices and Simulators → iPhone → Open Console** açın, sağ üstteki aramaya `Runner` yazın ve **Start** deyin. Çökme olursa aynı pencerede **View Device Logs**.
+   - Önemli satırlar:
+     - `Push: FCM token stored in room` / `Push: no FCM token`
+     - `APNs token not available ... (registration: ...)`
+     - `Standby noise meter`
+     - `Offline microphone error`
+     - `Unhandled Exception`
+3. **Push için ön koşul:** Function deploy edilmiş ve APNs anahtarı Firebase'e yüklenmiş olmalı (REPORT.md). Deploy yoksa P1–P3'ü atlayın, diğerlerini yapın.
+
+### Testler
+
+| # | Ağ | Yön | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|---|
+| AI-1 | Aynı Wi-Fi | A→I | A: Bebek modu → Oda kodu oluştur. I: Ebeveyn modu → kodu gir. | 10 sn içinde I'da görüntü + ses; iki tarafta "Bağlı". I'da bildirim izni sorulur → İzin ver. | ✅/❌ + süre: |
+| AI-2 | Aynı Wi-Fi | A→I | I ön planda; A'nın yanında 5 sn ağlama sesi çalın. Sonra 1 sn'lik tek bir ses (el çırpma). | Ağlamada ~2 sn sonra I'da alarm ekranı ve titreşim; el çırpmada alarm **yok**. I'da alarm geçmişinde kayıt var. | ✅/❌ + gecikme: |
+| AI-3 | Aynı Wi-Fi | A→I | I'da Ayarlar → eşik 60 → 75. A'da ayarları açın. | A'da eşik 75. 65 dB civarı ses artık alarm vermez. | ✅/❌ |
+| AI-4 | Aynı Wi-Fi | A→I | A'da gece modu (ay simgesi); iki kez dokunup çıkın. | Ekran siyah, yayın I'da sürüyor; çift dokunuşla çıkılıyor. | ✅/❌ |
+| AI-5 | Aynı Wi-Fi | A→I | I: Bağlantıyı kes → aynı kodla tekrar katıl. Sonra I'da Wi-Fi'ı 20 sn kapatıp açın. | Yeniden katılınca görüntü geri gelir. Wi-Fi dönünce ≤ 30 sn içinde kendiliğinden bağlanır. | ✅/❌ + süre: |
+| AI-6 | Aynı Wi-Fi | A→I | I'da 20 sn kayıt → galeri → oynat → Fotoğraflar'a kaydet / paylaş. | Video oynuyor; Fotoğraflar izni sorulur, kayıt Fotoğraflar'da. | ✅/❌ |
+| AI-7 | Aynı Wi-Fi | I→A | I: Bebek modu → Oda kodu oluştur ("gece modunu kullanın" uyarısı görünür). A: Ebeveyn → kodu gir. | A'da I'nın arka kamerası + ses. | ✅/❌ + süre: |
+| AI-8 | Aynı Wi-Fi | I→A | **Ebeveyn bağlanmadan önce** I'nın yanında 5 sn ağlama sesi (A'yı henüz bağlamayın); sonra A'yı bağlayıp tekrar 5 sn ağlama. | İki durumda da I'nın ses çubuğu hareket eder. Bağlıyken A'da ~2 sn sonra alarm. (Bağlı değilken alarm, push deploy edildiyse A'ya bildirim olarak gelir.) | Bağlı değil ✅/❌ Bağlı ✅/❌ |
+| AI-9 | Aynı Wi-Fi | I→A | I'da gece modu; 10 dk bırakın. A'dan izleyin. | Yayın kesilmez; I'nın ekranı kapanmaz. | ✅/❌ |
+| AI-10 | Aynı Wi-Fi | I→A | A: Bağlantıyı kes → aynı kodla katıl. A'nın Wi-Fi'ını 20 sn kapatıp açın. Sonra A'da uygulamayı son uygulamalardan kapatıp I'nın yanında 5 sn ağlama sesi çalın. | Yeniden katılma ve otomatik dönüş AI-5 gibi. A kapalıyken I'nın ses çubuğu ~30 sn içinde yine hareket eder (iPhone ağlamayı algılamaya devam eder). | ✅/❌ |
+| AI-11 | **Farklı ağ** (A Wi-Fi, I mobil veri) | A→I | AI-1, AI-2. | Bağlanırsa ✅. Bağlanmazsa bekleme süresini ve hatayı yazın (TURN yok, D4 kararı buna bağlı). | ✅/❌ + süre: |
+| AI-12 | **Farklı ağ** (I Wi-Fi, A mobil veri) | I→A | AI-7, AI-8. | AI-11 ile aynı. | ✅/❌ + süre: |
+| P1 | Herhangi | A→I | Push (deploy sonrası): I **ön planda**, A'da 5 sn ağlama. | I'da tek bir uyarı (uygulama içi alarm); çift bildirim yok. | ✅/❌ |
+| P2 | Herhangi | A→I | I'da uygulamayı **arka plana** alın (Home), ekranı kilitleyin; A'da 5 sn ağlama. | Birkaç saniye içinde I'ya "Bebek ağlıyor" push'u. | ✅/❌ + gecikme: |
+| P3 | Herhangi | A→I ve I→A | Ebeveyn uygulamasını **tamamen kapatın** (son uygulamalardan kaydırın); bebekte 5 sn ağlama. Yönü çevirip tekrarlayın. | İki yönde de ebeveyne push gelir. I→A'da bu, iPhone bebeğin ebeveyn yokken de ağlamayı algıladığını gösterir. | A→I ✅/❌ I→A ✅/❌ |
+| OFF | — | — | Offline mod (Nearby). | **2. Android gerekli.** iPhone'da offline seçeneği yok (yalnızca Android). 2. Android bulunca bölüm 3 + 3.11. | atlandı |
+
+**Bir şey ❌ çıkarsa:** İki log dosyasını (`android_logcat.txt`, `iphone_run.log`) ve Xcode Console'dan ilgili satırları saklayın. Notunuza testin numarasını ve saatini yazın.
+
+---
 
 ## ★ Önce bunu okuyun: emülatörde ne test edildi, telefonda ne kaldı
 
@@ -13,7 +83,7 @@ Otonom oturumda (22.11.2026) iki Android emülatöründe ve iki iOS simülatör�
 |---|---|---|---|
 | G1 | Temiz kurulum: izin diyalogları, pil optimizasyonu, ebeveynde bildirim izni | 1.1, 1.6, 12.36 | Testlerde izinler `adb pm grant` ile verildi; diyaloglar hiç görünmedi. |
 | G2 | Bebek Wi-Fi, ebeveyn **mobil veri**: bağlan, 5 dk izle | 2B.1, 2B.3 | İki emülatör aynı makinede, NAT/TURN sorunu oluşmuyor (B07). |
-| G3 | Offline: yayın, arama, bağlan, ses, sessizlik, uzaklaşma, 20 sn kayıt; `fix/audio-license` sürümüyle ses (3.11) | 3.1–3.3, 3.7, 3.9, 3.11, 12.3 | Nearby Connections emülatörde çalışmıyor. |
+| G3 | Offline: yayın, arama, bağlan, ses, sessizlik, uzaklaşma, 20 sn kayıt; yeni offline ses (3.11) | 3.1–3.3, 3.7, 3.9, 3.11, 12.3 | Nearby Connections emülatörde çalışmıyor. |
 | G4 | Function deploy edildikten sonra: ebeveyn arka planda / kilitli / kapalı → push | 12.39–12.42, 5.3–5.5 | Emülatörde Function çalıştı ama gerçek FCM gönderilmedi (DECISIONS A3). |
 | G5 | Gerçek ağlama sesiyle eşik ayarı ve online/offline dB farkı | 12.13, 12.17, 5.9 | Testlerde ses seviyesi `DebugHooks.fakeNoiseDb` ile taklit edildi. |
 | G6 | Gecikme ve ses kalitesi | 4.1, 4.3 | Emülatörde kamera/mikrofon sanal. |
@@ -34,7 +104,7 @@ Otonom oturumda (22.11.2026) iki Android emülatöründe ve iki iOS simülatör�
 | 2A.4 | ✅ | Hayır | Bebek kesince oda siliniyor |
 | 2B.1–2B.3 | — | **Evet** (G2) | |
 | 3.1–3.10 | — | **Evet** (G3: 3.1–3.3, 3.7, 3.9) | Nearby emülatörde yok |
-| 3.11 | Kısmen: yeni ses kanalının mikrofon ve oynatıcısı emülatörde ✅ (smoke test); Nearby üzerinden — | **Evet** (G3) | B68: `sound_stream` yerine kendi kanalımız |
+| 3.11 | Kısmen: yeni ses kanalının mikrofon ve oynatıcısı emülatörde ✅ (smoke test); Nearby üzerinden — | **Evet** (G3) | B68: `sound_stream` yerine `record` + kendi oynatıcımız |
 | 4.1–4.4 | — | **Evet** (G6: 4.1, 4.3) | |
 | 5.1 | ✅ | Hayır | Sahte ağlama: 70 sn'de 2 alarm (60 sn sınırı) |
 | 5.2 | — | Hayır | |
@@ -210,7 +280,7 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 3.8 | 3.3 | E'de pil göstergesine bakın. | B'nin pil yüzdesi görünür; B şarja takılınca "şarj oluyor" olur (1 dk içinde). | ✅/❌ + not: |
 | 3.9 | Bağlıyken | İki cihazı 15–20 m uzaklaştırın, sonra geri getirin. | Bağlantı koparsa E'de "bağlı değil" durumu görünür. Geri getirince **otomatik bağlanmaz**; E'den yeniden arama gerekir (B39, bilinen eksik). | ✅/❌ + not: |
 | 3.10 | Bağlıyken | B'de Bluetooth'u kapatıp açın. | Uygulama çökmez; yeniden arama ile tekrar bağlanılabilir. | ✅/❌ + not: |
-| 3.11 | **`fix/audio-license` sürümü iki telefona kurulu** (B68), offline bağlı | 1) E'de B'nin yanındaki konuşmayı 1 dk dinleyin. 2) B'nin mikrofonunu kapatın (sessizlik). 3) Ağlama sesi çalın. 4) E'de bağlantıyı kesip yeniden bağlanın; B'de offline ↔ online modu bir kez değiştirip geri gelin. | 1) Ses anlaşılır, cızırtı ve takılma yok; `dev` sürümüyle aynı kalitede. 2) Ses çubuğu ~0'a iner. 3) dB değerleri `dev` sürümüyle aynı aralıkta; ~2 sn sonra alarm. 4) Ses yeniden gelir; logda `Offline microphone error` / `AudioTrack` hatası yok. İlk açılışta kamera izninden sonra mikrofon izni sorulur. | ✅/❌ + not: |
+| 3.11 | **Güncel `dev` sürümü iki Android'e kurulu** (B68: `record` + kendi oynatıcımız), offline bağlı | 1) E'de B'nin yanındaki konuşmayı 1 dk dinleyin. 2) B'nin mikrofonunu kapatın (sessizlik). 3) Ağlama sesi çalın. 4) E'de bağlantıyı kesip yeniden bağlanın; B'de offline ↔ online modu bir kez değiştirip geri gelin. | 1) Ses anlaşılır, cızırtı ve takılma yok; eski sürümle (`sound_stream`) aynı kalitede. 2) Ses çubuğu ~0'a iner. 3) dB değerleri online moddakiyle aynı aralıkta; ~2 sn sonra alarm. 4) Ses yeniden gelir; logda `Offline microphone error` / `AudioTrack` hatası yok. İlk açılışta kamera izninden sonra mikrofon izni sorulur. | ✅/❌ + not: |
 
 ## 4. Görüntü/ses kalitesi ve gecikme
 

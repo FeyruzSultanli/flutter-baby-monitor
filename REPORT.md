@@ -1,6 +1,40 @@
 # REPORT.md — Otonom oturum raporu (21–22.11.2026)
 
-## Sabah özeti
+## Güncel durum (22.11.2026 öğleden sonra): 1 Android + 1 iPhone testine hazır
+
+**Ne değişti (`dev`):**
+1. **`sound_stream` (GPL-3.0) kaldırıldı (B68).**
+   - Mikrofon artık `record` paketiyle (BSD-3), Android ve iOS'ta.
+   - Offline ebeveyn tarafında kendi küçük oynatıcımız var (`AudioTrack`).
+   - Lisans taraması: 165 paket, GPL/LGPL/AGPL yok (DECISIONS A16).
+2. **Ebeveyn bağlı değilken ağlama algılanmıyordu (B70).**
+   - Simülatörde ölçüldü: WebRTC, görüşme kurulmadan mikrofonu açmıyor; bu durumda ses seviyesi 0. Bu, iPhone'u ve büyük olasılıkla Android'i de etkiliyordu.
+   - Artık beklemede `record`, görüşmede WebRTC ölçüyor; ikisi aynı anda mikrofonu tutmuyor.
+   - Ebeveyn uygulamayı kapatırsa bebek beklemeye dönüp ölçmeye devam ediyor. Push'un asıl senaryosu bu.
+3. **iPhone'a push gitmesi için düzeltmeler (B69):**
+   - `aps-environment` entitlement'ı eklendi.
+   - APNs kaydını uygulama kendisi istiyor (UIScene geçişinden sonra eklenti bunu yapmıyordu).
+   - FCM token APNs token'ını bekliyor.
+   - Loglarda `Push: ...` satırları var.
+4. **iOS imzalama:** Automatic signing açık (Debug/Release/Profile); Team'i siz seçeceksiniz. Bundle ID'ler eşleşiyor.
+5. **Function:** `REGION = europe-west1` (eur3). Deploy komutları hazır; kurallar sonraya kaldı.
+6. **TEST_PLAN.md:** En başta "1 Android + 1 iPhone" listesi (G-AI: AI-1…AI-12, P1–P3), log toplama komutlarıyla.
+
+**Doğrulama:**
+- `flutter analyze`: 0 hata/uyarı. `flutter test`: 96/96. Android debug ve iOS derlemesi ✅. Function testleri 8/8.
+- `record` mikrofonu Android emülatöründe ve iOS simülatöründe çalıştı (~16 kHz PCM16).
+- iOS'ta `record` → WebRTC mikrofon devri simülatörde çalıştı.
+- **Doğrulanamayan:** APNs zinciri, çünkü simülatör APNs'e yanıt vermiyor (BLOCKERS 6). Gerçek ses kalibrasyonu ve offline (2. Android gerekli).
+
+**Sizin sıranız:**
+1. **Xcode'da Team'i seçin** (aşağıda "iOS: sizin yapmanız gerekenler", 1–3).
+2. **Function'ı deploy edin.** Komutlar PLAN_NEXT.md → "D2 deploy adımları": `login` → `use bebekmonitor-282fd` → `npm --prefix functions ci && npm --prefix functions test` → `deploy --only functions`. **Firestore kurallarını şimdi yayınlamayın.**
+3. **İki telefona kurun ve TEST_PLAN.md → G-AI listesini yapın;** logları toplayın.
+4. **Sonra:** sonuçları bana getirin. Kurallar (D3 adım 3) ve TTL politikaları, telefon testi bitince yayınlanacak. TURN (D4) ve foreground service (7. adım) kararları da test sonuçlarına göre verilecek.
+
+---
+
+## Sabah özeti (gece oturumu)
 
 1. **Yapıldı:** D2/D3 uygulama değişiklikleri bağımsız olarak incelendi; 6 bulgu düzeltildi (B55–B60). Android ve iOS için emülatörde çalışan uçtan uca testler yazıldı. Bu testler 7 hata daha buldu ve hepsi düzeltildi (B61–B67).
 2. **Android ↔ Android (API 35 Google Play emülatörleri):** 44/44 kontrol ✅. Kapsam: oda kodu, WebRTC, yanlış/süresi geçmiş kod, üçüncü cihazın reddi, ağlama alarmı (2 sn kuralı, 60 sn sınırı), alarm geçmişi, eşik senkronu, yeniden katılma, uçak modundan dönüş, gece modu, kayıt, galeri, dil, tema.
@@ -103,22 +137,20 @@
 - **Bilinen:** `flutter build ios --simulator` Flutter 3.44'te hata veriyor; `flutter run` / `flutter test -d <udid>` çalışıyor (DECISIONS A12). Gerçek cihaz derlemesi etkilenmiyor.
 - **Android ↔ iOS offline:** Kod yazılmadı. Seçenekler PLAN_NEXT.md §6'da.
 
-### iOS: sizin yapmanız gerekenler
+### iOS: sizin yapmanız gerekenler (ücretli hesap var, APNs anahtarı yüklendi)
 
-1. **Apple Developer hesabı:** Ücretsiz Apple ID ile kendi iPhone'unuza 7 günlük kurulum yapabilirsiniz. Push için ücretli Apple Developer Program (yıllık 99 USD) gerekir.
-2. **İmzalama:**
-   - `ios/Runner.xcworkspace`'i Xcode'da açın.
-   - Runner → Signing & Capabilities → Team'i seçin.
-   - Bundle ID `com.feyruz.bebekmonitorclean` kalabilir. Değiştirirseniz Firebase'de yeni bir iOS uygulaması ve yeni bir `GoogleService-Info.plist` gerekir.
-3. **Capability ekleyin:** "+ Capability" → **Push Notifications** ve **Background Modes** (Audio ile Remote notifications işaretli; Info.plist'te hazır).
-4. **APNs anahtarı:**
-   - developer.apple.com → Certificates, IDs & Profiles → Keys → "+" → Apple Push Notifications service (APNs) → `.p8` dosyasını indirin. Key ID ve Team ID'yi not edin.
-   - Firebase konsolu → Proje ayarları → Cloud Messaging → Apple uygulaması → APNs Authentication Key → `.p8`'i, Key ID'yi ve Team ID'yi yükleyin.
-5. **iPhone'a kurulum:**
-   - iPhone'u kabloyla bağlayın, Ayarlar → Gizlilik ve Güvenlik → Geliştirici Modu'nu açın.
-   - `flutter run -d <iphone>` (ya da Xcode'da ▶).
-   - İlk açılışta Ayarlar → Genel → VPN ve Cihaz Yönetimi → geliştirici sertifikasına güvenin.
-6. **Test:** TEST_PLAN.md bölüm 13.
+1. **Xcode'da Team seçimi:**
+   - Terminalde `open /Users/feyruz/Desktop/baby_monitor_app/ios/Runner.xcworkspace` ile projeyi açın (`.xcodeproj` değil).
+   - Sol üstteki Project navigator'da mavi **Runner** proje simgesine tıklayın.
+   - Ortadaki panelde **TARGETS → Runner** seçin, üstteki **Signing & Capabilities** sekmesine geçin.
+   - Sekmenin üstündeki **All** düğmesini seçin (Debug/Release/Profile üçü birden). **Automatically manage signing** işaretli olmalı.
+   - **Team** açılır listesinden ücretli hesabınızın takımını seçin ("Personal Team" olanı değil).
+   - Projede şu an kayıtlı Team ID `U374S5G5L5`. Sizinki farklıysa Xcode kendisi günceller.
+2. **Kontrol (aynı sekmede):**
+   - **Push Notifications** ve **Background Modes** (Audio, AirPlay, and Picture in Picture + Remote notifications işaretli) listede görünmeli. Görünmüyorsa "+ Capability" ile ekleyin; ayarlar dosyada hazır.
+   - "Provisioning Profile: Xcode Managed Profile" yazmalı, kırmızı hata olmamalı.
+3. **Bundle ID:** `com.feyruz.bebekmonitorclean`, `GoogleService-Info.plist`'teki `BUNDLE_ID` ile aynı. Xcode "bu bundle ID kullanılamıyor" derse (başka bir takıma kayıtlıysa) bana yazın: yeni ID için Firebase'de yeni iOS uygulaması ve yeni plist gerekir.
+4. **iPhone'a kurulum:** TEST_PLAN.md → G-AI → Hazırlık (`flutter run --profile -d <IPHONE_ID>`). İlk açılışta Ayarlar → Genel → VPN ve Cihaz Yönetimi → geliştirici sertifikasına güvenin.
 
 ## Genel durum: D kararları ve açık konular
 

@@ -43,29 +43,68 @@
 
 Kural testlerini yerelde tekrar çalıştırmak için `firestore-tests/README.md`'ye bakın. Testler emülatörde çalışır; Android Studio JDK'sı kullanılır ve gerçek projeye dokunulmaz.
 
-### D2 deploy adımları (Blaze kararından sonra)
+### D2 deploy adımları
 
-1. Firebase konsolu → **Upgrade → Blaze**. Ardından Google Cloud Console → Billing → **Budgets & alerts** altında bir bütçe uyarısı kurulmasını öneririm (ör. 1 $).
-2. Firebase konsolu → Firestore → veritabanı **konumuna** bakın. `functions/src/index.ts` içindeki `REGION` değerini buna göre ayarlayın (ör. `eur3` → `europe-west1`, `nam5` → `us-central1`). İsterseniz konumu bana söyleyin, ben ayarlarım.
-3. İlk seferde Firebase'e giriş yapın:
+Durum (22.11.2026, Cavid):
+- Blaze plana geçildi.
+- Anonymous giriş açıldı.
+- APNs anahtarı (Team Scoped, Sandbox & Production) Firebase'e yüklendi.
+- Firestore konumu `eur3` olduğu için `REGION = 'europe-west1'` yapıldı.
+- **Firestore kuralları telefon testinden sonra** deploy edilecek, aşağıdaki komutlara dahil değil. Function, Admin SDK kullandığı için kurallardan etkilenmez.
+- Bütçe uyarısı önerim: Google Cloud Console → Billing → **Budgets & alerts** (ör. 1 $).
+
+Komutlar (Mac'te, sırayla; `login` tarayıcıda Google hesabınızı sorar):
+
+1. Proje klasörüne geçin:
 
    ```bash
-   cd functions && npm install && npx firebase-tools login
+   cd /Users/feyruz/Desktop/baby_monitor_app
    ```
 
-4. Deploy edin:
+2. Giriş yapın:
 
    ```bash
-   cd functions && npm run deploy
+   npx firebase-tools@latest login
    ```
 
-   İlk deploy'da Cloud Functions, Cloud Build, Artifact Registry ve Eventarc API'lerinin açılması için onay istenebilir.
-5. TEST_PLAN 12.39–12.43.
+3. Projeyi seçin; bu klasör için varsayılan proje olur ve `.firebaserc` dosyası oluşur:
+
+   ```bash
+   npx firebase-tools@latest use bebekmonitor-282fd
+   ```
+
+4. Function'ı derleyip testlerini çalıştırın (8/8 geçmeli):
+
+   ```bash
+   npm --prefix functions ci && npm --prefix functions test
+   ```
+
+5. Yalnızca Function'ı deploy edin:
+
+   ```bash
+   npx firebase-tools@latest deploy --only functions --project bebekmonitor-282fd
+   ```
+
+   İlk deploy'da Cloud Functions, Cloud Build, Artifact Registry, Eventarc ve Cloud Run API'lerini açmak için onay istenir ("y"). İmaj temizleme politikası sorulursa `1` gün yeterli. Sonunda `onCryAlertCreated(europe-west1)` satırı görünmeli.
+
+6. Kontrol: bir ağlama alarmından sonra loga bakın:
+
+   ```bash
+   npx firebase-tools@latest functions:log --only onCryAlertCreated --project bebekmonitor-282fd
+   ```
+
+Sonra TEST_PLAN G-AI listesinde P1–P3.
 
 Geri almak için:
 
 ```bash
-npx firebase-tools functions:delete onCryAlertCreated --project bebekmonitor-282fd
+npx firebase-tools@latest functions:delete onCryAlertCreated --region europe-west1 --project bebekmonitor-282fd
+```
+
+Firestore kuralları (telefon testinden sonra, ayrı adım; bkz. "D3 + D8 için konsol adımları"):
+
+```bash
+npx firebase-tools@latest deploy --only firestore:rules --project bebekmonitor-282fd
 ```
 
 Kararlar (kullanıcı):
