@@ -398,7 +398,7 @@ class BabyLiveScreen extends StatelessWidget {
     final c = context.watch<MonitorController>();
     final connected = c.isConnected;
     final media = MediaQuery.of(context);
-    final cameraHeight = (media.size.height * 0.25).clamp(150.0, 230.0);
+    final cameraHeight = (media.size.height * 0.24).clamp(150.0, 230.0);
 
     Future<void> end() async {
       if (await confirmEndBroadcast(context)) await c.leaveRole();
@@ -622,12 +622,38 @@ class _BabyHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        StatusPill(
-          key: Key(connected ? 'linkConnected' : 'linkNotConnected'),
-          label: connected ? l10n.linkShortOk : l10n.linkShortWait,
-          semanticLabel: connected ? l10n.parentConnected : l10n.parentWaiting,
-          tone: connected ? PillTone.mint : PillTone.neutral,
-        ),
+        // Narrow phones (Huawei RNE-L01, long AZ names): the link pill shows
+        // only its dot, with the full label for screen readers (V2.1 §4.2).
+        if (MediaQuery.sizeOf(context).width < 380 && (c.roomName ?? l10n.defaultRoomName).length > 9)
+          Semantics(
+            key: Key(connected ? 'linkConnected' : 'linkNotConnected'),
+            label: connected ? l10n.parentConnected : l10n.parentWaiting,
+            excludeSemantics: true,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: connected ? NinniColors.mintPillOnNight : NinniColors.night800,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: connected ? NinniColors.mint : NinniColors.onNightMuted,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          )
+        else
+          StatusPill(
+            key: Key(connected ? 'linkConnected' : 'linkNotConnected'),
+            label: connected ? l10n.linkShortOk : l10n.linkShortWait,
+            semanticLabel: connected ? l10n.parentConnected : l10n.parentWaiting,
+            tone: connected ? PillTone.mint : PillTone.neutral,
+          ),
         const SizedBox(width: 6),
         StatusPill(
           label: battery,
