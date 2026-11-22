@@ -219,6 +219,25 @@ class WebRTCService {
     }
   }
 
+  /// Parent: video frames decoded so far (inbound RTP), or null. Used to
+  /// check that frames reach the recorder before it is stopped (B72).
+  Future<int?> getInboundVideoFrames() async {
+    final pc = _peerConnection;
+    if (pc == null) return null;
+    try {
+      for (final report in await pc.getStats()) {
+        if (report.type != 'inbound-rtp') continue;
+        final kind = report.values['kind'] ?? report.values['mediaType'];
+        if (kind != 'video') continue;
+        final frames = report.values['framesDecoded'] ?? report.values['framesReceived'];
+        if (frames is num) return frames.toInt();
+      }
+    } catch (e) {
+      debugPrint('getStats (frames) error: $e');
+    }
+    return null;
+  }
+
   /// Parent: mutes/unmutes the baby's audio locally, e.g. when background
   /// listening is turned off and the app goes to the background (V2 5.10).
   void setRemoteAudioEnabled(bool enabled) {

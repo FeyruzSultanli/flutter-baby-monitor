@@ -337,6 +337,8 @@ class AppLocalizations {
       'tonight': 'Tonight',
       'totalCryLabel': 'total crying',
       'waitingForParent': 'Waiting for the parent phone',
+      'recordingSaved': 'Recording saved to the gallery',
+      'recordingNoPicture': 'No picture arrived, so nothing was recorded',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -659,6 +661,8 @@ class AppLocalizations {
       'tonight': 'Bu gece',
       'totalCryLabel': 'toplam ağlama',
       'waitingForParent': 'Ebeveyn telefonu bekleniyor',
+      'recordingSaved': 'Kayıt galeriye kaydedildi',
+      'recordingNoPicture': 'Görüntü gelmediği için kayıt yapılamadı',
     },
   };
 
@@ -985,6 +989,8 @@ class AppLocalizations {
   String get tonight => _t('tonight');
   String get totalCryLabel => _t('totalCryLabel');
   String get waitingForParent => _t('waitingForParent');
+  String get recordingSaved => _t('recordingSaved');
+  String get recordingNoPicture => _t('recordingNoPicture');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

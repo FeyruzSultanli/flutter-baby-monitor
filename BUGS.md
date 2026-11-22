@@ -541,6 +541,12 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Neden:** Oda anlık görüntüleri teklifi her güncellemede tekrar veriyor. İki görüntü art arda gelince `onOffer` dinleyicisi iki kez çalışıyor; ikisi de `getRemoteDescription()` beklerken "henüz yok" görüp cevap üretmeye başlıyor. Bağlantı koptu bekçisinin 2 sn'lik `getStats` çağrıları zamanlamayı değiştirip bunu görünür kıldı; hata eskiden de vardı.
 - **Düzeltme:** `webrtc_service.dart`: ilk `await`'ten önce eşzamanlı bir bayrak; hata yakalanıyor ve durum `FAILED` yapılıyor (otomatik yeniden katılma devralır).
 
+### B72 — Görüntü gelmezken kayıt durdurulursa uygulama çöküyor (Yüksek) — ✅ önlem alındı
+- **Bulan:** Ninni v2 Faz 2 E2E (`test-results/20261122-182726-android`): ağ kesintisinden hemen sonra 6 sn'lik kayıt, durdururken ebeveyn uygulaması kapandı.
+- **Neden:** flutter_webrtc 0.12.12 Android `VideoFileRenderer.release()`, `MediaMuxer`'ı hiç başlamamış olsa bile (`muxerStarted == false`, yani kodlayıcıya hiç kare ulaşmamış) `stop()` ediyor; `IllegalStateException` yerel bir thread'de atılıyor ve uygulamayı kapatıyor. Dart'tan yakalanamaz.
+- **Önlem:** `VideoRecorderService`: başlangıçtaki ve durdurmadaki gelen kare sayısı (`framesDecoded`) karşılaştırılıyor; en az 1,5 sn ve 15 kare geçmeden yerel `stop()` çağrılmıyor (en fazla 4 sn beklenir). Kare gelmediyse kayıt bırakılıyor, kullanıcıya "Görüntü gelmediği için kayıt yapılamadı" deniyor.
+- **Kalan:** Eklentide düzeltilmesi gerekir (yukarı akışa hata bildirimi). Önlem, kare sayacı alınamayan (istatistik yok) durumda eski davranışa döner.
+
 ## Hiç çalışmayan veya yarım kalmış özellikler
 
 1. **Arka planda izleme:** İki cihazda da yok (B01, B02).

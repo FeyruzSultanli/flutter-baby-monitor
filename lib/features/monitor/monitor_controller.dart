@@ -2242,9 +2242,11 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         await _recorderService.stopAny();
         if (mounted) {
           setState(() {});
-          _messenger?.showSnackBar(
-            SnackBar(content: Text('${l10n.videoGallery} ${l10n.recordings}')),
-          );
+          _messenger?.showSnackBar(SnackBar(
+            content: Text(_recorderService.lastStopDroppedNoFrames
+                ? l10n.recordingNoPicture
+                : l10n.recordingSaved),
+          ));
         }
       } else {
         // Start Recording
@@ -2268,7 +2270,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         } else {
           final stream = _webrtcService?.remoteRenderer.srcObject;
           if (stream != null) {
-            await _recorderService.startWebRTCRecording(stream);
+            await _recorderService.startWebRTCRecording(stream,
+                framesProbe: () async => await _webrtcService?.getInboundVideoFrames());
           } else {
             if (mounted) {
               _messenger?.showSnackBar(

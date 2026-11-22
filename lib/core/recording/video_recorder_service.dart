@@ -53,9 +53,23 @@ class VideoRecorderService {
     }
   }
 
+  // B72: flutter_webrtc's Android recorder stops its MediaMuxer even when
+  // the muxer never started (no frame reached the encoder), which throws on
+  // a native thread and kills the app. Frames are counted (inbound RTP)
+  // and the native stop is only called once enough frames went through.
+  Future<int?> Function()? _framesProbe;
+  int? _framesAtStart;
+  DateTime? _webrtcStartedAt;
+  static const int _minFramesBeforeStop = 15;
+
+  /// True after [stopAny] when a WebRTC recording had to be dropped because
+  /// no picture arrived (B72); the caller tells the user.
+  bool lastStopDroppedNoFrames = false;
+
   /// Starts recording a WebRTC MediaStream.
-  /// Returns the path where the video is being recorded.
-  Future<String> startWebRTCRecording(MediaStream stream) async {
+  /// Returns the path where the video is being recorded. [framesProbe]
+  /// returns the decoded video frame count (see B72).
+  Future<String> startWebRTCRecording(MediaStream stream, {Future<int?> Function()? framesProbe}) async {
     if (isRecording) throw Exception("Already recording");
 
     final appDir = await getApplicationDocumentsDirectory();
@@ -72,6 +86,10 @@ class VideoRecorderService {
       throw Exception('No video track to record');
     }
 
+    _framesProbe = framesProbe;
+    _framesAtStart = await framesProbe?.call();
+    _webrtcStartedAt = DateTime.now();
+    lastStopDroppedNoFrames = false;
     final recorder = MediaRecorder();
     _mediaRecorder = recorder;
     // Set before the async start so a stopAny() racing the start can stop
@@ -102,6 +120,20 @@ class VideoRecorderService {
     final recorder = _mediaRecorder;
     if (recorder == null) return;
 
+    if (!await _framesWentThrough()) {
+      // Never call the native stop here (it would crash the app, B72). The
+      // native recorder stays attached until the stream goes away.
+      debugPrint('Recording dropped: no video frames arrived (B72)');
+      _mediaRecorder = null;
+      _webrtcFilePath = null;
+      lastStopDroppedNoFrames = true;
+      try {
+        final file = File(filePath);
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+      return;
+    }
+
     try {
       await recorder.stop();
     } finally {
@@ -127,6 +159,26 @@ class VideoRecorderService {
 
     // Save to Gallery
     await _saveToGallery(filePath, isVideo: true);
+  }
+
+  /// Waits (bounded) until at least [_minFramesBeforeStop] frames were
+  /// decoded since the start and 1.5 s passed. Without a probe it only waits.
+  Future<bool> _framesWentThrough() async {
+    final started = _webrtcStartedAt ?? DateTime.now();
+    final minEnd = started.add(const Duration(milliseconds: 1500));
+    final now = DateTime.now();
+    if (now.isBefore(minEnd)) await Future<void>.delayed(minEnd.difference(now));
+    final probe = _framesProbe;
+    final base = _framesAtStart;
+    if (probe == null || base == null) return true;
+    final deadline = DateTime.now().add(const Duration(seconds: 4));
+    while (true) {
+      final frames = await probe();
+      if (frames == null) return true; // no stats: keep the old behavior
+      if (frames - base >= _minFramesBeforeStop) return true;
+      if (DateTime.now().isAfter(deadline)) return false;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
   }
 
   /// Starts offline recording (collecting frames).
