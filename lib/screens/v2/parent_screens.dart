@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/pairing/recent_room_store.dart';
 import '../../core/pairing/room_code.dart';
 import '../../features/monitor/monitor_controller.dart';
 import '../../l10n/app_localizations.dart';
@@ -11,6 +12,8 @@ import '../../theme/app_theme.dart';
 import '../../theme/components/components.dart';
 import '../../theme/tokens.dart';
 import 'alert_history_v2_screen.dart';
+import 'lullaby_sheet.dart';
+import 'qr_scan_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/live_video.dart';
 
@@ -82,6 +85,21 @@ class _ParentJoinScreenState extends State<ParentJoinScreen> {
                     semanticLabel: l10n.roomCode,
                     onSubmitted: (_) => _join(c),
                   ),
+                  const SizedBox(height: 24),
+                  NinniButton(
+                    key: const Key('scanQrButton'),
+                    label: l10n.scanQr,
+                    icon: Icons.qr_code_scanner_rounded,
+                    variant: NinniButtonVariant.secondary,
+                    onPressed: () async {
+                      final code = await Navigator.of(context).push<String>(
+                        MaterialPageRoute(builder: (_) => const QrScanScreen()),
+                      );
+                      if (code == null || !mounted) return;
+                      _code.text = code;
+                      await _join(c);
+                    },
+                  ),
                   if (error != null) ...[
                     const SizedBox(height: 10),
                     Semantics(
@@ -93,6 +111,19 @@ class _ParentJoinScreenState extends State<ParentJoinScreen> {
                   ],
                 ],
               ),
+              if (c.recentRooms.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SectionLabel(l10n.recentRoom, padding: EdgeInsets.zero),
+                    const SizedBox(height: 10),
+                    _RecentRoomCard(
+                      room: c.recentRooms.first,
+                      busy: c.pairingBusy,
+                      onTap: () => c.joinRoom(c.recentRooms.first.code),
+                    ),
+                  ],
+                ),
             ],
           ],
           footer: [
@@ -105,6 +136,61 @@ class _ParentJoinScreenState extends State<ParentJoinScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RecentRoomCard extends StatelessWidget {
+  const _RecentRoomCard({required this.room, required this.busy, required this.onTap});
+  final RecentRoom room;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = NinniPalette.of(context);
+    final now = DateTime.now();
+    final day = DateTime(room.joinedAt.year, room.joinedAt.month, room.joinedAt.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final time = DateFormat.Hm().format(room.joinedAt);
+    final when = day == today
+        ? '${l10n.today} $time'
+        : day == today.subtract(const Duration(days: 1))
+            ? '${l10n.yesterdayLower} $time'
+            : DateFormat('d MMM HH:mm', l10n.locale.languageCode).format(room.joinedAt);
+    return SectionCard(
+      key: const Key('recentRoomCard'),
+      radius: NinniRadii.r20,
+      padding: const EdgeInsets.all(14),
+      onTap: busy ? null : onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: NinniColors.night900, borderRadius: BorderRadius.circular(NinniRadii.r14)),
+            child: const Center(child: BassinetIcon(size: 24, color: NinniColors.cream50)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(room.name ?? l10n.defaultRoomName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: p.text)),
+                const SizedBox(height: 2),
+                Text('${RoomCode.format(room.code)} · $when',
+                    style: NinniType.numeric(NinniType.caption.copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: p.textMuted))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(l10n.reconnect, style: NinniType.bodySm.copyWith(fontSize: 14, fontWeight: FontWeight.w700, color: p.accentText)),
+        ],
       ),
     );
   }
@@ -381,8 +467,22 @@ class ParentLiveScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 16),
+                          if (!c.isOffline) ...[
+                            _TalkButton(controller: c),
+                            const SizedBox(height: 16),
+                          ],
                           Row(
                             children: [
+                              Expanded(
+                                child: IconTile(
+                                  key: const Key('lullabyButton'),
+                                  label: l10n.lullabyShort,
+                                  icon: Icons.music_note_rounded,
+                                  active: c.soothe.isPlayingAt(DateTime.now()) || c.nightLight.on,
+                                  onTap: () => showLullabySheet(context),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: IconTile(
                                   key: const Key('recordButton'),
@@ -428,6 +528,64 @@ class ParentLiveScreen extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Hold to talk to the baby" (V2 5.3).
+class _TalkButton extends StatelessWidget {
+  const _TalkButton({required this.controller});
+  final MonitorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final c = controller;
+    final enabled = c.canTalk;
+    final talking = c.talking;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: talking ? l10n.talkingNow : l10n.holdToTalk,
+      hint: l10n.holdToTalkHint,
+      excludeSemantics: true,
+      // Screen readers cannot hold: a double tap toggles talking for them.
+      onTap: enabled ? () => talking ? c.stopTalking() : c.startTalking() : null,
+      child: GestureDetector(
+        key: const Key('talkButton'),
+        onTapDown: enabled ? (_) => c.startTalking() : null,
+        onTapUp: enabled ? (_) => c.stopTalking() : null,
+        onTapCancel: enabled ? c.stopTalking : null,
+        child: AnimatedScale(
+          scale: talking ? 0.97 : 1,
+          duration: NinniDurations.fast,
+          child: AnimatedContainer(
+            duration: NinniDurations.fast,
+            constraints: const BoxConstraints(minHeight: 64),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            decoration: BoxDecoration(
+              color: !enabled
+                  ? NinniColors.primary.withValues(alpha: 0.45)
+                  : (talking ? NinniColors.primaryGlow : NinniColors.primary),
+              borderRadius: BorderRadius.circular(NinniRadii.r22),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(talking ? Icons.mic_rounded : Icons.mic_none_rounded, color: NinniColors.white),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    talking ? l10n.talkingNow : l10n.holdToTalk,
+                    textAlign: TextAlign.center,
+                    style: NinniType.body.copyWith(fontWeight: FontWeight.w800, color: NinniColors.white),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

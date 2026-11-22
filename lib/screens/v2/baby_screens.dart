@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/pairing/pairing_service.dart';
@@ -13,6 +14,79 @@ import '../../theme/components/components.dart';
 import '../../theme/tokens.dart';
 import 'baby_night_view.dart';
 import 'widgets/live_video.dart';
+
+/// Baby: give the room a name (shown on the parent phone, V2 5.2).
+Future<void> renameRoom(BuildContext context, MonitorController c) async {
+  final l10n = AppLocalizations.of(context);
+  final controller = TextEditingController(text: c.roomName ?? l10n.defaultRoomName);
+  final name = await showDialog<String>(
+    context: context,
+    builder: (ctx) => NightTheme(
+      child: AlertDialog(
+        title: Text(l10n.roomNameTitle),
+        content: TextField(
+          key: const Key('roomNameField'),
+          controller: controller,
+          autofocus: true,
+          maxLength: 24,
+          textCapitalization: TextCapitalization.sentences,
+          style: NinniType.body.copyWith(color: NinniColors.onNight),
+          decoration: InputDecoration(hintText: l10n.defaultRoomName, counterText: ''),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: Text(l10n.save)),
+        ],
+      ),
+    ),
+  );
+  controller.dispose();
+  if (name != null) await c.setRoomName(name);
+}
+
+class _RoomNameRow extends StatelessWidget {
+  const _RoomNameRow({required this.name, required this.onRename});
+  final String? name;
+  final VoidCallback onRename;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Semantics(
+      button: true,
+      label: '${l10n.roomNameTitle}: ${name ?? l10n.defaultRoomName}',
+      excludeSemantics: true,
+      child: InkWell(
+        key: const Key('roomNameRow'),
+        borderRadius: BorderRadius.circular(NinniRadii.r14),
+        onTap: onRename,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: NinniSpace.touch),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.edit_outlined, size: 16, color: NinniColors.onNightMuted),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: '${l10n.roomNameTitle}: '),
+                    TextSpan(
+                      text: name ?? l10n.defaultRoomName,
+                      style: const TextStyle(color: NinniColors.onNight, fontWeight: FontWeight.w700),
+                    ),
+                  ]),
+                  style: NinniType.label.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600, color: NinniColors.onNightMuted),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 Future<bool> confirmEndBroadcast(BuildContext context) async {
   final l10n = AppLocalizations.of(context);
@@ -104,7 +178,7 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
       children.addAll([
         ScreenHeading(
           title: l10n.babyPairingTitle,
-          subtitle: l10n.babyPairingSubtitle,
+          subtitle: l10n.babyPairingSubtitleQr,
           style: NinniType.h1.copyWith(fontSize: 28, letterSpacing: -0.7),
         ),
         SectionCard(
@@ -113,8 +187,31 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Column(
             children: [
-              if (code != null && !expired)
-                CodeBoxes.display(code: code)
+              if (code != null && !expired) ...[
+                CodeBoxes.display(code: code),
+                const SizedBox(height: 18),
+                Semantics(
+                  label: l10n.qrSemantic,
+                  child: Container(
+                    key: const Key('roomQr'),
+                    width: 168,
+                    height: 168,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: NinniColors.cream50,
+                      borderRadius: BorderRadius.circular(NinniRadii.r20),
+                    ),
+                    child: QrImageView(
+                      data: RoomCode.joinUri(code),
+                      padding: EdgeInsets.zero,
+                      backgroundColor: NinniColors.cream50,
+                      eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: NinniColors.night900),
+                      dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square, color: NinniColors.night900),
+                    ),
+                  ),
+                ),
+              ]
               else if (c.pairingBusy || (code == null && c.pairingError == null))
                 const SizedBox(
                   height: 48,
@@ -150,6 +247,8 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
                   variant: NinniButtonVariant.secondary,
                   onPressed: c.startBroadcast,
                 ),
+              const SizedBox(height: 6),
+              _RoomNameRow(name: c.roomName, onRename: () => renameRoom(context, c)),
             ],
           ),
         ),
@@ -185,7 +284,7 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
       child: Scaffold(
         backgroundColor: NinniColors.night900,
         body: ScreenFrame(
-          gap: 24,
+          gap: 20,
           items: children,
           footer: [
             SectionCard(

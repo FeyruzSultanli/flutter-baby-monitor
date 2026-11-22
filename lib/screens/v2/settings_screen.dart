@@ -20,6 +20,7 @@ class SettingsScreen extends StatelessWidget {
   static const List<(String, String)> languages = [
     ('tr', 'Türkçe'),
     ('en', 'English'),
+    ('az', 'Azərbaycanca'),
   ];
 
   @override

@@ -8,7 +8,7 @@ class LanguageProvider extends ChangeNotifier {
   }
 
   static const String _key = 'language';
-  static const List<String> supported = ['tr', 'en'];
+  static const List<String> supported = ['tr', 'en', 'az'];
 
   Locale _locale = const Locale('tr');
 
