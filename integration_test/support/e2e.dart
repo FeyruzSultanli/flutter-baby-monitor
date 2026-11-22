@@ -87,6 +87,29 @@ Future<void> goBack(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 500));
 }
 
+/// Opens the main (⋮) menu and taps the item labelled [label]. Waits for the
+/// popup instead of a fixed delay and retries, because a slow emulator may
+/// not have opened the menu yet (the plain text finder then hits a same-named
+/// widget behind the menu, e.g. the "Ebeveyn Modu" segment).
+Future<void> chooseMenuItem(WidgetTester tester, String label) async {
+  final item = find.descendant(
+    of: find.byWidgetPredicate((w) => w is PopupMenuItem),
+    matching: find.text(label),
+  );
+  for (var attempt = 0; attempt < 3; attempt++) {
+    await tester.tap(find.byKey(const Key('mainMenuButton')));
+    final open = await pumpUntil(tester, () => item.evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
+    if (!open) continue;
+    // Let the open animation finish so the tap lands on the item.
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    await tester.tap(item.last);
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    return;
+  }
+  fail('menu item "$label" did not appear');
+}
+
 /// Pumps for [duration] of real time.
 Future<void> pumpFor(WidgetTester tester, Duration duration) async {
   final end = DateTime.now().add(duration);

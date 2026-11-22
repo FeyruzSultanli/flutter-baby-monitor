@@ -38,16 +38,12 @@ void main() {
     result('parent_anonymous_sign_in', true);
 
     // --- Switch to parent mode ----------------------------------------------
-    await tester.tap(find.byKey(const Key('mainMenuButton')));
-    await pumpFor(tester, const Duration(milliseconds: 800));
-    await tester.tap(find.text(tr('parentMode')).last);
+    await chooseMenuItem(tester, tr('parentMode'));
     await pumpFor(tester, const Duration(seconds: 2));
     screenshot('parent_01_parent_mode');
 
     Future<void> submitCode(String code) async {
-      await tester.tap(find.byKey(const Key('mainMenuButton')));
-      await pumpFor(tester, const Duration(milliseconds: 800));
-      await tester.tap(find.text(tr('enterRoomCode')).last);
+      await chooseMenuItem(tester, tr('enterRoomCode'));
       final sheet = await pumpUntil(tester,
           () => find.byKey(const Key('roomCodeField')).evaluate().isNotEmpty,
           timeout: const Duration(seconds: 10));
@@ -240,21 +236,29 @@ void main() {
     // --- Settings: language and theme ------------------------------------------------
     await tester.tap(find.byKey(const Key('settingsButton')));
     await pumpFor(tester, const Duration(seconds: 1));
+    // Dropdowns: wait until the opened list shows the option (slow emulators).
     await tester.tap(find.text('Türkçe'));
-    await pumpFor(tester, const Duration(milliseconds: 800));
+    await pumpUntil(tester, () => find.text('English').evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.text('English').last);
     await pumpFor(tester, const Duration(seconds: 1));
     result('language_switch_to_english',
         find.text(en('settings')).evaluate().isNotEmpty);
     await tester.tap(find.text(en('systemDefault')));
-    await pumpFor(tester, const Duration(milliseconds: 800));
+    await pumpUntil(
+        tester, () => find.text(en('darkMode')).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.text(en('darkMode')).last);
     await pumpFor(tester, const Duration(seconds: 1));
     screenshot('parent_10_english_dark');
     final theme = Theme.of(tester.element(find.byType(Scaffold).first));
     result('theme_dark_applied', theme.brightness == Brightness.dark);
     await tester.tap(find.text('English'));
-    await pumpFor(tester, const Duration(milliseconds: 800));
+    await pumpUntil(tester, () => find.text('Türkçe').evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.text('Türkçe').last);
     await pumpFor(tester, const Duration(seconds: 1));
     result('language_switch_back_to_turkish',

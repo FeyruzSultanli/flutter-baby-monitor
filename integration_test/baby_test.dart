@@ -39,9 +39,7 @@ void main() {
     result('baby_anonymous_sign_in', true);
 
     // --- Create a room -----------------------------------------------------
-    await tester.tap(find.byKey(const Key('mainMenuButton')));
-    await pumpFor(tester, const Duration(milliseconds: 800));
-    await tester.tap(find.text(tr('createRoomCode')).last);
+    await chooseMenuItem(tester, tr('createRoomCode'));
     final room = await waitFor(() async {
       final rooms = await db.rooms();
       for (final r in rooms) {
