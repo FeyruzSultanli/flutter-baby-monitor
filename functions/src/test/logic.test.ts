@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { PUSH_COOLDOWN_MS, isStaleTokenError, shouldSendPush } from '../cooldown';
+import { BATTERY_PUSH_COOLDOWN_MS, PUSH_COOLDOWN_MS, isStaleTokenError, shouldSendPush } from '../cooldown';
 import { CHANNEL_ID, TAG, TAG_BATTERY, buildBatteryPushText, buildCryPushText, normalizeLocale } from '../messages';
 
 describe('cooldown', () => {
@@ -71,5 +71,13 @@ describe('v2 messages', () => {
     assert.equal(buildBatteryPushText('tr', 12).body, 'Pil %12. Bebek telefonunu şarja takın.');
     assert.equal(buildBatteryPushText('en', 9.6).body, 'Battery at 10%. Plug the baby phone into a charger.');
     assert.equal(buildBatteryPushText('en', undefined).body, 'Plug the baby phone into a charger.');
+  });
+});
+
+describe('battery cooldown', () => {
+  it('allows one battery push per 30 minutes', () => {
+    const now = 5_000_000_000;
+    assert.equal(shouldSendPush(now - 10 * 60_000, now, BATTERY_PUSH_COOLDOWN_MS), false);
+    assert.equal(shouldSendPush(now - BATTERY_PUSH_COOLDOWN_MS, now, BATTERY_PUSH_COOLDOWN_MS), true);
   });
 });

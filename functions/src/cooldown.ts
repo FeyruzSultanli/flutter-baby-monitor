@@ -2,6 +2,12 @@
 export const PUSH_COOLDOWN_MS = 60_000;
 
 /**
+ * Low battery pushes (v2 5.7): the app sends one per low battery episode;
+ * the server allows at most one per room per 30 minutes regardless.
+ */
+export const BATTERY_PUSH_COOLDOWN_MS = 30 * 60_000;
+
+/**
  * Server-side rate limit: at most one push per room per cooldown window,
  * even if clients write alerts more often.
  */

@@ -4,7 +4,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 
-import { isStaleTokenError, shouldSendPush } from './cooldown';
+import { BATTERY_PUSH_COOLDOWN_MS, PUSH_COOLDOWN_MS, isStaleTokenError, shouldSendPush } from './cooldown';
 import { CHANNEL_ID, TAG, TAG_BATTERY, buildBatteryPushText, buildCryPushText } from './messages';
 
 initializeApp();
@@ -32,8 +32,7 @@ export const onCryAlertCreated = onDocumentCreated(
     const alert = event.data?.data() ?? {};
     const db = getFirestore();
     const roomRef = db.collection('rooms').doc(roomId);
-    // v2: low battery alerts (once per episode, decided by the baby app)
-    // bypass the cry cooldown and use their own notification tag.
+    // v2: low battery alerts have their own cooldown and notification tag.
     const isBattery = alert.type === 'battery';
 
     // Read token + apply the cooldown atomically (one push per minute).
@@ -43,10 +42,13 @@ export const onCryAlertCreated = onDocumentCreated(
       const data = room.data() ?? {};
       const token = data.viewerFcmToken;
       if (typeof token !== 'string' || token.length === 0) return null;
-      if (isBattery) return { token, locale: data.viewerLocale };
-      const lastPushAt = data.lastPushAt instanceof Timestamp ? data.lastPushAt.toMillis() : null;
-      if (!shouldSendPush(lastPushAt, Date.now())) return null;
-      tx.update(roomRef, { lastPushAt: FieldValue.serverTimestamp() });
+      // Separate windows: cry pushes every 60 s at most, battery pushes
+      // every 30 min at most (a misbehaving client cannot flood the parent).
+      const field = isBattery ? 'lastBatteryPushAt' : 'lastPushAt';
+      const cooldown = isBattery ? BATTERY_PUSH_COOLDOWN_MS : PUSH_COOLDOWN_MS;
+      const last = data[field] instanceof Timestamp ? (data[field] as Timestamp).toMillis() : null;
+      if (!shouldSendPush(last, Date.now(), cooldown)) return null;
+      tx.update(roomRef, { [field]: FieldValue.serverTimestamp() });
       return { token, locale: data.viewerLocale };
     });
 
