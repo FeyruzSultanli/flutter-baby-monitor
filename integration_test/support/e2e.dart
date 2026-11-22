@@ -100,11 +100,15 @@ Future<void> chooseMenuItem(WidgetTester tester, String label) async {
     await tester.tap(find.byKey(const Key('mainMenuButton')));
     final open = await pumpUntil(tester, () => item.evaluate().isNotEmpty,
         timeout: const Duration(seconds: 10));
-    if (!open) continue;
+    if (!open) {
+      log('menu not open (attempt ${attempt + 1}) for "$label"');
+      continue;
+    }
     // Let the open animation finish so the tap lands on the item.
     await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(item.last);
     await pumpFor(tester, const Duration(milliseconds: 500));
+    log('menu item "$label" tapped (attempt ${attempt + 1})');
     return;
   }
   fail('menu item "$label" did not appear');
