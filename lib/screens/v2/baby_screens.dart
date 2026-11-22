@@ -284,39 +284,42 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
     return NightTheme(
       child: Scaffold(
         backgroundColor: NinniColors.night900,
-        body: ScreenFrame(
-          gap: 20,
-          items: children,
-          footer: [
-            SectionCard(
-              radius: NinniRadii.r20,
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const PulseDot(),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(l10n.waitingForParent,
-                            style: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: NinniColors.onNight)),
-                        const SizedBox(height: 2),
-                        Text(
-                          c.hasLocalVideo || (c.cameraController?.value.isInitialized ?? false)
-                              ? l10n.cameraMicReady
-                              : l10n.cameraPreparing,
-                          style: NinniType.caption
-                              .copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightMuted),
+        body: NightSky(
+            starStrength: 0.5,
+            child: ScreenFrame(
+              gap: 20,
+              items: children,
+              footer: [
+                SectionCard(
+                  radius: NinniRadii.r20,
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const PulseDot(),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(l10n.waitingForParent,
+                                style:
+                                    NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: NinniColors.onNight)),
+                            const SizedBox(height: 2),
+                            Text(
+                              c.hasLocalVideo || (c.cameraController?.value.isInitialized ?? false)
+                                  ? l10n.cameraMicReady
+                                  : l10n.cameraPreparing,
+                              style: NinniType.caption
+                                  .copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightMuted),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
+                ),
+              ],
+            )),
       ),
     );
   }

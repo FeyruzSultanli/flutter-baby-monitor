@@ -72,3 +72,15 @@ class NightSummary {
 
 /// A cry shorter than this is listed as "short noise".
 const Duration shortNoiseLimit = Duration(seconds: 5);
+
+/// Alarms per hour of the night, from [startHour] for [hours] hours
+/// (21:00 → 07:00 by default; V2.1 §4 alert history chart). Alarms outside
+/// these hours are not counted. Over several nights the hours add up.
+List<int> hourlyCounts(Iterable<AlertModel> events, {int startHour = 21, int hours = 10}) {
+  final counts = List<int>.filled(hours, 0);
+  for (final e in events) {
+    final idx = (e.timestamp.hour - startHour + 24) % 24;
+    if (idx < hours) counts[idx]++;
+  }
+  return counts;
+}

@@ -257,3 +257,17 @@ class _HomePainter extends CustomPainter {
   @override
   bool shouldRepaint(_HomePainter old) => false;
 }
+
+/// [NightSky] behind menu screens when they are shown in the dark theme
+/// (V2.1 §4.3); nothing in the light theme.
+class ThemedSky extends StatelessWidget {
+  const ThemedSky({super.key, required this.child, this.starStrength = 0.8});
+  final Widget child;
+  final double starStrength;
+
+  @override
+  Widget build(BuildContext context) {
+    final night = Theme.of(context).brightness == Brightness.dark;
+    return night ? NightSky(starStrength: starStrength, child: child) : child;
+  }
+}

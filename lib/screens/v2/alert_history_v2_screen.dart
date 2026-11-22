@@ -73,7 +73,8 @@ class _AlertHistoryV2ScreenState extends State<AlertHistoryV2Screen> {
     };
 
     return Scaffold(
-      body: SafeArea(
+      body: ThemedSky(
+          child: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: NinniSpace.maxContentWidth),
@@ -123,12 +124,20 @@ class _AlertHistoryV2ScreenState extends State<AlertHistoryV2Screen> {
                       padding: const EdgeInsets.symmetric(horizontal: NinniSpace.screen, vertical: 24),
                       child: Column(
                         children: [
-                          Icon(Icons.nights_stay_outlined, size: 40, color: p.textMuted),
-                          const SizedBox(height: 12),
-                          Text(l10n.noAlertsInRange,
+                          // V2.1 §4: a small moon instead of an empty list.
+                          const SizedBox(
+                            width: 96,
+                            height: 96,
+                            child: BreathingMoon(size: 96),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(l10n.calmNight,
                               key: const Key('historyEmpty'),
                               textAlign: TextAlign.center,
-                              style: NinniType.bodySm.copyWith(color: p.textMuted)),
+                              style: NinniType.title.copyWith(color: p.text)),
+                          const SizedBox(height: 4),
+                          Text(l10n.calmNightBody,
+                              textAlign: TextAlign.center, style: NinniType.bodySm.copyWith(color: p.textMuted)),
                         ],
                       ),
                     ),
@@ -139,14 +148,15 @@ class _AlertHistoryV2ScreenState extends State<AlertHistoryV2Screen> {
                     sliver: SliverList.separated(
                       itemCount: summary.events.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, i) => _EventTile(alert: summary.events[i], showDate: _range == HistoryRange.week),
+                      itemBuilder: (context, i) =>
+                          _EventTile(alert: summary.events[i], showDate: _range == HistoryRange.week),
                     ),
                   ),
               ],
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 }
@@ -186,11 +196,16 @@ class _SummaryCard extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(value,
-                      style: NinniType.numeric(NinniType.h1.copyWith(fontSize: 28, color: NinniColors.onNight))),
+                  child: int.tryParse(value) != null
+                      ? CountText(int.parse(value),
+                          style: NinniType.h1.copyWith(fontSize: 28, color: NinniColors.onNight))
+                      : Text(value,
+                          style: NinniType.numeric(NinniType.h1.copyWith(fontSize: 28, color: NinniColors.onNight))),
                 ),
                 const SizedBox(height: 2),
-                Text(label, style: NinniType.caption.copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightSoft)),
+                Text(label,
+                    style: NinniType.caption
+                        .copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightSoft)),
               ],
             ),
           ),
@@ -198,7 +213,11 @@ class _SummaryCard extends StatelessWidget {
     return Container(
       key: const Key('nightSummary'),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: NinniColors.night900, borderRadius: BorderRadius.circular(NinniRadii.r24)),
+      decoration: BoxDecoration(
+        color: NinniColors.night900,
+        borderRadius: BorderRadius.circular(NinniRadii.r24),
+        border: Border.all(color: NinniColors.nightCardLine),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -213,6 +232,21 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(width: 10),
               stat(s == null ? '–' : formatDurationShort(l10n, s.longestQuiet), l10n.longestQuietLabel),
             ],
+          ),
+          const SizedBox(height: 18),
+          Text(l10n.byHour, style: NinniType.caption.copyWith(color: NinniColors.onNightMuted)),
+          const SizedBox(height: 10),
+          Semantics(
+            label: l10n.byHour,
+            child: HourBars(
+              key: const Key('hourBars'),
+              counts: s == null ? List<int>.filled(10, 0) : hourlyCounts(s.events),
+              labels: const ['21', '', '23', '', '01', '', '03', '', '05', ''],
+              height: 56,
+              barColor: NinniColors.apricot,
+              emptyColor: NinniColors.night700,
+              labelStyle: NinniType.numeric(NinniType.caption.copyWith(fontSize: 11, color: NinniColors.onNightMuted)),
+            ),
           ),
         ],
       ),
@@ -266,7 +300,8 @@ class _EventTile extends StatelessWidget {
                 if (detail.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(detail,
-                      style: NinniType.numeric(NinniType.caption.copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: p.textMuted))),
+                      style: NinniType.numeric(
+                          NinniType.caption.copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: p.textMuted))),
                 ],
               ],
             ),

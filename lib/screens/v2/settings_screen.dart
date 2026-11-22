@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/enums/device_role.dart';
+import '../../core/pairing/room_code.dart';
 import '../../features/monitor/monitor_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/video_settings.dart';
@@ -35,9 +36,8 @@ class SettingsScreen extends StatelessWidget {
     final isParent = c.role == DeviceRole.PARENT;
     final quality = c.videoSettings.quality;
 
-    final languageName = languages
-        .firstWhere((l) => l.$1 == language.locale.languageCode, orElse: () => languages.first)
-        .$2;
+    final languageName =
+        languages.firstWhere((l) => l.$1 == language.locale.languageCode, orElse: () => languages.first).$2;
     final themeName = switch (theme.mode) {
       ThemeMode.system => l10n.themeAuto,
       ThemeMode.light => l10n.themeLight,
@@ -50,7 +50,8 @@ class SettingsScreen extends StatelessWidget {
         );
 
     return Scaffold(
-      body: SafeArea(
+      body: ThemedSky(
+          child: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: NinniSpace.maxContentWidth),
@@ -59,6 +60,10 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 TopBar(backLabel: l10n.back, title: l10n.settings),
                 const SizedBox(height: 18),
+                if (c.role != null) ...[
+                  _RoomCard(controller: c),
+                  const SizedBox(height: 18),
+                ],
                 SectionLabel(l10n.sectionAlarm),
                 const SizedBox(height: 8),
                 card([
@@ -75,8 +80,8 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             Text('${c.noiseThreshold.round()} dB',
                                 key: const Key('thresholdValue'),
-                                style: NinniType.numeric(
-                                    NinniType.bodySm.copyWith(fontSize: 14, fontWeight: FontWeight.w700, color: p.accentText))),
+                                style: NinniType.numeric(NinniType.bodySm
+                                    .copyWith(fontSize: 14, fontWeight: FontWeight.w700, color: p.accentText))),
                           ],
                         ),
                         Slider(
@@ -92,7 +97,8 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         Row(
                           children: [
-                            Expanded(child: Text(l10n.moreSensitive, style: NinniType.caption.copyWith(color: p.textMuted))),
+                            Expanded(
+                                child: Text(l10n.moreSensitive, style: NinniType.caption.copyWith(color: p.textMuted))),
                             Text(l10n.lessSensitive, style: NinniType.caption.copyWith(color: p.textMuted)),
                           ],
                         ),
@@ -101,14 +107,24 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   SettingsRow(
                     key: const Key('micTestRow'),
+                    leading: const SettingsIcon(Icons.mic_none_rounded, color: NinniColors.apricot),
                     title: l10n.micTestTitle,
                     subtitle: l10n.micTestSubtitle,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(builder: (_) => const MicTestScreen()),
                     ),
                   ),
-                  SettingsRow(title: l10n.alarmDuration, subtitle: l10n.alarmDurationSub, value: l10n.secondsShort.replaceAll('{s}', '2')),
-                  SettingsRow(title: l10n.notifyInterval, subtitle: l10n.notifyIntervalSub, value: l10n.perMinute, divider: false),
+                  SettingsRow(
+                      leading: const SettingsIcon(Icons.timer_outlined, color: NinniColors.amber),
+                      title: l10n.alarmDuration,
+                      subtitle: l10n.alarmDurationSub,
+                      value: l10n.secondsShort.replaceAll('{s}', '2')),
+                  SettingsRow(
+                      leading: const SettingsIcon(Icons.notifications_none_rounded, color: NinniColors.primaryGlow),
+                      title: l10n.notifyInterval,
+                      subtitle: l10n.notifyIntervalSub,
+                      value: l10n.perMinute,
+                      divider: false),
                 ]),
                 const SizedBox(height: 18),
                 SectionLabel(l10n.sectionVideo),
@@ -119,7 +135,8 @@ class SettingsScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(l10n.quality, style: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: p.text)),
+                        Text(l10n.quality,
+                            style: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700, color: p.text)),
                         const SizedBox(height: 12),
                         SegmentedControl<String>(
                           key: const Key('qualityControl'),
@@ -135,6 +152,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   SettingsRow(
+                    leading: const SettingsIcon(Icons.dark_mode_outlined, color: NinniColors.lightPurple),
                     title: l10n.autoNightMode,
                     subtitle: l10n.autoNightModeShort,
                     divider: isParent,
@@ -147,6 +165,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   if (isParent)
                     SettingsRow(
+                      leading: const SettingsIcon(Icons.headphones_rounded, color: NinniColors.mint),
                       title: l10n.backgroundListening,
                       subtitle: l10n.backgroundListeningSubtitle,
                       divider: false,
@@ -164,6 +183,7 @@ class SettingsScreen extends StatelessWidget {
                 card([
                   SettingsRow(
                     key: const Key('languageRow'),
+                    leading: const SettingsIcon(Icons.translate_rounded, color: NinniColors.lightBlue),
                     title: l10n.language,
                     value: languageName,
                     showChevron: true,
@@ -177,6 +197,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   SettingsRow(
                     key: const Key('themeRow'),
+                    leading: const SettingsIcon(Icons.palette_outlined, color: NinniColors.lightPink),
                     title: l10n.theme,
                     value: themeName,
                     showChevron: true,
@@ -194,6 +215,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   SettingsRow(
                     key: const Key('galleryButton'),
+                    leading: const SettingsIcon(Icons.video_library_outlined, color: NinniColors.apricot),
                     title: l10n.recordings,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(builder: (_) => const VideoGalleryScreen()),
@@ -201,6 +223,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   SettingsRow(
                     key: const Key('replayIntroRow'),
+                    leading: const SettingsIcon(Icons.replay_rounded, color: NinniColors.mint),
                     title: l10n.replayIntro,
                     divider: false,
                     onTap: () async {
@@ -218,6 +241,7 @@ class SettingsScreen extends StatelessWidget {
                 card([
                   const _VersionRow(),
                   SettingsRow(
+                    leading: const SettingsIcon(Icons.description_outlined, color: NinniColors.onNightMuted),
                     title: l10n.licenses,
                     divider: false,
                     onTap: () => showLicensePage(
@@ -229,12 +253,13 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ]),
                 const SizedBox(height: 16),
-                Text(l10n.privacyNote, textAlign: TextAlign.center, style: NinniType.caption.copyWith(color: p.textMuted)),
+                Text(l10n.privacyNote,
+                    textAlign: TextAlign.center, style: NinniType.caption.copyWith(color: p.textMuted)),
               ],
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 
@@ -309,11 +334,63 @@ class _VersionRowState extends State<_VersionRow> {
     final l10n = AppLocalizations.of(context);
     return SettingsRow(
       key: const Key('versionRow'),
+      leading: const SettingsIcon(Icons.info_outline_rounded, color: NinniColors.primaryGlow),
       title: 'Ninni',
       subtitle: l10n.appTagline,
       value: '${l10n.version} ${_VersionRow.version}',
       showChevron: false,
       onTap: _onTap,
+    );
+  }
+}
+
+/// Room card at the top of the settings (V2.1 §4): name, code and the
+/// connected device. Always dark, like the summary cards.
+class _RoomCard extends StatelessWidget {
+  const _RoomCard({required this.controller});
+  final MonitorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final c = controller;
+    final code = c.roomCode;
+    final device = c.role == DeviceRole.BABY ? l10n.deviceParentPhone : l10n.deviceBabyPhone;
+    return Container(
+      key: const Key('settingsRoomCard'),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: NinniColors.night900,
+        borderRadius: BorderRadius.circular(NinniRadii.r22),
+        border: Border.all(color: NinniColors.nightCardLine),
+      ),
+      child: Row(
+        children: [
+          const AppIcon(size: 44, painter: AppIconPainter(background: NinniColors.night700)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(c.roomName ?? l10n.defaultRoomName, style: NinniType.title.copyWith(color: NinniColors.onNight)),
+                if (code != null) ...[
+                  const SizedBox(height: 2),
+                  Text(RoomCode.format(code),
+                      style:
+                          NinniType.numeric(NinniType.caption.copyWith(fontSize: 13, color: NinniColors.onNightSoft))),
+                ],
+                const SizedBox(height: 4),
+                Text(
+                  c.isConnected ? l10n.roomCardDevices.replaceAll('{device}', device) : l10n.roomCardNone,
+                  style: NinniType.caption
+                      .copyWith(color: c.isConnected ? NinniColors.mintOnNight : NinniColors.onNightMuted),
+                ),
+              ],
+            ),
+          ),
+          if (c.isConnected) const PulseDot(size: 10, color: NinniColors.mint),
+        ],
+      ),
     );
   }
 }

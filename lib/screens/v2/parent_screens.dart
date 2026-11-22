@@ -62,7 +62,8 @@ class _ParentJoinScreenState extends State<ParentJoinScreen> {
     final error = c.pairingError;
 
     return Scaffold(
-      body: PopScope(
+      body: ThemedSky(
+          child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) unawaited(c.leaveRole());
@@ -139,7 +140,7 @@ class _ParentJoinScreenState extends State<ParentJoinScreen> {
               ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

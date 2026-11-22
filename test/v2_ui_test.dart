@@ -152,6 +152,8 @@ void main() {
     expect(find.byKey(const Key('thresholdSlider')), findsOneWidget);
     await tester.dragUntilVisible(
         find.byKey(const Key('languageRow')), find.byType(ListView), const Offset(0, -200));
+    await tester.ensureVisible(find.byKey(const Key('languageRow')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('languageRow')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('English'));

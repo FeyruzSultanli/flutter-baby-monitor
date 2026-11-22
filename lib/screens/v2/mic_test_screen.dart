@@ -89,11 +89,11 @@ class _MicTestScreenState extends State<MicTestScreen> {
     final c = context.watch<MonitorController>();
     final p = NinniPalette.of(context);
     final ValueListenable<double> level = _ownMic ? _ownLevel : c.level;
-    final source = _ownMic
-        ? l10n.micTestOwn
-        : (c.role == DeviceRole.PARENT ? l10n.micTestFromBaby : l10n.micTestInCall);
+    final source =
+        _ownMic ? l10n.micTestOwn : (c.role == DeviceRole.PARENT ? l10n.micTestFromBaby : l10n.micTestInCall);
     return Scaffold(
-      body: SafeArea(
+      body: ThemedSky(
+          child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(NinniSpace.screen, 16, NinniSpace.screen, 32),
           children: [
@@ -204,7 +204,7 @@ class _MicTestScreenState extends State<MicTestScreen> {
             Text(l10n.micTestHint, style: NinniType.bodySm.copyWith(color: p.textSoft)),
           ],
         ),
-      ),
+      )),
     );
   }
 }

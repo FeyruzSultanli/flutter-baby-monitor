@@ -51,7 +51,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     final c = context.read<MonitorController>();
     final p = NinniPalette.of(context);
     return Scaffold(
-      body: SafeArea(
+      body: ThemedSky(
+          child: SafeArea(
         child: ListenableBuilder(
           listenable: c.diag,
           builder: (context, _) {
@@ -68,7 +69,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                     icon: Icons.copy_rounded,
                     tooltip: l10n.diagCopy,
                     onPressed: () {
-                      unawaited(Clipboard.setData(ClipboardData(text: '${d.cryLine()}\n${d.talkLine()}\n${d.asText()}')));
+                      unawaited(
+                          Clipboard.setData(ClipboardData(text: '${d.cryLine()}\n${d.talkLine()}\n${d.asText()}')));
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.diagCopied)));
                     },
                   ),
@@ -80,7 +82,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                   padding: const EdgeInsets.all(14),
                   child: SelectableText(
                     '${d.cryLine()}\n\n${d.talkLine()}',
-                    style: NinniType.numeric(NinniType.caption.copyWith(color: p.text, fontFamily: 'monospace', fontSize: 12)),
+                    style: NinniType.numeric(
+                        NinniType.caption.copyWith(color: p.text, fontFamily: 'monospace', fontSize: 12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -104,7 +107,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                                 child: Text(
                                   v,
                                   textAlign: TextAlign.end,
-                                  style: NinniType.numeric(NinniType.caption.copyWith(color: p.text, fontWeight: FontWeight.w700)),
+                                  style: NinniType.numeric(
+                                      NinniType.caption.copyWith(color: p.text, fontWeight: FontWeight.w700)),
                                 ),
                               ),
                             ],
@@ -117,7 +121,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
             );
           },
         ),
-      ),
+      )),
     );
   }
 }

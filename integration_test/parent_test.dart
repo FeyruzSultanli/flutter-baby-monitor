@@ -302,6 +302,7 @@ void main() {
     Future<void> pickRow(String rowKey, String option) async {
       final row = find.byKey(Key(rowKey));
       await tester.dragUntilVisible(row, find.byType(ListView), const Offset(0, -250));
+      await tester.ensureVisible(row);
       await pumpFor(tester, const Duration(milliseconds: 400));
       await tester.tap(row);
       await pumpUntil(tester, () => find.text(option).evaluate().isNotEmpty,
@@ -343,6 +344,7 @@ void main() {
     await pumpFor(tester, const Duration(seconds: 1));
     final galleryRow = find.byKey(const Key('galleryButton'));
     await tester.dragUntilVisible(galleryRow, find.byType(ListView), const Offset(0, -250));
+    await tester.ensureVisible(galleryRow);
     await pumpFor(tester, const Duration(milliseconds: 400));
     await tester.tap(galleryRow);
     final galleryOpen = await pumpUntil(

@@ -65,4 +65,14 @@ void main() {
     expect(b.duration, const Duration(seconds: 42));
     expect(AlertModel.fromJson({'timestamp': '2026-11-22T20:00:00.000', 'message': 'x'}).duration, isNull);
   });
+
+  test('hourly counts from 21:00 to 07:00 (V2.1 §4)', () {
+    AlertModel at(int d, int h, int m) => AlertModel(timestamp: DateTime(2026, 11, d, h, m), message: 'x');
+    final counts = hourlyCounts([at(22, 21, 5), at(22, 21, 50), at(23, 1, 12), at(23, 6, 59), at(23, 7, 0), at(22, 20, 59)]);
+    expect(counts.length, 10);
+    expect(counts[0], 2); // 21:00
+    expect(counts[4], 1); // 01:00
+    expect(counts[9], 1); // 06:00
+    expect(counts.reduce((a, b) => a + b), 4); // 07:00 and 20:59 are outside
+  });
 }

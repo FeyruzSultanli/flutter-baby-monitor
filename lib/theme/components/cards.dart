@@ -86,8 +86,11 @@ class SettingsRow extends StatelessWidget {
     this.onTap,
     this.divider = true,
     this.showChevron,
+    this.leading,
   });
 
+  /// Small colored icon box on the left (V2.1 §4, [SettingsIcon]).
+  final Widget? leading;
   final String title;
   final String? subtitle;
   final String? value;
@@ -106,6 +109,7 @@ class SettingsRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
+            if (leading != null) ...[leading!, const SizedBox(width: 14)],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,6 +224,29 @@ class IconTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 34 px rounded square with a tinted background for settings rows.
+class SettingsIcon extends StatelessWidget {
+  const SettingsIcon(this.icon, {super.key, required this.color});
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = NinniPalette.of(context);
+    return ExcludeSemantics(
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: p.isNight ? 0.18 : 0.14),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 19, color: p.isNight ? color : Color.lerp(color, NinniColors.ink, 0.35)),
       ),
     );
   }

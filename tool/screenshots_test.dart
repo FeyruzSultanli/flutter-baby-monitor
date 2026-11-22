@@ -22,6 +22,8 @@ import 'package:bebek_monitor_clean/theme/components/layout.dart';
 import 'package:bebek_monitor_clean/theme/tokens.dart';
 import 'package:bebek_monitor_clean/screens/v2/monitor_shell.dart';
 import 'package:bebek_monitor_clean/screens/v2/onboarding_screen.dart';
+import 'package:bebek_monitor_clean/screens/v2/diagnostics_screen.dart';
+import 'package:bebek_monitor_clean/screens/v2/mic_test_screen.dart';
 import 'package:bebek_monitor_clean/screens/v2/settings_screen.dart';
 import 'package:bebek_monitor_clean/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +42,12 @@ final double _h = double.tryParse(const String.fromEnvironment('SHOT_H')) ?? 844
 final double _textScale = double.tryParse(const String.fromEnvironment('SHOT_TEXT')) ?? 1.0;
 // 3 with 430x932 gives App Store 6.7" (1290x2796).
 final double _ratio = double.tryParse(const String.fromEnvironment('SHOT_RATIO')) ?? 2.0;
+// V2.1: menu screens in light or dark (SHOT_THEME=dark), output folder
+// (SHOT_OUT=design/screens_v21) and folder name (SHOT_NAME=tr_1080x2160_dark).
+const String _theme = String.fromEnvironment('SHOT_THEME', defaultValue: 'light');
+const String _out = String.fromEnvironment('SHOT_OUT', defaultValue: 'build/screens');
+const String _name = String.fromEnvironment('SHOT_NAME');
+const ThemeMode _mode = _theme == 'dark' ? ThemeMode.dark : ThemeMode.light;
 
 Future<void> _loadFonts() async {
   final family = FontLoader('PlusJakartaSans');
@@ -63,7 +71,8 @@ Future<void> _shot(WidgetTester tester, String name) async {
     return image.toByteData(format: ui.ImageByteFormat.png);
   });
   final suffix = _textScale != 1.0 ? '_x$_textScale' : '';
-  final file = File('build/screens/${_locale}_${_w.toInt()}$suffix/$name.png')..createSync(recursive: true);
+  final folder = _name.isNotEmpty ? _name : '${_locale}_${_w.toInt()}$suffix${_theme == 'dark' ? '_dark' : ''}';
+  final file = File('$_out/$folder/$name.png')..createSync(recursive: true);
   file.writeAsBytesSync(bytes!.buffer.asUint8List());
 }
 
@@ -78,7 +87,7 @@ void main() {
 
     final controller = MonitorController(locale: () => const Locale(_locale));
     final language = LanguageProvider()..setLocale(const Locale(_locale));
-    Widget app(Widget home, {ThemeMode mode = ThemeMode.light}) => MultiProvider(
+    Widget app(Widget home, {ThemeMode mode = _mode}) => MultiProvider(
           providers: [
             ChangeNotifierProvider(create: (_) => ThemeProvider()),
             ChangeNotifierProvider.value(value: language),
@@ -133,12 +142,17 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await _shot(tester, '03_onboard3');
 
-    await scene(DemoScene.roleSelect, '04_role_select');
+    await scene(DemoScene.roleSelect, '04_home');
+    await scene(DemoScene.offline, '04b_home_offline');
     await scene(DemoScene.babyPairing, '05_baby_pairing');
     await scene(DemoScene.babyLive, '06_baby_live');
     await scene(DemoScene.babyNight, '07_baby_night');
     await scene(DemoScene.parentJoin, '08_parent_join');
     await scene(DemoScene.parentLive, '09_parent_live');
+    await controller.startTalking();
+    await tester.pump();
+    await _shot(tester, '09b_parent_talking');
+    await controller.stopTalking();
     await scene(DemoScene.cryAlert, '10_cry_alert');
     await scene(DemoScene.connectionLost, '11_connection_lost');
 
@@ -176,12 +190,28 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
     await tester.pump();
     await _shot(tester, '12_history');
+    final emptyHistory = await tester.runAsync(() async {
+      final dir = await Directory.systemTemp.createTemp('ninni_shots_empty');
+      return AlertHistoryService.withDirectory(() async => dir);
+    });
+    await tester.pumpWidget(app(AlertHistoryV2Screen(key: const ValueKey('emptyHistory'), service: emptyHistory)));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pump();
+    await _shot(tester, '12b_history_empty');
     await tester.pumpWidget(app(const SettingsScreen()));
     await tester.pump();
     await _shot(tester, '13_settings');
-    await tester.pumpWidget(app(const SettingsScreen(), mode: ThemeMode.dark));
+    await tester.pumpWidget(app(const SettingsScreen(), mode: _mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark));
     await tester.pump();
-    await _shot(tester, '14_settings_dark');
+    await _shot(tester, _mode == ThemeMode.dark ? '14_settings_light' : '14_settings_dark');
+
+    controller.debugDemo(DemoScene.babyLive);
+    await tester.pumpWidget(app(const MicTestScreen(useOwnMicrophone: false)));
+    await tester.pump();
+    await _shot(tester, '16_mic_test');
+    await tester.pumpWidget(app(const DiagnosticsScreen()));
+    await tester.pump(const Duration(seconds: 1));
+    await _shot(tester, '17_diagnostics');
 
     await tester.pumpWidget(const SizedBox());
     controller.dispose();
