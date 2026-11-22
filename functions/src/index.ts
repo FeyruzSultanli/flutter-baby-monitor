@@ -13,8 +13,11 @@ initializeApp();
  * Region of this function. Firestore triggers should run in (or next to) the
  * database location: check Firebase console -> Firestore -> location and set
  * e.g. 'europe-west1' for eur3 or 'us-central1' for nam5 before deploying.
+ *
+ * The project's Firestore is in eur3 (Europe multi-region), so the function
+ * runs in europe-west1, the region Firebase recommends for eur3.
  */
-const REGION = 'us-central1';
+const REGION = 'europe-west1';
 
 /**
  * D2: a new cry alert in rooms/{roomId}/alerts/{alertId} -> high priority FCM

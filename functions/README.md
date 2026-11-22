@@ -4,8 +4,9 @@
 high-priority FCM notification to the paired parent (`viewerFcmToken`), at
 most once per minute per room, in the parent's language (`viewerLocale`).
 
-Requires the **Blaze** plan. Before deploying, set `REGION` in
-`src/index.ts` to match the Firestore location (console → Firestore).
+Requires the **Blaze** plan. `REGION` in `src/index.ts` is `europe-west1`,
+matching the project's Firestore location (eur3). Exact deploy commands:
+PLAN_NEXT.md, "D2 deploy adımları".
 
 ```bash
 cd functions && npm install && npm test
