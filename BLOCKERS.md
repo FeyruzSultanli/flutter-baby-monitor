@@ -31,3 +31,11 @@
   2. Makinede açık kalan üçüncü simülatörü (`baby-ios`, iOS 26.5) kapatıp tekrar koşmak: koşu 7'de iki taraf da sorunsuz bitti.
   3. Uygulama kodu: değişiklik gerekmiyor. Bu, aynı Mac'te birden çok simülatörün ses sunucusunu paylaşmasından kaynaklanan bir simülatör sorunu; gerçek iPhone'da AURemoteIO yerel çalışır.
 - **Sizden:** Gerek yok. iOS E2E'yi çalıştırırken yalnızca iki simülatör açık olsun.
+
+## 5. B67 sonrası iOS ↔ iOS tekrar koşusu tamamlanamadı
+- **Durum:** Tamamen geçen son iOS ↔ iOS koşusu koşu 7 (`test-results/20261122-025845-ios`). Bu koşu B67 düzeltmesinden önceydi; tek eksik, "Bağlantıyı kes" düğmesine snackbar yüzünden dokunulamamasıydı (B67'yi bu koşu buldu).
+- **Denenenler:**
+  1. Koşu 8: bebek tarafında oda 40 sn içinde oluşmadı. Makine çok yüklüydü; uygulama kurulumu 4 dk sürdü.
+  2. Koşu 9: menü seçimi loglandı ("Oda Kodu Oluştur/Yenile" tıklandı). Koşu bitmeden, süre sınırı ve kullanıcı talimatı nedeniyle durduruldu.
+  3. Aynı test kodu Android ↔ Android'de (API 35) ve karma koşuda geçti.
+- **Sizden:** Gerek yok. İsterseniz emülatörleri başlatıp `python3 scripts/run_e2e.py --platform ios` ile tekrar koşun (yalnızca iki simülatör açıkken, ~6 dk). Koşu 8'deki gecikme yeniden görülürse yeni bir bug olarak ele alınmalı.
