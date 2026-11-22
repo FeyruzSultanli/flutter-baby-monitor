@@ -13,4 +13,13 @@ void mockMonitorPlugins() {
     const MethodChannel('dev.fluttercommunity.plus/battery'),
     (call) async => call.method == 'getBatteryLevel' ? 76 : 'charging',
   );
+  // V2.1 native channels (network status, audio route).
+  messenger.setMockStreamHandler(
+    const EventChannel('ninni/network'),
+    MockStreamHandler.inline(onListen: (args, sink) => sink.success(true)),
+  );
+  messenger.setMockMethodCallHandler(
+    const MethodChannel('ninni/device'),
+    (call) async => call.method == 'audioRoute' ? {'platform': 'test', 'outputs': ['speaker']} : true,
+  );
 }

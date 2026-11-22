@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:camera/camera.dart';
@@ -21,6 +22,8 @@ import '../../core/alert_history_service.dart';
 import '../../core/audio/app_audio.dart';
 import '../../core/audio/soothe.dart';
 import '../../core/audio/audio_level.dart';
+import '../../core/audio/noise_history.dart';
+import '../../core/alerts/night_summary.dart';
 import '../../core/audio/cry_detector.dart';
 import '../../core/audio/offline_audio.dart';
 import '../../core/audio/pcm_microphone.dart';
@@ -225,10 +228,18 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   bool _speakerReasserted = false;
   final ValueNotifier<double> _talkLevel = ValueNotifier<double>(0);
   String _micPermission = '-';
+  DateTime? _talkStartedAt;
   // Parent: connection quality pill (V2.1 §4).
   final ConnectionQualityMeter _qualityMeter = ConnectionQualityMeter();
   ConnectionQuality? _quality;
   int _parentPollTicks = 0;
+  // V2.1 §4: baby's last hour (minute maxima, alarm minutes); parent's
+  // watching time and alarms tonight.
+  final NoiseHistory _noiseHistory = NoiseHistory();
+  final ValueNotifier<int> _historyRevision = ValueNotifier<int>(0);
+  DateTime? _lastHistoryBump;
+  DateTime? _watchingSince;
+  int _tonightAlarms = 0;
 
   double _noiseThreshold = 60.0;
   bool _noiseAlert = false;
@@ -331,6 +342,29 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       _recentRooms = rooms;
       _notify();
     }));
+  }
+
+  void _addHistory(double db, DateTime now, bool alarm) {
+    final changed = _noiseHistory.add(db, now, alarm: alarm);
+    final last = _lastHistoryBump;
+    // Redraw the chart at most every 2 s (performance, A35).
+    if (changed && (last == null || now.difference(last) > const Duration(seconds: 2) || alarm)) {
+      _lastHistoryBump = now;
+      _historyRevision.value++;
+    }
+  }
+
+  Future<void> _refreshTonightAlarms() async {
+    try {
+      final alerts = await AlertHistoryService().getAlerts();
+      final n = NightSummary.of(alerts, windowFor(HistoryRange.tonight, DateTime.now())).alarms;
+      if (n != _tonightAlarms) {
+        _tonightAlarms = n;
+        _notify();
+      }
+    } catch (e) {
+      debugPrint('Alarm count not loaded: $e');
+    }
   }
 
   /// Baby in a call (B76): notices the parent's voice arriving (audio bytes
@@ -888,6 +922,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       }
     });
     if (status == ConnectionStatus.CONNECTED) {
+      _watchingSince ??= DateTime.now();
+      if (_role == DeviceRole.PARENT) unawaited(_refreshTonightAlarms());
       if (_role == DeviceRole.BABY && !_parentEverConnected) {
         setState(() => _parentEverConnected = true);
       }
@@ -1161,6 +1197,9 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _quality = null;
     _lastStats = RtcStatsSnapshot.empty;
     _dbSource = 'none';
+    _watchingSince = null;
+    _noiseHistory.clear();
+    _historyRevision.value++;
     _soothe = SootheState.off;
     _nightLight = NightLightState.off;
     _rememberedRoom = null;
@@ -1694,6 +1733,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     final now = DateTime.now();
     final bool alert = _detectCry(db, now);
     _lastDetectorDb = db;
+    if (_role == DeviceRole.BABY) _addHistory(db, now, alert);
 
     // Publish (local UI + parent) on alert changes or every 200 ms. Audio
     // chunks arrive many times per second; rebuilding the whole HomeScreen
@@ -2244,6 +2284,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         message: message,
         decibel: db,
       ));
+      await _refreshTonightAlarms();
     }
   }
 
@@ -2251,6 +2292,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     final now = DateTime.now();
     final bool alert = _detectCry(db, now);
     _lastDetectorDb = db;
+    if (_role == DeviceRole.BABY) _addHistory(db, now, alert);
 
     if (_role == DeviceRole.BABY) {
       _setLevel(db);
@@ -2779,6 +2821,18 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   /// Parent, while talking: our audio really leaves the phone ("the baby
   /// hears you"); false for a moment after pressing.
   bool get talkFlowing => _demo ? _talking : _talkFlowing;
+  DateTime? get talkStartedAt => _talkStartedAt;
+  /// Baby: last hour of noise (V2.1 §4); [historyRevision] changes when the
+  /// chart should redraw.
+  List<({double? db, bool alarm})> get noiseLastHour => _noiseHistory.lastHour(DateTime.now());
+  ValueListenable<int> get historyRevision => _historyRevision;
+  int get alarmsLastHour => _noiseHistory.alarmCount(DateTime.now());
+  DateTime? get lastBabyAlarmAt => _noiseHistory.lastAlarmAt;
+  /// Since when this session is connected (parent: watching, baby: since
+  /// the first parent connected); null before.
+  DateTime? get connectedSince => _watchingSince;
+  /// Parent: cry alarms tonight (alert history, 18:00–12:00).
+  int get tonightAlarmCount => _tonightAlarms;
   /// Parent: connection quality from RTT and packet loss (V2.1 §4).
   ConnectionQuality? get connectionQuality => _demo ? ConnectionQuality.good : _quality;
   /// Parent: push-to-talk is available (online, connected, negotiated).
@@ -3066,6 +3120,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     setState(() => _talking = true);
+    _talkStartedAt = DateTime.now();
     _talkOutFlow.reset();
     final ok = await _webrtcService!.startTalking();
     if (!ok) {
@@ -3136,6 +3191,13 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       case DemoScene.roleSelect:
       case DemoScene.offline:
         _pairingState = null;
+        final lastNight = now.subtract(const Duration(days: 1));
+        _recentRooms = [
+          RecentRoom(
+            code: 'K7MQT2H9',
+            joinedAt: DateTime(lastNight.year, lastNight.month, lastNight.day, 21, 40),
+          ),
+        ];
       case DemoScene.babyPairing:
         _role = DeviceRole.BABY;
         _pairingState = PairingState(roomCode: 'K7MQT2H9', status: ConnectionStatus.CONNECTING);
@@ -3150,6 +3212,12 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _parentEverConnected = true;
         _setLevel(42);
         _nightMode = scene == DemoScene.babyNight;
+        _roomCreatedAt = now.subtract(const Duration(hours: 1, minutes: 12));
+        _watchingSince = _roomCreatedAt;
+        _noiseHistory.fill(now, (i) => i == 41 ? 71 : 34 + 9 * math.sin(i / 4) .abs() + (i % 7 == 0 ? 8 : 0),
+            alarmMinutesAgo: {41});
+        _lastCryAlertSent = false;
+        _historyRevision.value++;
       case DemoScene.parentJoin:
         _role = DeviceRole.PARENT;
         _pairingState = null;
@@ -3173,6 +3241,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _setLevel(scene == DemoScene.cryAlert ? 74 : 38);
         _noiseAlert = scene == DemoScene.cryAlert;
         _lastRecordedAlertTime = DateTime(now.year, now.month, now.day, 1, 12);
+        _watchingSince = now.subtract(const Duration(hours: 3, minutes: 8));
+        _tonightAlarms = 2;
         _soothe = SootheState(
           track: SootheTrack.whiteNoise,
           volume: 0.4,

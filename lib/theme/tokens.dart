@@ -76,6 +76,25 @@ abstract final class NinniColors {
   static const nightClock = Color(0xFF5E6283);
   static const nightHint = Color(0xFF8A8EAE);
 
+  // V2.1 §4: night sky, cards and home illustration
+  /// Top of the night sky gradient (to night900).
+  static const nightSkyTop = Color(0xFF1A1D45);
+  /// 1 px border of night cards (#1C1F3D).
+  static const nightCardLine = Color(0xFF262A52);
+  /// Home illustration sky top, clouds and hill.
+  static const homeSkyTop = Color(0xFF23275A);
+  static const cloudA = Color(0xFF2A2E5E);
+  static const cloudB = Color(0xFF242853);
+  static const hill = Color(0xFF1A1D40);
+  /// Tip card on the home screen.
+  static const tipBg = Color(0xFF1A1D3A);
+  /// Warm star / cradle pillow.
+  static const starWarm = Color(0xFFFFD2BF);
+  /// Night light tile background when on (parent controls).
+  static const lightTileOn = Color(0xFF3A2E1A);
+  /// Muted label on placeholders ("KAMERA").
+  static const nightPlaceholder = Color(0xFF7579A3);
+
   // Night light colors (V2 5.5)
   static const lightAmber = Color(0xFFFFB45E);
   static const lightPink = Color(0xFFFF9FB2);

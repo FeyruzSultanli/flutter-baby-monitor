@@ -29,8 +29,11 @@ class SectionCard extends StatelessWidget {
     final bg = color ?? p.surface;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
-      side: border && !p.isNight && color == null
-          ? BorderSide(color: p.line, width: 1.5)
+      // V2.1 §4.4: night cards get a 1 px #262A52 edge.
+      side: border && color == null
+          ? (p.isNight
+              ? const BorderSide(color: NinniColors.nightCardLine)
+              : BorderSide(color: p.line, width: 1.5))
           : BorderSide.none,
     );
     final content = Padding(padding: padding, child: child);

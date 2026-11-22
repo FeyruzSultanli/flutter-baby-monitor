@@ -202,8 +202,7 @@ void main() {
 
     // --- Leave and rejoin the same code (B08) ---------------------------------------
     final sessionBefore = (await db.get('rooms/$code'))?['viewerSession'];
-    await tester.ensureVisible(find.byKey(const Key('disconnectButton')));
-    await tester.tap(find.byKey(const Key('disconnectButton')));
+    await tapLiveMenuDisconnect(tester);
     final leftOk = await pumpUntil(tester, () async {
       final r = await db.get('rooms/$code');
       return r?['viewerSession'] == null && r?['viewerFcmToken'] == null;
@@ -358,8 +357,7 @@ void main() {
     await pumpFor(tester, const Duration(seconds: 1));
 
     // --- Leave for good --------------------------------------------------------------------
-    await tester.ensureVisible(find.byKey(const Key('disconnectButton')));
-    await tester.tap(find.byKey(const Key('disconnectButton')));
+    await tapLiveMenuDisconnect(tester);
     final finalLeave = await pumpUntil(tester,
         () async => (await db.get('rooms/$code'))?['viewerSession'] == null,
         timeout: const Duration(seconds: 20));
@@ -368,4 +366,12 @@ void main() {
     // ignore: avoid_print
     print('E2E_DONE');
   }, timeout: const Timeout(Duration(minutes: 45)));
+}
+
+/// V2.1 §4: "Disconnect" moved into the live screen's top-right menu.
+Future<void> tapLiveMenuDisconnect(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('liveMenuButton')));
+  await pumpUntil(tester, () => find.byKey(const Key('disconnectButton')).evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 5));
+  await tester.tap(find.byKey(const Key('disconnectButton')));
 }

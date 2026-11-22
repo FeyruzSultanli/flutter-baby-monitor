@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/audio/soothe.dart';
 import '../../core/pairing/pairing_service.dart';
 import '../../core/pairing/room_code.dart';
 import '../../features/monitor/monitor_controller.dart';
@@ -77,7 +79,8 @@ class _RoomNameRow extends StatelessWidget {
                       style: const TextStyle(color: NinniColors.onNight, fontWeight: FontWeight.w700),
                     ),
                   ]),
-                  style: NinniType.label.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600, color: NinniColors.onNightMuted),
+                  style: NinniType.label
+                      .copyWith(letterSpacing: 0, fontWeight: FontWeight.w600, color: NinniColors.onNightMuted),
                 ),
               ),
             ],
@@ -148,9 +151,7 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
     final c = context.watch<MonitorController>();
     final code = c.roomCode;
     final createdAt = c.roomCreatedAt;
-    final remaining = createdAt == null
-        ? null
-        : PairingService.claimWindow - DateTime.now().difference(createdAt);
+    final remaining = createdAt == null ? null : PairingService.claimWindow - DateTime.now().difference(createdAt);
     final expired = remaining != null && remaining <= Duration.zero;
 
     final children = <Widget>[
@@ -172,7 +173,8 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
 
     if (c.isOffline) {
       children.addAll([
-        ScreenHeading(title: l10n.offlineBabyTitle, subtitle: l10n.offlineBabyBody, style: NinniType.h1.copyWith(fontSize: 28)),
+        ScreenHeading(
+            title: l10n.offlineBabyTitle, subtitle: l10n.offlineBabyBody, style: NinniType.h1.copyWith(fontSize: 28)),
       ]);
     } else {
       children.addAll([
@@ -211,8 +213,7 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
                     ),
                   ),
                 ),
-              ]
-              else if (c.pairingBusy || (code == null && c.pairingError == null))
+              ] else if (c.pairingBusy || (code == null && c.pairingError == null))
                 const SizedBox(
                   height: 48,
                   child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
@@ -305,7 +306,8 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
                           c.hasLocalVideo || (c.cameraController?.value.isInitialized ?? false)
                               ? l10n.cameraMicReady
                               : l10n.cameraPreparing,
-                          style: NinniType.caption.copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightMuted),
+                          style: NinniType.caption
+                              .copyWith(fontSize: 13, fontWeight: FontWeight.w500, color: NinniColors.onNightMuted),
                         ),
                       ],
                     ),
@@ -392,13 +394,18 @@ class BabyLiveScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final c = context.watch<MonitorController>();
     final connected = c.isConnected;
-    final threshold = c.noiseThreshold;
-    final listening = c.listeningNoise || c.isOffline;
-    final code = c.roomCode;
+    final media = MediaQuery.of(context);
+    final cameraHeight = (media.size.height * 0.25).clamp(150.0, 230.0);
 
     Future<void> end() async {
       if (await confirmEndBroadcast(context)) await c.leaveRole();
     }
+
+    final quality = switch (c.videoSettings.quality) {
+      'LOW' => l10n.qualitySaver,
+      'HIGH' => l10n.qualitySharp,
+      _ => l10n.qualityBalanced,
+    };
 
     final screen = Scaffold(
       backgroundColor: NinniColors.night900,
@@ -407,150 +414,110 @@ class BabyLiveScreen extends StatelessWidget {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) unawaited(end());
         },
-        child: ScreenFrame(
-          gap: 18,
-          items: [
-            _StatusRow(
-              pills: [
-                StatusPill(
-                  key: Key(connected ? 'linkConnected' : 'linkNotConnected'),
-                  label: connected ? l10n.parentConnected : l10n.parentWaiting,
-                  tone: connected ? PillTone.mint : PillTone.neutral,
+        child: NightSky(
+          // Fainter stars on the baby side (V2.1 §4.3).
+          starStrength: 0.5,
+          child: ScreenFrame(
+            gap: 14,
+            padding: const EdgeInsets.fromLTRB(NinniSpace.screen, 12, NinniSpace.screen, 16),
+            items: [
+              _BabyHeader(controller: c),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: SizedBox(
+                  height: cameraHeight,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      RepaintBoundary(
+                        child: LiveVideo(
+                          placeholder: VideoPlaceholder(label: l10n.cameraPreview, busy: c.cameraInitializing),
+                        ),
+                      ),
+                      const Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 80,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0x0012142B), Color(0xD912142B)],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(top: 12, left: 12, child: LiveBadge(label: l10n.live, height: 26)),
+                      Positioned(
+                        left: 14,
+                        right: 64,
+                        bottom: 14,
+                        child: Text(
+                          '${c.frontCamera ? l10n.cameraFront : l10n.cameraBack} · $quality',
+                          style: NinniType.label.copyWith(letterSpacing: 0, color: NinniColors.onNight),
+                        ),
+                      ),
+                      Positioned(
+                        right: 6,
+                        bottom: 4,
+                        child: NinniIconButton(
+                          key: const Key('switchCameraButton'),
+                          icon: Icons.cameraswitch_outlined,
+                          tooltip: l10n.switchCamera,
+                          background: NinniColors.night900.withValues(alpha: 0.7),
+                          foreground: NinniColors.white,
+                          onPressed: c.switchCamera,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                StatusPill(
-                  label: c.batteryCharging
-                      ? l10n.batteryCharging.replaceAll('{level}', '${c.batteryLevel}')
-                      : l10n.batteryPercent.replaceAll('{level}', '${c.batteryLevel}'),
-                  icon: c.batteryCharging ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
-                ),
-              ],
-              trailing: code == null ? null : '${l10n.roomShort} ${RoomCode.format(code)}',
-            ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(NinniRadii.r28),
-              child: SizedBox(
-                height: 236,
-                child: Stack(
-                  fit: StackFit.expand,
+              ),
+              _BabySoundCard(controller: c),
+              _BabyStatusBoxes(controller: c),
+              if (Theme.of(context).platform == TargetPlatform.iOS)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RepaintBoundary(
-                      child: LiveVideo(
-                        placeholder: VideoPlaceholder(label: l10n.cameraPreview, busy: c.cameraInitializing),
-                      ),
-                    ),
-                    Positioned(top: 14, left: 14, child: LiveBadge(label: l10n.live)),
-                    Positioned(
-                      right: 14,
-                      bottom: 14,
-                      child: NinniIconButton(
-                        key: const Key('switchCameraButton'),
-                        icon: Icons.cameraswitch_outlined,
-                        tooltip: l10n.switchCamera,
-                        background: NinniColors.night900,
-                        foreground: NinniColors.white,
-                        onPressed: c.switchCamera,
-                      ),
+                    const Icon(Icons.info_outline_rounded, size: 18, color: NinniColors.onNightMuted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(l10n.iosKeepOpenHint,
+                          style: NinniType.caption.copyWith(
+                              fontSize: 13,
+                              height: 1.45,
+                              fontWeight: FontWeight.w500,
+                              color: NinniColors.onNightMuted)),
                     ),
                   ],
                 ),
+            ],
+            footer: [
+              NinniButton(
+                key: const Key('nightModeButton'),
+                label: l10n.enterNightMode,
+                icon: Icons.dark_mode_outlined,
+                height: 62,
+                onPressed: c.enterNightMode,
               ),
-            ),
-            SectionCard(
-              radius: NinniRadii.r24,
-              // Only this card follows the live level (V2 phase 4).
-              child: ValueListenableBuilder<double>(
-                valueListenable: c.level,
-                builder: (context, db, _) {
-                  final level = !listening
-                      ? l10n.levelOff
-                      : db >= threshold
-                          ? l10n.levelLoud
-                          : (db >= threshold - 12 ? l10n.levelActive : l10n.levelQuiet);
-                  return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(l10n.soundLevel,
-                                style: NinniType.label.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600, color: NinniColors.onNightMuted)),
-                            const SizedBox(height: 2),
-                            Text(level, style: NinniType.h2.copyWith(fontSize: 22, color: NinniColors.onNight)),
-                          ],
-                        ),
-                      ),
-                      Semantics(
-                        label: '${db.round()} dB',
-                        excludeSemantics: true,
-                        child: Text.rich(
-                          TextSpan(children: [
-                            TextSpan(text: '${db.round()}'),
-                            TextSpan(
-                              text: ' dB',
-                              style: NinniType.body.copyWith(fontWeight: FontWeight.w700, color: NinniColors.onNightMuted),
-                            ),
-                          ]),
-                          style: NinniType.numeric(NinniType.display.copyWith(color: NinniColors.onNight)),
-                        ),
-                      ),
-                    ],
+              Center(
+                child: TextButton(
+                  key: const Key('disconnectButton'),
+                  onPressed: end,
+                  style: TextButton.styleFrom(
+                    foregroundColor: NinniColors.apricotSoftOnNight,
+                    minimumSize: const Size(160, 44),
+                    textStyle: NinniType.bodySm.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 14),
-                  RepaintBoundary(child: LevelMeter(db: db, thresholdDb: threshold)),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(l10n.alarmAfter2s,
-                            style: NinniType.caption.copyWith(color: NinniColors.onNightMuted)),
-                      ),
-                      Text(
-                        l10n.thresholdValue.replaceAll('{db}', '${threshold.round()}'),
-                        key: const Key('thresholdLabel'),
-                        style: NinniType.numeric(NinniType.caption.copyWith(color: NinniColors.apricotSoftOnNight)),
-                      ),
-                    ],
-                  ),
-                ],
-                  );
-                },
-              ),
-            ),
-            NinniButton(
-              key: const Key('nightModeButton'),
-              label: l10n.enterNightMode,
-              icon: Icons.dark_mode_outlined,
-              height: 64,
-              onPressed: c.enterNightMode,
-            ),
-          ],
-          footer: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.info_outline_rounded, size: 18, color: NinniColors.onNightMuted),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    Theme.of(context).platform == TargetPlatform.iOS
-                        ? '${l10n.babyPlacementHint} ${l10n.iosKeepOpenHint}'
-                        : l10n.babyPlacementHint,
-                    style: NinniType.caption.copyWith(fontSize: 13, height: 1.45, fontWeight: FontWeight.w500, color: NinniColors.onNightMuted),
-                  ),
+                  child: Text(l10n.endBroadcast),
                 ),
-              ],
-            ),
-            NinniButton(
-              key: const Key('disconnectButton'),
-              label: l10n.endBroadcast,
-              variant: NinniButtonVariant.danger,
-              onPressed: end,
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -565,6 +532,272 @@ class BabyLiveScreen extends StatelessWidget {
               onExit: c.exitNightMode,
             )
           : screen,
+    );
+  }
+}
+
+/// "3 sa 08 dk" / "12 dk" since [since].
+String formatElapsed(AppLocalizations l10n, Duration d) {
+  final m = d.inMinutes;
+  if (m < 60) return l10n.durationM.replaceAll('{m}', '$m');
+  return l10n.durationHm.replaceAll('{h}', '${m ~/ 60}').replaceAll('{m}', (m % 60).toString().padLeft(2, '0'));
+}
+
+/// Text that refreshes every 30 s (elapsed times in headers).
+class TickingText extends StatefulWidget {
+  const TickingText({super.key, required this.builder, required this.style});
+  final String Function(DateTime now) builder;
+  final TextStyle style;
+
+  @override
+  State<TickingText> createState() => _TickingTextState();
+}
+
+class _TickingTextState extends State<TickingText> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(widget.builder(DateTime.now()), style: NinniType.numeric(widget.style));
+}
+
+class _BabyHeader extends StatelessWidget {
+  const _BabyHeader({required this.controller});
+  final MonitorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final c = controller;
+    final connected = c.isConnected;
+    final since = c.roomCreatedAt;
+    final battery = '%${c.batteryLevel}';
+    return Row(
+      children: [
+        const AppIcon(size: 34, painter: AppIconPainter(background: NinniColors.night700)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: '${l10n.roomNameTitle}: ${c.roomName ?? l10n.defaultRoomName}',
+            excludeSemantics: true,
+            child: InkWell(
+              key: const Key('roomNameRow'),
+              borderRadius: BorderRadius.circular(NinniRadii.r12),
+              onTap: () => renameRoom(context, c),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: NinniSpace.touch),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(c.roomName ?? l10n.defaultRoomName,
+                        style: NinniType.title.copyWith(color: NinniColors.onNight)),
+                    if (since != null)
+                      TickingText(
+                        builder: (now) =>
+                            l10n.onAirFor.replaceAll('{time}', formatElapsed(l10n, now.difference(since))),
+                        style: NinniType.caption.copyWith(color: NinniColors.onNightMuted),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        StatusPill(
+          key: Key(connected ? 'linkConnected' : 'linkNotConnected'),
+          label: connected ? l10n.linkShortOk : l10n.linkShortWait,
+          semanticLabel: connected ? l10n.parentConnected : l10n.parentWaiting,
+          tone: connected ? PillTone.mint : PillTone.neutral,
+        ),
+        const SizedBox(width: 6),
+        StatusPill(
+          label: battery,
+          semanticLabel: c.batteryCharging
+              ? l10n.batteryCharging.replaceAll('{level}', '${c.batteryLevel}')
+              : l10n.batteryPercent.replaceAll('{level}', '${c.batteryLevel}'),
+          icon: c.batteryCharging ? Icons.bolt_rounded : Icons.battery_std_rounded,
+          dot: false,
+        ),
+      ],
+    );
+  }
+}
+
+/// Ring gauge + last hour chart (mockup BabyLive21).
+class _BabySoundCard extends StatelessWidget {
+  const _BabySoundCard({required this.controller});
+  final MonitorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final c = controller;
+    final threshold = c.noiseThreshold;
+    final listening = c.listeningNoise || c.isOffline;
+    return SectionCard(
+      radius: NinniRadii.r24,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // Only the gauge and the level word follow the live level (A35).
+          ValueListenableBuilder<double>(
+            valueListenable: c.level,
+            builder: (context, db, _) => Semantics(
+              label: '${db.round()} dB',
+              excludeSemantics: true,
+              child: RepaintBoundary(child: RingGauge(db: db, threshold: threshold, active: listening)),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Expanded(
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: c.level,
+                        builder: (context, db, _) {
+                          final word = !listening
+                              ? l10n.levelOff
+                              : db >= threshold
+                                  ? l10n.levelLoud
+                                  : (db >= threshold - 12 ? l10n.levelActive : l10n.levelQuiet);
+                          return Text(word, style: NinniType.title.copyWith(fontSize: 18, color: NinniColors.onNight));
+                        },
+                      ),
+                    ),
+                    Text(
+                      '${l10n.thresholdShort} ${threshold.round()}',
+                      key: const Key('thresholdLabel'),
+                      style: NinniType.numeric(NinniType.caption
+                          .copyWith(fontWeight: FontWeight.w700, color: NinniColors.apricotSoftOnNight)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ValueListenableBuilder<int>(
+                  valueListenable: c.historyRevision,
+                  builder: (context, _, __) => RepaintBoundary(
+                    child: MinuteBars(values: c.noiseLastHour, threshold: threshold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ValueListenableBuilder<int>(
+                  valueListenable: c.historyRevision,
+                  builder: (context, _, __) {
+                    final n = c.alarmsLastHour;
+                    final last = c.lastBabyAlarmAt;
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Text(l10n.lastHour,
+                              style: NinniType.caption.copyWith(fontSize: 11, color: NinniColors.onNightMuted)),
+                        ),
+                        Text(
+                          n == 0 || last == null
+                              ? l10n.noAlarmsShort
+                              : l10n.alarmsAt
+                                  .replaceAll('{n}', '$n')
+                                  .replaceAll('{time}', DateFormat.Hm().format(last)),
+                          style: NinniType.numeric(
+                              NinniType.caption.copyWith(fontSize: 11, color: NinniColors.onNightMuted)),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Parent / lullaby / light boxes.
+class _BabyStatusBoxes extends StatelessWidget {
+  const _BabyStatusBoxes({required this.controller});
+  final MonitorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final c = controller;
+    final soothe = c.soothe;
+    final playing = soothe.isPlayingAt(DateTime.now()) && soothe.track != null;
+    final track = !playing
+        ? l10n.stateOff
+        : switch (soothe.track!) {
+            SootheTrack.whiteNoise => l10n.sootheWhite,
+            SootheTrack.rain => l10n.sootheRain,
+            SootheTrack.heartbeat => l10n.sootheHeart,
+            SootheTrack.dandini => l10n.sootheDandini,
+          };
+    final light = c.nightLight;
+    final lightText = !light.on
+        ? l10n.stateOff
+        : switch (light.color) {
+            NightLightColor.amber => l10n.colorAmber,
+            NightLightColor.pink => l10n.colorPink,
+            NightLightColor.purple => l10n.colorPurple,
+            NightLightColor.blue => l10n.colorBlue,
+          };
+    Widget box(IconData icon, Color iconColor, String label, String value) => Expanded(
+          child: Semantics(
+            label: '$label: $value',
+            excludeSemantics: true,
+            child: SectionCard(
+              radius: NinniRadii.r18,
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 20, color: iconColor),
+                  const SizedBox(height: 6),
+                  Text(label, style: NinniType.caption.copyWith(color: NinniColors.onNightMuted)),
+                  const SizedBox(height: 2),
+                  Text(value,
+                      style: NinniType.bodySm.copyWith(
+                          fontSize: 14, height: 1.25, fontWeight: FontWeight.w800, color: NinniColors.onNight)),
+                ],
+              ),
+            ),
+          ),
+        );
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          box(Icons.smartphone_rounded, NinniColors.mintOnNight, l10n.boxParent,
+              c.isConnected ? l10n.boxParentOn : l10n.boxParentOff),
+          const SizedBox(width: 10),
+          box(Icons.music_note_rounded, NinniColors.primarySoftOnNight, l10n.boxLullaby, track),
+          const SizedBox(width: 10),
+          box(Icons.lightbulb_outline_rounded, light.on ? light.color.color : NinniColors.lightAmber, l10n.boxLight,
+              lightText),
+        ],
+      ),
     );
   }
 }

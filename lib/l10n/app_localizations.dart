@@ -406,6 +406,62 @@ class AppLocalizations {
       'diagCopied': 'Copied',
       'diagHint': 'Live values for finding real-device bugs. The same values are logged once a second as CRYDIAG / TALKDIAG lines.',
       'version': 'Version',
+      'greetMorning': 'Good morning',
+      'greetDay': 'Good afternoon',
+      'greetEvening': 'Good evening',
+      'greetNight': 'Good night',
+      'homeWatchTitle': 'Watch the baby room',
+      'homeWatchLast': 'Last connected · {when}',
+      'homeBabyTitle': 'Baby phone',
+      'homeBabyBody': 'Becomes the camera and microphone',
+      'homeNewTitle': 'New room',
+      'homeNewBody': 'Connect with a QR or code',
+      'tipLabel': 'Tip:',
+      'tip1': 'Plug the baby phone in and turn on night mode. The phone stays cooler and the screen light will not disturb your baby.',
+      'tip2': 'Place the baby phone at least 1 metre from the crib, where it can see your baby.',
+      'tip3': 'Alarm too often or never? Set the threshold for your room in Settings → Test the microphone.',
+      'tip4': 'Keep "Listen in the background" on in Settings to hear your baby with the screen locked.',
+      'tip5': 'Hold the middle button to talk; your voice plays from the baby phone\'s speaker.',
+      'tip6Android': 'No internet? Two Android phones can use Offline mode.',
+      'tip6Ios': 'Scan the QR code on the parent phone to connect in seconds.',
+      'onAirFor': 'On air · {time}',
+      'watchingFor': 'Watching for {time}',
+      'durationHm': '{h} h {m} min',
+      'durationM': '{m} min',
+      'linkShortOk': 'Connected',
+      'linkShortWait': 'Waiting',
+      'cameraBack': 'Back camera',
+      'cameraFront': 'Front camera',
+      'lastHour': 'Last hour',
+      'alarmsAt': '{n} alarms · {time}',
+      'noAlarmsShort': 'No alarms',
+      'boxParent': 'Parent',
+      'boxParentOn': 'Watching',
+      'boxParentOff': 'Waiting',
+      'boxLullaby': 'Lullaby',
+      'boxLight': 'Light',
+      'stateOff': 'Off',
+      'babyRestless': 'Baby is restless',
+      'tonightAlarms': '{n} alarms tonight',
+      'tonightNone': 'No alarms tonight',
+      'lastShort': 'last {time}',
+      'historyLink': 'History ›',
+      'talkShort': 'Hold to talk',
+      'lightOn': 'Light on',
+      'lightOff': 'Light off',
+      'qualityGood': 'Good',
+      'qualityFair': 'Fair',
+      'qualityPoor': 'Weak',
+      'connectionQualityLabel': 'Connection quality: {q}',
+      'babyBatteryLabel': 'Baby phone battery {level}%',
+      'moreActions': 'More actions',
+      'calmNight': 'A calm night!',
+      'calmNightBody': 'No cry alarms in this period.',
+      'byHour': 'Alarms by hour',
+      'roomCardDevices': 'Connected device: {device}',
+      'roomCardNone': 'No device connected yet',
+      'deviceParentPhone': 'parent phone',
+      'deviceBabyPhone': 'baby phone',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -797,6 +853,62 @@ class AppLocalizations {
       'diagCopied': 'Kopyalandı',
       'diagHint': 'Gerçek cihaz hatalarını bulmak için canlı değerler. Aynı bilgiler saniyede bir CRYDIAG / TALKDIAG satırı olarak loga yazılır.',
       'version': 'Sürüm',
+      'greetMorning': 'Günaydın',
+      'greetDay': 'İyi günler',
+      'greetEvening': 'İyi akşamlar',
+      'greetNight': 'İyi geceler',
+      'homeWatchTitle': 'Bebek odasını izle',
+      'homeWatchLast': 'Son bağlantı · {when}',
+      'homeBabyTitle': 'Bebek telefonu',
+      'homeBabyBody': 'Kamera ve mikrofon olur',
+      'homeNewTitle': 'Yeni oda',
+      'homeNewBody': 'QR ya da kodla bağlan',
+      'tipLabel': 'İpucu:',
+      'tip1': 'Bebek telefonunu şarja takın ve gece modunu açın. Telefon daha az ısınır, ekran ışığı bebeği rahatsız etmez.',
+      'tip2': 'Bebek telefonunu beşikten en az 1 metre uzağa, bebeği gören bir yere koyun.',
+      'tip3': 'Alarm çok sık ya da hiç çalmıyorsa Ayarlar → Mikrofonu test et ile eşiği odanıza göre ayarlayın.',
+      'tip4': 'Ekran kilitliyken de dinlemek için Ayarlar\'da "Arka planda dinle" açık kalsın.',
+      'tip5': 'Bebeğe konuşmak için ortadaki düğmeyi basılı tutun; sesiniz bebek telefonunun hoparlöründen çıkar.',
+      'tip6Android': 'İnternet yoksa iki Android telefonla İnternetsiz modu kullanabilirsiniz.',
+      'tip6Ios': 'Ebeveyn telefonunda QR kodu okutarak saniyeler içinde bağlanın.',
+      'onAirFor': 'Yayında · {time}',
+      'watchingFor': '{time}\'dır izleniyor',
+      'durationHm': '{h} sa {m} dk',
+      'durationM': '{m} dk',
+      'linkShortOk': 'Bağlı',
+      'linkShortWait': 'Bekliyor',
+      'cameraBack': 'Arka kamera',
+      'cameraFront': 'Ön kamera',
+      'lastHour': 'Son 1 saat',
+      'alarmsAt': '{n} alarm · {time}',
+      'noAlarmsShort': 'Alarm yok',
+      'boxParent': 'Ebeveyn',
+      'boxParentOn': 'İzliyor',
+      'boxParentOff': 'Bekleniyor',
+      'boxLullaby': 'Ninni',
+      'boxLight': 'Işık',
+      'stateOff': 'Kapalı',
+      'babyRestless': 'Bebek huzursuz',
+      'tonightAlarms': 'Bu gece {n} alarm',
+      'tonightNone': 'Bu gece alarm yok',
+      'lastShort': 'son {time}',
+      'historyLink': 'Geçmiş ›',
+      'talkShort': 'Basılı tut, konuş',
+      'lightOn': 'Işık açık',
+      'lightOff': 'Işık kapalı',
+      'qualityGood': 'İyi',
+      'qualityFair': 'Orta',
+      'qualityPoor': 'Zayıf',
+      'connectionQualityLabel': 'Bağlantı kalitesi: {q}',
+      'babyBatteryLabel': 'Bebek telefonunun pili %{level}',
+      'moreActions': 'Diğer işlemler',
+      'calmNight': 'Sakin bir gece!',
+      'calmNightBody': 'Bu aralıkta hiç ağlama alarmı yok.',
+      'byHour': 'Saat saat alarmlar',
+      'roomCardDevices': 'Bağlı cihaz: {device}',
+      'roomCardNone': 'Henüz bağlı cihaz yok',
+      'deviceParentPhone': 'ebeveyn telefonu',
+      'deviceBabyPhone': 'bebek telefonu',
     },
     'az': {
       'settings': 'Parametrlər',
@@ -1188,6 +1300,62 @@ class AppLocalizations {
       'diagCopied': 'Kopyalandı',
       'diagHint': 'Real cihaz xətalarını tapmaq üçün canlı dəyərlər. Eyni məlumat saniyədə bir dəfə CRYDIAG / TALKDIAG sətri kimi loga yazılır.',
       'version': 'Versiya',
+      'greetMorning': 'Sabahınız xeyir',
+      'greetDay': 'Gününüz xeyir',
+      'greetEvening': 'Axşamınız xeyir',
+      'greetNight': 'Gecəniz xeyrə',
+      'homeWatchTitle': 'Körpə otağını izlə',
+      'homeWatchLast': 'Son bağlantı · {when}',
+      'homeBabyTitle': 'Körpə telefonu',
+      'homeBabyBody': 'Kamera və mikrofon olur',
+      'homeNewTitle': 'Yeni otaq',
+      'homeNewBody': 'QR və ya kodla qoşul',
+      'tipLabel': 'Məsləhət:',
+      'tip1': 'Körpə telefonunu şarja qoşun və gecə rejimini açın. Telefon az qızır, ekran işığı körpəni narahat etmir.',
+      'tip2': 'Körpə telefonunu beşikdən ən azı 1 metr aralı, körpəni görən yerə qoyun.',
+      'tip3': 'Siqnal tez-tez çalır və ya heç çalmır? Ayarlar → Mikrofonu yoxla bölməsində həddi otağınıza görə tənzimləyin.',
+      'tip4': 'Ekran kilidli olanda da dinləmək üçün Ayarlarda "Arxa planda dinlə" açıq qalsın.',
+      'tip5': 'Körpəyə danışmaq üçün ortadakı düyməni basılı saxlayın; səsiniz körpə telefonunun dinamikindən çıxır.',
+      'tip6Android': 'İnternet yoxdursa, iki Android telefonla İnternetsiz rejimdən istifadə edə bilərsiniz.',
+      'tip6Ios': 'Valideyn telefonunda QR kodu oxudaraq saniyələr içində qoşulun.',
+      'onAirFor': 'Yayımda · {time}',
+      'watchingFor': '{time} ərzində izlənilir',
+      'durationHm': '{h} saat {m} dəq',
+      'durationM': '{m} dəq',
+      'linkShortOk': 'Qoşulub',
+      'linkShortWait': 'Gözləyir',
+      'cameraBack': 'Arxa kamera',
+      'cameraFront': 'Ön kamera',
+      'lastHour': 'Son 1 saat',
+      'alarmsAt': '{n} siqnal · {time}',
+      'noAlarmsShort': 'Siqnal yoxdur',
+      'boxParent': 'Valideyn',
+      'boxParentOn': 'İzləyir',
+      'boxParentOff': 'Gözlənilir',
+      'boxLullaby': 'Layla',
+      'boxLight': 'İşıq',
+      'stateOff': 'Sönülü',
+      'babyRestless': 'Körpə narahatdır',
+      'tonightAlarms': 'Bu gecə {n} siqnal',
+      'tonightNone': 'Bu gecə siqnal yoxdur',
+      'lastShort': 'son {time}',
+      'historyLink': 'Tarixçə ›',
+      'talkShort': 'Basıb danış',
+      'lightOn': 'İşıq açıq',
+      'lightOff': 'İşıq sönülü',
+      'qualityGood': 'Yaxşı',
+      'qualityFair': 'Orta',
+      'qualityPoor': 'Zəif',
+      'connectionQualityLabel': 'Bağlantı keyfiyyəti: {q}',
+      'babyBatteryLabel': 'Körpə telefonunun batareyası %{level}',
+      'moreActions': 'Digər əməliyyatlar',
+      'calmNight': 'Sakit gecə!',
+      'calmNightBody': 'Bu aralıqda heç bir ağlama siqnalı yoxdur.',
+      'byHour': 'Saatbasaat siqnallar',
+      'roomCardDevices': 'Qoşulmuş cihaz: {device}',
+      'roomCardNone': 'Hələ qoşulmuş cihaz yoxdur',
+      'deviceParentPhone': 'valideyn telefonu',
+      'deviceBabyPhone': 'körpə telefonu',
     },
   };
 
@@ -1583,6 +1751,62 @@ class AppLocalizations {
   String get diagCopied => _t('diagCopied');
   String get diagHint => _t('diagHint');
   String get version => _t('version');
+  String get greetMorning => _t('greetMorning');
+  String get greetDay => _t('greetDay');
+  String get greetEvening => _t('greetEvening');
+  String get greetNight => _t('greetNight');
+  String get homeWatchTitle => _t('homeWatchTitle');
+  String get homeWatchLast => _t('homeWatchLast');
+  String get homeBabyTitle => _t('homeBabyTitle');
+  String get homeBabyBody => _t('homeBabyBody');
+  String get homeNewTitle => _t('homeNewTitle');
+  String get homeNewBody => _t('homeNewBody');
+  String get tipLabel => _t('tipLabel');
+  String get tip1 => _t('tip1');
+  String get tip2 => _t('tip2');
+  String get tip3 => _t('tip3');
+  String get tip4 => _t('tip4');
+  String get tip5 => _t('tip5');
+  String get tip6Android => _t('tip6Android');
+  String get tip6Ios => _t('tip6Ios');
+  String get onAirFor => _t('onAirFor');
+  String get watchingFor => _t('watchingFor');
+  String get durationHm => _t('durationHm');
+  String get durationM => _t('durationM');
+  String get linkShortOk => _t('linkShortOk');
+  String get linkShortWait => _t('linkShortWait');
+  String get cameraBack => _t('cameraBack');
+  String get cameraFront => _t('cameraFront');
+  String get lastHour => _t('lastHour');
+  String get alarmsAt => _t('alarmsAt');
+  String get noAlarmsShort => _t('noAlarmsShort');
+  String get boxParent => _t('boxParent');
+  String get boxParentOn => _t('boxParentOn');
+  String get boxParentOff => _t('boxParentOff');
+  String get boxLullaby => _t('boxLullaby');
+  String get boxLight => _t('boxLight');
+  String get stateOff => _t('stateOff');
+  String get babyRestless => _t('babyRestless');
+  String get tonightAlarms => _t('tonightAlarms');
+  String get tonightNone => _t('tonightNone');
+  String get lastShort => _t('lastShort');
+  String get historyLink => _t('historyLink');
+  String get talkShort => _t('talkShort');
+  String get lightOn => _t('lightOn');
+  String get lightOff => _t('lightOff');
+  String get qualityGood => _t('qualityGood');
+  String get qualityFair => _t('qualityFair');
+  String get qualityPoor => _t('qualityPoor');
+  String get connectionQualityLabel => _t('connectionQualityLabel');
+  String get babyBatteryLabel => _t('babyBatteryLabel');
+  String get moreActions => _t('moreActions');
+  String get calmNight => _t('calmNight');
+  String get calmNightBody => _t('calmNightBody');
+  String get byHour => _t('byHour');
+  String get roomCardDevices => _t('roomCardDevices');
+  String get roomCardNone => _t('roomCardNone');
+  String get deviceParentPhone => _t('deviceParentPhone');
+  String get deviceBabyPhone => _t('deviceBabyPhone');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
