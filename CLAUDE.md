@@ -67,7 +67,7 @@ flutter build apk --debug
 
 ## Bilinen kısıtlar
 
-- Offline mod (Nearby Connections: Bluetooth + Wi-Fi) **sadece Android**'de çalışır; iOS'ta arayüzde gizli. Offline modda `WebRTCService` oluşturulmaz. `sound_stream` iOS'ta `AppDelegate`'te kaydedilmez (B63).
+- Offline mod (Nearby Connections: Bluetooth + Wi-Fi) **sadece Android**'de çalışır; iOS'ta arayüzde gizli. Offline modda `WebRTCService` oluşturulmaz. Offline ses (PCM) kendi Android platform kanalımızla: `android/.../OfflineAudio.kt` + `lib/core/audio/offline_audio.dart` (16 kHz mono PCM16; GPL'li `sound_stream` yerine, B68).
 - Nearby, gerçek ses/kamera kalitesi, arka plan ve push **emülatörde test edilemez**; gerçek cihazda test et.
 - Uçtan uca emülatör testleri: `scripts/firebase_emulators.sh` (Auth + Firestore + Functions, `firebase.emulators.json`) açıkken `python3 scripts/run_e2e.py --platform android|ios|mixed`. Testler `integration_test/`, sonuçlar `test-results/` (git dışı). iOS simülatörü için `flutter build ios --simulator` yerine `flutter test -d <udid>` kullanılır (DECISIONS A12).
 - `home_screen.dart` çok büyük; değişiklik yaparken ilgili bölümü dikkatle bul, istenmeden büyük refactor yapma.
