@@ -11,6 +11,17 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- MonitorService (V2 5.10 / 5.12): baby broadcast and parent listening
+         keep running with the screen off. The type used at start depends on
+         the granted runtime permissions (MonitorForegroundService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Android 13+ (API 33) -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
     
@@ -49,6 +60,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <service
+            android:name=".MonitorService"
+            android:exported="false"
+            android:stopWithTask="true"
+            android:foregroundServiceType="camera|microphone|connectedDevice|mediaPlayback" />
         <!-- FCM notifications shown by Android while the app is in the
              background or killed (D2): same channel as local alerts, and a
              monochrome status bar icon. Channel id: NotificationService. -->
