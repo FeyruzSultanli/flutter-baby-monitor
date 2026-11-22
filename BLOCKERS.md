@@ -23,3 +23,11 @@
 ## 3. `flutter build ios --simulator` hatası (Flutter 3.44)
 - **Hata:** "Flutter.framework does not contain architectures arm64 x86_64".
 - **Durum:** Simülatör için `flutter run`/`flutter test -d <udid>` kullanın (DECISIONS A12). Gerçek cihaz derlemesi etkilenmez.
+
+## 4. iOS simülatöründe ara sıra CoreAudio zaman aşımı (WebRTC)
+- **Hata:** Koşu 6'da bebek simülatörü bağlandıktan sonra çöktü. Neden: `WebRTC` → `AudioUnitInitialize` → `AURemoteIO::Initialize` → `_ReportRPCTimeout` → `abort`. Bu, B63'teki CoreAudio zaman aşımıyla aynı; bu kez WebRTC'nin kendi ses birimi tetikledi.
+- **Denenenler:**
+  1. Tekrar koşmak: koşu 5'te bu adım geçmişti.
+  2. Makinede açık kalan üçüncü simülatörü (`baby-ios`, iOS 26.5) kapatıp tekrar koşmak: koşu 7'de iki taraf da sorunsuz bitti.
+  3. Uygulama kodu: değişiklik gerekmiyor. Bu, aynı Mac'te birden çok simülatörün ses sunucusunu paylaşmasından kaynaklanan bir simülatör sorunu; gerçek iPhone'da AURemoteIO yerel çalışır.
+- **Sizden:** Gerek yok. iOS E2E'yi çalıştırırken yalnızca iki simülatör açık olsun.

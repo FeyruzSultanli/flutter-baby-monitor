@@ -490,6 +490,12 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Nasıl bulundu:** iOS simülatörü E2E testi (koşu 5).
 - **Durum:** Düzeltildi (`609f427`): hata loglanıyor; uygulama içi alarm etkilenmiyor.
 
+### B67 — Eylem düğmeli snackbar'lar hiç kapanmıyor (Orta)
+- **Dosya:** `home_screen.dart`. Etkilenenler: iOS gece modu ipucu, izin reddedildi ve bildirim izni uyarıları.
+- **Sorun:** Flutter'ın yeni sürümlerinde eylem düğmesi olan bir `SnackBar` varsayılan olarak ekranda kalıyor (`persist`). Bu yüzden uyarılar kendiliğinden kapanmıyor ve alttaki kontrolleri, ör. "Bağlantıyı kes" düğmesini, sürekli örtüyordu.
+- **Nasıl bulundu:** iOS simülatörü E2E testi (koşu 7). Bebek "Bağlantıyı kes"e dokunamadı.
+- **Durum:** Düzeltildi (`9e10308`): uyarılar 8 sn sonra kapanıyor (`persist: false`).
+
 ---
 
 ## Hiç çalışmayan veya yarım kalmış özellikler
