@@ -107,6 +107,27 @@ TEST_PLAN.md §14 (V1.1–V1.16). En önemlileri: **V1.1/V1.2** (ekran kapalıyk
 
   Çıktı `build/screens/tr_430/*.png` (1290×2796, App Store 6,7"). `--dart-define=SHOT_LOCALE=en` / `az` ile diğer diller.
 - Gerçek cihaz maddeleri: TEST_PLAN §17 (V4.1–V4.6).
+- **Testler (Faz 4 sonu):** `flutter analyze` 0 error / 0 warning (7 info: bilinçli bırakılan enum adları ve `use_build_context_synchronously`); `flutter test` 161/161; kurallar 29/29; Function 11/11; lisans taraması temiz (A36).
+- **E2E:**
+  - Android ↔ Android `test-results/20261122-193020-android`: iki taraf da geçti (0 hata).
+  - Android bebek ↔ iOS ebeveyn `test-results/20261122-191353-mixed`: iOS ebeveyn tamamen geçti; Android bebekte tek hata testin kendisindeydi (ebeveynin gece lambası bebeği gece moduna almıştı, test bunu beklemiyordu) — test düzeltildi, tekrar koşusu aşağıda.
+  - Ağ kesintisi adımı karma koşuda atlanır (iOS simülatöründe uçak modu yok, A14).
+- iOS derlemesi (`flutter build ios --no-codesign`) ✅, Android debug APK ✅.
+
+## Açık konular
+
+- **Gerçek cihaz testleri** (emülatörde doğrulanamayanlar): foreground service ile ekran kapalıyken kamera/mikrofon (V1.1–V1.3, en büyük risk), arka planda dinleme (V1.6–V1.8), bas-konuşta yankı ve hoparlör (V3.5), iPhone'da ninni çalarken WebRTC sesi (A23, V3.7), push zinciri (Function deploy sonrası), ısı/pil (V4.4).
+- **Kulak/anadil kontrolü:** "Dandini dandini" melodisi ve Azerbaycanca metinler (BLOCKERS 9).
+- **Bilinen eklenti hataları:** flutter_webrtc kayıt (B72 önlem, B73 çözüldü) — yukarı akışa bildirilmeli.
+- **Kapsam dışı bırakılanlar:** `ninni://` URL şeması kaydı (A30), offline bas-konuş (A31), çoklu kamera ekranı (A26).
+
+## Kullanıcıdan beklenenler (Cavid)
+
+1. Aşağıdaki "Cavid yapacak" adımları (kurallar + Function deploy).
+2. İki gerçek telefonla TEST_PLAN §14–§17 (V1–V4). Öncelik: V1.1/V1.2, V1.9–V1.13, V2.12, V3.5–V3.8.
+3. Melodi ve AZ metin kontrolü (BLOCKERS 9).
+4. Mağaza hazırlığı: Play Console foreground service beyanı; ekran görüntüleri `tool/screenshots_test.dart` ile (Faz 4).
+
 
 ## Cavid yapacak
 

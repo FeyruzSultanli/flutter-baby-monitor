@@ -201,6 +201,9 @@
 - Ebeveyn ses çubukları ~10 Hz gelen ses seviyesiyle (WebRTC inbound `audioLevel`), oda alanı (5 sn'de bir) yalnızca yedek.
 - Gerçek CPU/ısı ölçümü emülatörde yapılamaz → TEST_PLAN V4.4.
 
+### A36 — v2 lisans taraması
+- `pubspec.lock` 180 paket (A16'da 165): GPL/LGPL/AGPL yok. v2'de eklenenler: `audioplayers` + alt paketleri (MIT), `shared_preferences` (BSD-3), `animations` (BSD-3), `qr_flutter` + `qr` (BSD-3), `mobile_scanner` (BSD-3; Android'de Google ML Kit), `flutter_native_splash` (MIT, yalnızca geliştirme). Yazı tipi Plus Jakarta Sans: SIL OFL 1.1 (`assets/fonts/OFL.txt`). Sesler kendi sentezimiz (`assets/audio/LICENSES.md`).
+
 ## Cavid'in kararı bekleniyor
 
 - **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.
