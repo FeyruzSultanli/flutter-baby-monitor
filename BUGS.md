@@ -535,6 +535,12 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 
 ---
 
+### B71 — Ebeveyn aynı teklife iki kez cevap verebiliyor (Orta) — ✅ düzeltildi
+- **Bulan:** Ninni v2 Faz 1 E2E (Android ↔ Android, `test-results/20261122-180053-android`).
+- **Belirti:** `setLocalDescription: Failed to set local answer sdp: Called in wrong state: stable`, yakalanmamış hata; ilk bağlantı kurulmadan test düştü.
+- **Neden:** Oda anlık görüntüleri teklifi her güncellemede tekrar veriyor. İki görüntü art arda gelince `onOffer` dinleyicisi iki kez çalışıyor; ikisi de `getRemoteDescription()` beklerken "henüz yok" görüp cevap üretmeye başlıyor. Bağlantı koptu bekçisinin 2 sn'lik `getStats` çağrıları zamanlamayı değiştirip bunu görünür kıldı; hata eskiden de vardı.
+- **Düzeltme:** `webrtc_service.dart`: ilk `await`'ten önce eşzamanlı bir bayrak; hata yakalanıyor ve durum `FAILED` yapılıyor (otomatik yeniden katılma devralır).
+
 ## Hiç çalışmayan veya yarım kalmış özellikler
 
 1. **Arka planda izleme:** İki cihazda da yok (B01, B02).

@@ -512,26 +512,41 @@ class WebRTCService {
       };
 
       // Wait for the offer of our session
+      // Set synchronously before the first await: room snapshots repeat the
+      // offer, and two snapshots in quick succession used to answer twice
+      // ("setLocalDescription ... wrong state: stable", B71).
+      var answering = false;
       _offerSub = _signalingService.onOffer.listen((offer) async {
          if (!identical(_peerConnection, pc)) return;
-         // The room snapshot repeats the offer on every update; answer once.
-         if (await pc.getRemoteDescription() != null) return;
+         if (answering) return;
+         answering = true;
+         try {
+           // The room snapshot repeats the offer on every update; answer once.
+           if (await pc.getRemoteDescription() != null) return;
 
-         await pc.setRemoteDescription(offer);
-         await _flushPendingCandidates(pc);
+           await pc.setRemoteDescription(offer);
+           await _flushPendingCandidates(pc);
 
-         // Explicitly request video/audio
-         const constraints = {
-            'mandatory': {
-              'OfferToReceiveAudio': true,
-              'OfferToReceiveVideo': true,
-            },
-            'optional': [],
-          };
+           // Explicitly request video/audio
+           const constraints = {
+              'mandatory': {
+                'OfferToReceiveAudio': true,
+                'OfferToReceiveVideo': true,
+              },
+              'optional': [],
+            };
 
-         final answer = await pc.createAnswer(constraints);
-         await pc.setLocalDescription(answer);
-         await _signalingService.sendAnswer(answer);
+           final answer = await pc.createAnswer(constraints);
+           if (!identical(_peerConnection, pc)) return;
+           await pc.setLocalDescription(answer);
+           await _signalingService.sendAnswer(answer);
+         } catch (e) {
+           // A peer replaced meanwhile throws here; that is not an error.
+           if (!identical(_peerConnection, pc)) return;
+           debugPrint('Answering the offer failed: $e');
+           // Let the automatic rejoin start a new session.
+           _setStatus(ConnectionStatus.FAILED);
+         }
       }, onError: (e) => _reportError('Teklif alınamadı: $e'));
 
       _remoteCandidateSub = _signalingService.onCandidate.listen(
