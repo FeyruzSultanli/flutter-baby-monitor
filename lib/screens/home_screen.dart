@@ -16,7 +16,6 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
 
 import 'package:image/image.dart' as img;
-import 'package:sound_stream/sound_stream.dart';
 
 import '../l10n/app_localizations.dart';
 import '../core/recording/video_recorder_service.dart';
@@ -26,6 +25,7 @@ import '../core/feature_flags.dart';
 import '../core/debug/debug_hooks.dart';
 import '../core/audio/audio_level.dart';
 import '../core/audio/cry_detector.dart';
+import '../core/audio/offline_audio.dart';
 import '../core/offline/offline_payload.dart';
 import '../core/pairing/pairing_service.dart';
 import '../core/pairing/pairing_state.dart';
@@ -102,10 +102,9 @@ class _HomeScreenState extends State<HomeScreen>
   final List<Map<String, String>> _discoveredEndpoints = []; // {id, name}
   final StreamController<List<Map<String, String>>> _discoveryStreamController = StreamController.broadcast();
 
-  // Audio Streaming (Offline)
-  final RecorderStream _recorder = RecorderStream();
-  final PlayerStream _player = PlayerStream();
-  StreamSubscription<List<int>>? _audioSub;
+  // Audio Streaming (Offline, Android only): raw PCM over Nearby.
+  final OfflineAudio _offlineAudio = OfflineAudio();
+  StreamSubscription<Uint8List>? _audioSub;
   bool _isAudioStreaming = false;
   bool _isPlayerRunning = false; // Track player state
 
@@ -196,8 +195,8 @@ class _HomeScreenState extends State<HomeScreen>
     _initCoreServices();
     _initBatteryMonitoring();
     // Camera setup (CAMERA permission prompt) first, then audio services
-    // (sound_stream asks for RECORD_AUDIO in initialize). Running both at once
-    // can make Android drop one of the concurrent permission requests (B12).
+    // (RECORD_AUDIO prompt). Running both at once can make Android drop one
+    // of the concurrent permission requests (B12).
     unawaited(_setup().whenComplete(_initAudioServices));
   }
 
@@ -275,14 +274,14 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _initAudioServices() async {
-    // sound_stream (offline audio) is only used by Android offline mode; it is
-    // not registered on iOS (see AppDelegate.swift).
+    // Offline audio (OfflineAudio platform channel) is Android-only. Ask for
+    // the microphone at startup, as the previous audio plugin did, so the
+    // first-launch prompts stay the same (camera, then microphone).
     if (defaultTargetPlatform != TargetPlatform.android) return;
     try {
-      await _recorder.initialize();
-      await _player.initialize();
+      await Permission.microphone.request();
     } catch (e) {
-      debugPrint('Audio services init error: $e');
+      debugPrint('Microphone permission request failed: $e');
     }
   }
 
@@ -406,17 +405,12 @@ class _HomeScreenState extends State<HomeScreen>
     _batteryStateSubscription?.cancel();
     // Resources that were not released before (B25).
     _noisePollTimer?.cancel();
+    // Cancelling the microphone subscription stops recording.
     _audioSub?.cancel();
-    // sound_stream is not registered on iOS (B63).
+    // The offline audio channel exists only on Android.
     if (defaultTargetPlatform == TargetPlatform.android) {
-      unawaited(Future(() async {
-        try {
-          await _recorder.stop();
-          await _player.stop();
-        } catch (e) {
-          debugPrint('Audio stream stop on dispose failed: $e');
-        }
-      }));
+      unawaited(_offlineAudio.stopPlayer().catchError(
+          (Object e) => debugPrint('Audio player stop on dispose failed: $e')));
     }
     if (_isOfflineMode && defaultTargetPlatform == TargetPlatform.android) {
       unawaited(Future(() async {
@@ -1198,7 +1192,8 @@ class _HomeScreenState extends State<HomeScreen>
     if (_isAudioStreaming || _connectedEndpointId == null) return;
     
     try {
-      _audioSub = _recorder.audioStream.listen((data) {
+      // Listening starts the microphone; cancelling stops it.
+      _audioSub = _offlineAudio.micStream().listen((data) {
         if (_connectedEndpointId != null) {
           // 1. Send Audio Data
           final payload = OfflinePayload.encode(OfflinePayloadType.audio, data);
@@ -1207,9 +1202,10 @@ class _HomeScreenState extends State<HomeScreen>
           // 2. Calculate dB and Send Status
           _calculateAndSendDb(data);
         }
+      }, onError: (Object e) {
+        debugPrint('Offline microphone error: $e');
+        _stopAudioStream();
       });
-      
-      await _recorder.start();
       _isAudioStreaming = true;
     } catch (e) {
       debugPrint("Error starting audio stream: $e");
@@ -1217,12 +1213,10 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _stopAudioStream() {
-    _audioSub?.cancel();
+    // Cancelling the subscription stops the microphone on the native side.
+    unawaited(_audioSub?.cancel().catchError(
+        (Object e) => debugPrint('Stopping offline audio failed: $e')));
     _audioSub = null;
-    if (_isAudioStreaming) {
-      unawaited(_recorder.stop().catchError(
-          (Object e) => debugPrint('Stopping offline audio failed: $e')));
-    }
     _isAudioStreaming = false;
   }
 
@@ -1464,15 +1458,14 @@ class _HomeScreenState extends State<HomeScreen>
         // The baby's threshold is the active one; tell the new parent.
         unawaited(_syncNoiseThreshold());
       } else if (_role == DeviceRole.PARENT) {
-        // Ensure player is initialized but DO NOT start yet.
-        // We will start it when the first audio packet arrives to avoid buffer underrun.
+        // Reset the player but DO NOT start it yet: it starts when the first
+        // audio packet arrives, to avoid a buffer underrun.
         // Note: We do NOT use Helper.setSpeakerphoneOn(true) here for Offline mode
-        // because sound_stream uses STREAM_MUSIC which naturally plays on the speaker.
+        // because the offline player uses the media stream, which plays on the speaker.
         // Using WebRTC's Helper might switch mode to IN_COMMUNICATION which can mute MUSIC stream on some devices.
-        _player.initialize().then((_) {
-          _player.stop(); // Reset state
-          _isPlayerRunning = false;
-        });
+        _isPlayerRunning = false;
+        unawaited(_offlineAudio.stopPlayer().catchError(
+            (Object e) => debugPrint('Offline player reset failed: $e')));
       }
     } else {
       setState(() {
@@ -1500,7 +1493,8 @@ class _HomeScreenState extends State<HomeScreen>
       _isStreaming = false;
       _stopAudioStream();
     } else if (_role == DeviceRole.PARENT) {
-      _player.stop();
+      unawaited(_offlineAudio.stopPlayer().catchError(
+          (Object e) => debugPrint('Offline player stop failed: $e')));
       _isPlayerRunning = false;
     }
     _refreshBottomSheet();
@@ -1586,11 +1580,18 @@ class _HomeScreenState extends State<HomeScreen>
     } else if (type == OfflinePayloadType.audio) {
       // Audio Data
       if (_role == DeviceRole.PARENT) {
+        // Platform channel messages are handled in order, so the player is
+        // started before the first chunk is written.
         if (!_isPlayerRunning) {
-          _player.start();
           _isPlayerRunning = true;
+          unawaited(_offlineAudio.startPlayer().then((ok) {
+            if (!ok) debugPrint('Offline player could not start');
+          }).catchError((Object e) {
+            debugPrint('Offline player start failed: $e');
+          }));
         }
-        _player.writeChunk(message.body);
+        unawaited(_offlineAudio.writeChunk(message.body).catchError(
+            (Object e) => debugPrint('Offline audio write failed: $e')));
       }
     } else if (type == OfflinePayloadType.battery) {
       // Battery Data

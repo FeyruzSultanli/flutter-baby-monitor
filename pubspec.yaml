@@ -24,7 +24,6 @@ dependencies:
   device_info_plus: 9.1.2
   image: ^4.7.2
   flutter_image_compress: ^2.4.0
-  sound_stream: ^0.4.2
   gal: ^2.3.0
   path_provider: ^2.1.2
   battery_plus: ^7.0.0
