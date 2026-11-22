@@ -1,6 +1,6 @@
 /* Permission texts (English). Keys from Info.plist. */
-"NSCameraUsageDescription" = "Baby Monitor uses the camera to show the baby's video on the parent's phone.";
-"NSMicrophoneUsageDescription" = "Baby Monitor uses the microphone to stream sound and detect crying.";
-"NSPhotoLibraryAddUsageDescription" = "Baby Monitor saves your recordings to the photo library.";
-"NSPhotoLibraryUsageDescription" = "Baby Monitor needs access to the photo library to save recordings.";
-"NSLocalNetworkUsageDescription" = "Baby Monitor connects directly to the other phone on your local network for a faster video stream.";
+"NSCameraUsageDescription" = "Ninni uses the camera to show the baby's video on the parent's phone.";
+"NSMicrophoneUsageDescription" = "Ninni uses the microphone to stream sound and detect crying.";
+"NSPhotoLibraryAddUsageDescription" = "Ninni saves your recordings to the photo library.";
+"NSPhotoLibraryUsageDescription" = "Ninni needs access to the photo library to save recordings.";
+"NSLocalNetworkUsageDescription" = "Ninni connects directly to the other phone on your local network for a faster video stream.";

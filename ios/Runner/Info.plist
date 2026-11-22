@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bebek Monitor</string>
+	<string>Ninni</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -32,15 +32,15 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Baby Monitor uses the camera to show the baby's video on the parent's phone.</string>
+	<string>Ninni uses the camera to show the baby's video on the parent's phone.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Baby Monitor connects directly to the other phone on your local network for a faster video stream.</string>
+	<string>Ninni connects directly to the other phone on your local network for a faster video stream.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Baby Monitor uses the microphone to stream sound and detect crying.</string>
+	<string>Ninni uses the microphone to stream sound and detect crying.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Baby Monitor saves your recordings to the photo library.</string>
+	<string>Ninni saves your recordings to the photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Baby Monitor needs access to the photo library to save recordings.</string>
+	<string>Ninni needs access to the photo library to save recordings.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -73,6 +73,8 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>UIStatusBarHidden</key>
+	<false/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

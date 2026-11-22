@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Monochrome status bar icon for notifications (B47). Android tints it;
-     a full-color launcher icon would show as a white square. Path: Material
-     "notifications" icon (Apache License 2.0). -->
+<!-- Monochrome status bar icon (B47, Ninni v2 §1): the crescent and the dot
+     of the Ninni mark on the 160 grid. Android tints it. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:viewportWidth="160"
+    android:viewportHeight="160">
+    <!-- circle(76,84,r46) minus circle(100,62,r40), as two arcs -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.89,2 2,2zM18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32V4c0,-0.83 -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z" />
+        android:pathData="M67.41,38.81 A46,46 0 1,0 120.27,96.48 A40,40 0 0,1 67.41,38.81 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M93,74 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0" />
 </vector>
