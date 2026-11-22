@@ -26,6 +26,7 @@ import '../core/debug/debug_hooks.dart';
 import '../core/audio/audio_level.dart';
 import '../core/audio/cry_detector.dart';
 import '../core/audio/offline_audio.dart';
+import '../core/audio/pcm_microphone.dart';
 import '../core/offline/offline_payload.dart';
 import '../core/pairing/pairing_service.dart';
 import '../core/pairing/pairing_state.dart';
@@ -102,10 +103,18 @@ class _HomeScreenState extends State<HomeScreen>
   final List<Map<String, String>> _discoveredEndpoints = []; // {id, name}
   final StreamController<List<Map<String, String>>> _discoveryStreamController = StreamController.broadcast();
 
+  // Microphone PCM (`record` package): offline streaming over Nearby, and
+  // the online baby's noise meter while no parent is connected.
+  final PcmMicrophone _mic = PcmMicrophone();
   // Audio Streaming (Offline, Android only): raw PCM over Nearby.
   final OfflineAudio _offlineAudio = OfflineAudio();
   StreamSubscription<Uint8List>? _audioSub;
   bool _isAudioStreaming = false;
+  // Online baby, no parent connected (standby): WebRTC does not capture, so
+  // the loudest chunk of our own microphone feeds cry detection.
+  StreamSubscription<Uint8List>? _standbyMicSub;
+  bool _standbyMicActive = false;
+  final PeakDbTracker _standbyPeak = PeakDbTracker();
   bool _isPlayerRunning = false; // Track player state
 
   bool _listeningNoise = false;
@@ -405,8 +414,10 @@ class _HomeScreenState extends State<HomeScreen>
     _batteryStateSubscription?.cancel();
     // Resources that were not released before (B25).
     _noisePollTimer?.cancel();
-    // Cancelling the microphone subscription stops recording.
     _audioSub?.cancel();
+    _standbyMicSub?.cancel();
+    unawaited(_mic.stop().catchError(
+        (Object e) => debugPrint('Microphone stop on dispose failed: $e')));
     // The offline audio channel exists only on Android.
     if (defaultTargetPlatform == TargetPlatform.android) {
       unawaited(_offlineAudio.stopPlayer().catchError(
@@ -673,6 +684,10 @@ class _HomeScreenState extends State<HomeScreen>
         pairingService: pairing,
         onStatusChanged: _handleConnectionStatus,
         onError: _handlePairingError,
+        // Cry detection: own microphone meter in standby, WebRTC's audio
+        // level during a call; never both on the microphone at once.
+        beforeBabyCall: _stopStandbyMic,
+        onBabyStandby: () => unawaited(_startStandbyMic()),
       );
       await webrtc.initRenderers();
       if (!mounted) {
@@ -1190,10 +1205,16 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _startAudioStream() async {
     if (_isAudioStreaming || _connectedEndpointId == null) return;
-    
+    _isAudioStreaming = true;
+
     try {
-      // Listening starts the microphone; cancelling stops it.
-      _audioSub = _offlineAudio.micStream().listen((data) {
+      final stream = await _mic.start();
+      if (!_isAudioStreaming || !mounted) {
+        // Stopped (disconnect/dispose) while the microphone was starting.
+        await _mic.stop();
+        return;
+      }
+      _audioSub = stream.listen((data) {
         if (_connectedEndpointId != null) {
           // 1. Send Audio Data
           final payload = OfflinePayload.encode(OfflinePayloadType.audio, data);
@@ -1206,19 +1227,72 @@ class _HomeScreenState extends State<HomeScreen>
         debugPrint('Offline microphone error: $e');
         _stopAudioStream();
       });
-      _isAudioStreaming = true;
     } catch (e) {
       debugPrint("Error starting audio stream: $e");
+      _isAudioStreaming = false;
     }
   }
 
   void _stopAudioStream() {
-    // Cancelling the subscription stops the microphone on the native side.
-    unawaited(_audioSub?.cancel().catchError(
-        (Object e) => debugPrint('Stopping offline audio failed: $e')));
+    unawaited(_audioSub?.cancel());
     _audioSub = null;
+    if (_isAudioStreaming) {
+      unawaited(_mic.stop().catchError(
+          (Object e) => debugPrint('Stopping offline audio failed: $e')));
+    }
     _isAudioStreaming = false;
   }
+
+  /// Online baby in standby (no parent connected): our own microphone meter
+  /// feeds cry detection, because WebRTC does not capture audio before a
+  /// call. Stopped before a call starts (WebRTCService.beforeBabyCall).
+  Future<void> _startStandbyMic() async {
+    if (!mounted || _isOfflineMode || _role != DeviceRole.BABY) return;
+    if (_standbyMicActive) return;
+    if (_isDebugIosSimulator) {
+      // CoreAudio on the iOS simulator aborts the app when a second audio
+      // engine starts (BLOCKERS 4); E2E tests inject the level instead.
+      debugPrint('Standby noise meter skipped on the iOS simulator');
+      return;
+    }
+    _standbyMicActive = true;
+    _standbyPeak.take();
+    try {
+      final stream = await _mic.start();
+      if (!_standbyMicActive || !mounted) {
+        await _mic.stop();
+        return;
+      }
+      _standbyMicSub = stream.listen(_standbyPeak.addChunk,
+          onError: (Object e) {
+        debugPrint('Standby noise meter error: $e');
+        unawaited(_stopStandbyMic());
+      });
+    } catch (e) {
+      // e.g. no microphone permission: fall back to WebRTC's level.
+      debugPrint('Standby noise meter unavailable: $e');
+      _standbyMicActive = false;
+    }
+  }
+
+  Future<void> _stopStandbyMic() async {
+    final wasActive = _standbyMicActive;
+    _standbyMicActive = false;
+    await _standbyMicSub?.cancel();
+    _standbyMicSub = null;
+    if (wasActive) {
+      try {
+        await _mic.stop();
+      } catch (e) {
+        debugPrint('Standby noise meter stop failed: $e');
+      }
+    }
+  }
+
+  static bool get _isDebugIosSimulator =>
+      kDebugMode &&
+      defaultTargetPlatform == TargetPlatform.iOS &&
+      Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
 
   void _calculateAndSendDb(List<int> data) {
     // PCM16 chunk -> shared noise scale (same as online, see audio_level.dart)
@@ -1781,13 +1855,22 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (_listeningNoise) return;
 
-    // Use WebRTC stats polling instead of a separate mic reader (e.g. noise_meter) to avoid mic conflict on devices like Redmi Note 9 Pro
+    // During a call: WebRTC stats (no second microphone reader next to
+    // WebRTC; that conflicted on devices like Redmi Note 9 Pro). In standby
+    // WebRTC does not capture, so our own meter runs instead (onBabyStandby /
+    // beforeBabyCall switch between the two).
     _noisePollTimer?.cancel();
     _noisePollTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) async {
       // Debug builds only: integration tests can inject a "fake cry" level.
       final fakeDb = DebugHooks.fakeNoiseDb;
       if (fakeDb != null) {
         _processNoiseLevel(fakeDb);
+        return;
+      }
+      if (_standbyMicActive) {
+        // Standby: loudest chunk of our own microphone since the last tick.
+        final db = _standbyPeak.take();
+        if (db != null) _processNoiseLevel(db);
         return;
       }
       if (_webrtcService == null) return;
@@ -1806,6 +1889,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _stopNoiseMonitoring() async {
+    // The standby meter can be running before monitoring started.
+    await _stopStandbyMic();
     if (!_listeningNoise) return;
     _noisePollTimer?.cancel();
     _noisePollTimer = null;

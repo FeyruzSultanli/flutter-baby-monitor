@@ -22,8 +22,20 @@ class WebRTCService {
     PairingService? pairingService,
     this.onStatusChanged,
     this.onError,
+    this.beforeBabyCall,
+    this.onBabyStandby,
   })  : _signalingService = signalingService,
         _pairingService = pairingService;
+
+  /// Baby side: awaited before a peer for a parent session is built. WebRTC
+  /// opens the microphone once that call is set up, so another microphone
+  /// reader (the standby noise meter) must be stopped here.
+  final Future<void> Function()? beforeBabyCall;
+
+  /// Baby side: called after a standby peer (no parent / call lost) was
+  /// built. WebRTC does not capture audio in standby (its audio level stays
+  /// 0), so cry detection needs its own microphone reader then.
+  final void Function()? onBabyStandby;
 
   /// How long a `disconnected` peer may take to recover before it counts as
   /// failed (B36). Short Wi-Fi hiccups usually recover within a few seconds.
@@ -55,6 +67,9 @@ class WebRTCService {
   String? _roomCode;
   String? _babySession;
   bool _isBaby = false;
+  // True while the baby's peer belongs to a parent session (a call); false
+  // in standby.
+  bool _babyInCall = false;
   Future<void> _babyNegotiation = Future.value();
   // Incremented by startAsBaby/startAsParent/hangUp; an in-flight negotiation
   // of an older generation abandons its peer instead of installing it.
@@ -213,9 +228,34 @@ class WebRTCService {
       // The baby just waits: the parent rejoins with a new session, which
       // triggers a fresh offer.
       _setStatus(ConnectionStatus.CONNECTING);
+      _babyCallLost();
     } else {
       _setStatus(ConnectionStatus.FAILED);
     }
+  }
+
+  /// Baby side: the call failed (e.g. the parent's app was closed). There is
+  /// no ICE restart, so the peer cannot recover; the parent comes back with
+  /// a new session. Replace it with a standby peer so WebRTC releases the
+  /// microphone and the standby noise meter can keep detecting cries (for
+  /// push notifications) meanwhile. [_babySession] is kept, so further room
+  /// snapshots with the old session do not start a new offer.
+  void _babyCallLost() {
+    final generation = _generation;
+    _babyNegotiation = _babyNegotiation.then((_) async {
+      if (generation != _generation || !_isBaby || !_babyInCall) return;
+      final roomCode = _roomCode;
+      if (roomCode == null || _localStream == null) return;
+      try {
+        await _closePeer();
+        // Standby candidates must not be written under the old session.
+        _signalingService.session = null;
+        if (generation != _generation) return;
+        await _buildBabyPeer(roomCode, session: null, generation: generation);
+      } catch (e) {
+        debugPrint('Standby after lost call failed: $e');
+      }
+    });
   }
 
   /// Baby side: opens the camera/microphone and the signaling channel. The
@@ -289,6 +329,21 @@ class WebRTCService {
     final localStream = _localStream;
     if (localStream == null) return;
 
+    if (session != null) {
+      // Release other microphone readers before WebRTC starts capturing.
+      final hook = beforeBabyCall;
+      if (hook != null) {
+        try {
+          // Bounded: a microphone that does not stop must not block the call.
+          await hook().timeout(const Duration(seconds: 8));
+        } catch (e) {
+          debugPrint('beforeBabyCall failed: $e');
+        }
+      }
+      if (generation != _generation) return;
+    }
+    _babyInCall = session != null;
+
     final pc = await _createPeerConnection();
     if (generation != _generation) {
       // hangUp() or a new start happened meanwhile
@@ -312,12 +367,15 @@ class WebRTCService {
     };
 
     if (session == null) {
-      // Standby (no parent yet): a local description makes libwebrtc create the
-      // audio sender, so getAudioLevel() (cry detection) works before a parent
-      // joins. Nothing is sent; candidates without a session are not written.
+      // Standby (no parent yet): a local description creates the senders.
+      // Nothing is sent; candidates without a session are not written.
+      // WebRTC does not capture audio before a call is set up (its audio
+      // level stays 0, measured on iOS), so the app runs its own noise meter
+      // in standby (onBabyStandby).
       final standbyOffer = await pc.createOffer();
       if (generation != _generation || !identical(_peerConnection, pc)) return;
       await pc.setLocalDescription(standbyOffer);
+      onBabyStandby?.call();
       return;
     }
 
