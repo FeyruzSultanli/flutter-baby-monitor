@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../auth/auth_service.dart';
 import '../enums/connection_status.dart';
+import '../audio/soothe.dart';
 import '../monitor/battery_alert.dart';
 import 'pairing_state.dart';
 import 'room_code.dart';
@@ -185,6 +186,28 @@ class PairingService {
     });
   }
 
+  /// V2 5.2: name of the room, set on the baby phone.
+  Future<void> setRoomName(String roomCode, String name) async {
+    await _rooms.doc(roomCode).update({'roomName': name});
+  }
+
+  /// V2 5.4: lullaby / white noise; written by the parent, cleared by the
+  /// baby when the timer ends.
+  Future<void> setSoothe(String roomCode, SootheState state) async {
+    final map = state.toMap();
+    await _rooms.doc(roomCode).update({
+      'soothe': {
+        ...map,
+        'endsAt': state.endsAt == null ? null : Timestamp.fromDate(state.endsAt!),
+      },
+    });
+  }
+
+  /// V2 5.5: night light of the baby phone.
+  Future<void> setNightLight(String roomCode, NightLightState state) async {
+    await _rooms.doc(roomCode).update({'nightLight': state.toMap()});
+  }
+
   Future<void> updateNoiseThreshold(String roomCode, double threshold) async {
     await _rooms.doc(roomCode).update({'noiseThreshold': threshold});
   }
@@ -269,6 +292,9 @@ class PairingService {
         noiseThreshold: (data['noiseThreshold'] as num?)?.toDouble(),
         viewerSession: data['viewerSession'] as String?,
         battery: BabyBattery.fromRoom(data['battery']),
+        roomName: data['roomName'] is String ? data['roomName'] as String : null,
+        soothe: SootheState.fromMap(data['soothe']),
+        nightLight: NightLightState.fromMap(data['nightLight']),
       );
     });
   }

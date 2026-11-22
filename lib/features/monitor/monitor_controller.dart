@@ -19,6 +19,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../app_keys.dart';
 import '../../core/alert_history_service.dart';
 import '../../core/audio/app_audio.dart';
+import '../../core/audio/soothe.dart';
 import '../../core/audio/audio_level.dart';
 import '../../core/audio/cry_detector.dart';
 import '../../core/audio/offline_audio.dart';
@@ -32,6 +33,7 @@ import '../../core/monitor/connection_watchdog.dart';
 import '../../core/offline/offline_payload.dart';
 import '../../core/pairing/pairing_service.dart';
 import '../../core/pairing/pairing_state.dart';
+import '../../core/pairing/recent_room_store.dart';
 import '../../core/pairing/room_code.dart';
 import '../../core/recording/video_recorder_service.dart';
 import '../../core/services/hybrid_notification_manager.dart';
@@ -95,6 +97,27 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
 
   // Baby: when the current room was created (code countdown, 10 min claim).
   DateTime? _roomCreatedAt;
+
+  // V2 phase 3 ---------------------------------------------------------------
+  // Lullaby / white noise (5.4) and night light (5.5): the baby plays and
+  // shows them; the parent requests them (room fields or Nearby messages).
+  final SoothePlayer _soothePlayer = SoothePlayer();
+  final SootheThreshold _sootheThreshold = SootheThreshold();
+  SootheState _soothe = SootheState.off;
+  double _sootheVolume = 0.4;
+  Duration? _sootheTimer = const Duration(minutes: 30);
+  Timer? _sootheVolumeDebounce;
+  NightLightState _nightLight = NightLightState.off;
+  // Push-to-talk (5.3).
+  final TalkGate _talkGate = TalkGate();
+  bool _talking = false;
+  // Room name (5.2): set on the baby phone, remembered there.
+  String? _babyRoomName;
+  static const String _roomNameKey = 'babyRoomName';
+  // Parent: recently joined rooms (5.2).
+  final RecentRoomStore _recentStore = RecentRoomStore();
+  List<RecentRoom> _recentRooms = const [];
+  String? _rememberedRoom;
 
   List<CameraDescription> _cameras = [];
   CameraController? _controller;
@@ -241,6 +264,10 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     };
     _coreReady = _initCoreServices();
     _initBatteryMonitoring();
+    unawaited(_recentStore.load().then((rooms) {
+      _recentRooms = rooms;
+      _notify();
+    }));
   }
 
   /// Completes when Firebase/WebRTC services are set up (or failed).
@@ -346,6 +373,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final listening = prefs.getBool(_backgroundListeningKey);
       final autoNight = prefs.getBool(_autoNightKey);
+      _babyRoomName = prefs.getString(_roomNameKey);
       final threshold = prefs.getDouble(_thresholdKey);
       if (!mounted) return;
       setState(() {
@@ -655,6 +683,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _discoveryStreamController.close();
     _controller?.dispose();
     unawaited(_cryAlarmSound.dispose());
+    unawaited(_soothePlayer.dispose());
+    _sootheVolumeDebounce?.cancel();
     if (_role == DeviceRole.BABY && _pairingState?.roomCode != null) {
       unawaited(_pairingService?.closeRoom(_pairingState!.roomCode).catchError(
           (Object e) => debugPrint('Closing room on dispose failed: $e')));
@@ -686,6 +716,10 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     if (status == ConnectionStatus.CONNECTED) {
       if (_role == DeviceRole.BABY && !_parentEverConnected) {
         setState(() => _parentEverConnected = true);
+      }
+      final joined = _pairingState?.roomCode;
+      if (_role == DeviceRole.PARENT && !_isOfflineMode && joined != null) {
+        unawaited(_rememberRoom(joined));
       }
       _rejoinBackoff.reset();
       _rejoinTimer?.cancel();
@@ -933,6 +967,13 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _cryActive = false;
     _cryAlarmVisible = false;
     unawaited(_cryAlarmSound.stop());
+    unawaited(_soothePlayer.stop());
+    _sootheThreshold.stop();
+    _talkGate.reset();
+    _talking = false;
+    _soothe = SootheState.off;
+    _nightLight = NightLightState.off;
+    _rememberedRoom = null;
     setState(() {
       _pairingState = null;
       _pairingError = null;
@@ -985,6 +1026,16 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Threshold sync failed: $e');
     }
+  }
+
+  /// Cry detection with the v2 adjustments: while our own lullaby plays the
+  /// threshold follows its measured level (5.4, A29); while the parent talks
+  /// and 3 s after, detection pauses (5.3).
+  bool _detectCry(double db, DateTime now) {
+    _sootheThreshold.add(db, now, alarming: _lastCryAlertSent);
+    _cryDetector.threshold = _sootheThreshold.effective(_noiseThreshold);
+    final talking = _talkGate.suppressed(now);
+    return _cryDetector.update(talking ? 0 : db, now);
   }
 
   /// Returns true (and starts a new cooldown) if a cry notification may be
@@ -1040,6 +1091,11 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _connectionStatus = ConnectionStatus.CONNECTING;
       });
       _roomCreatedAt = DateTime.now();
+      final name = _babyRoomName;
+      if (name != null) {
+        unawaited(_pairingService!.setRoomName(newCode, name).catchError(
+            (Object e) => debugPrint('Room name not stored: $e')));
+      }
       _listenRoomUpdates(newCode);
       _startRoomHeartbeat(newCode);
       await _webrtcService!.startAsBaby(newCode, facingMode: facingMode);
@@ -1145,6 +1201,12 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       if (!mounted) return;
       // A code that cannot be joined is final: no automatic rejoin.
       // V2: a failed first join goes back to the join screen.
+      if (e is RoomUnavailableException) {
+        unawaited(_recentStore.forget(roomCode).then((rooms) {
+          _recentRooms = rooms;
+          _notify();
+        }));
+      }
       _viewerSession = null;
       _stopWatchdog();
       unawaited(MonitorForegroundService.instance.stop());
@@ -1443,7 +1505,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     final db = pcm16ChunkToDb(data);
 
     final now = DateTime.now();
-    final bool alert = _cryDetector.update(db, now);
+    final bool alert = _detectCry(db, now);
 
     // Publish (local UI + parent) on alert changes or every 200 ms. Audio
     // chunks arrive many times per second; rebuilding the whole HomeScreen
@@ -1700,6 +1762,15 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         } else if (map['type'] == 'THRESHOLD') {
            final value = map['value'];
            if (value is num) _setNoiseThreshold(value.toDouble(), fromRemote: true);
+        } else if (map['type'] == 'SOOTHE') {
+           final state = SootheState.fromMap(map);
+           if (_role == DeviceRole.BABY) {
+             _applyRemoteSoothe(state);
+           } else {
+             setState(() => _soothe = state);
+           }
+        } else if (map['type'] == 'NIGHT_LIGHT') {
+           if (_role == DeviceRole.BABY) _applyRemoteNightLight(NightLightState.fromMap(map));
         } else if (map['type'] == 'SWITCH_CAMERA') {
            // Handle Camera Switch Request from Parent
            if (_role == DeviceRole.BABY) {
@@ -1937,7 +2008,9 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         return;
       }
       if (_webrtcService == null) return;
-      final level = await _webrtcService!.getAudioLevel();
+      final levels = await _webrtcService!.getAudioLevels();
+      _talkGate.onRemoteLevel(levels.remote, DateTime.now());
+      final level = levels.local;
       if (level != null) {
         // Linear 0..1 -> 20*log10(level) + 100, clamped to 0..120.
         _processNoiseLevel(webrtcAudioLevelToDb(level));
@@ -1986,7 +2059,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _processNoiseLevel(double db) {
     final now = DateTime.now();
-    final bool alert = _cryDetector.update(db, now);
+    final bool alert = _detectCry(db, now);
 
     if (_role == DeviceRole.BABY) {
       setState(() {
@@ -2055,11 +2128,15 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     }
     try {
       // Only this app's window; the system brightness setting is untouched.
-      await ScreenBrightness.instance.setApplicationScreenBrightness(0.0);
+      await ScreenBrightness.instance.setApplicationScreenBrightness(_nightBrightness);
     } catch (e) {
       debugPrint('Setting brightness failed: $e');
     }
   }
+
+  /// Night mode is at minimum brightness; with the night light on (5.5) the
+  /// screen glows softly.
+  double get _nightBrightness => _nightLight.on ? 0.25 : 0.0;
 
   Future<void> _exitNightMode() async {
     if (!_nightMode) return;
@@ -2131,6 +2208,11 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       if (_role == DeviceRole.BABY) {
+        _applyRemoteSoothe(roomState.soothe);
+        _applyRemoteNightLight(roomState.nightLight);
+      }
+
+      if (_role == DeviceRole.BABY) {
         // A parent joined (new session) or left (null): renegotiate (B08).
         unawaited(_webrtcService?.onViewerSessionChanged(roomState.viewerSession));
       }
@@ -2144,6 +2226,13 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         }
       }
       if (_role == DeviceRole.PARENT) {
+        if (roomState.soothe != _soothe || roomState.nightLight != _nightLight) {
+          setState(() {
+            _soothe = roomState.soothe;
+            _nightLight = roomState.nightLight;
+          });
+        }
+        if (roomState.roomName != null) unawaited(_rememberRoom(roomCode));
         final battery = roomState.battery;
         if (battery != null) {
           setState(() => _onRemoteBattery(battery.level, battery.charging));
@@ -2429,11 +2518,22 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
 
   DateTime? get roomCreatedAt => _roomCreatedAt;
 
-  /// Room name given on the baby phone (V2 5.2); null until set.
-  String? get roomName => null;
+  /// Room name (V2 5.2): the baby's own name, or the one in the room.
+  String? get roomName => _role == DeviceRole.BABY ? _babyRoomName : _pairingState?.roomName;
 
   /// Night light color on the baby phone (V2 5.5); null when off.
-  Color? get nightLightColor => null;
+  Color? get nightLightColor => _nightLight.on ? _nightLight.color.color : null;
+
+  SootheState get soothe => _soothe;
+  double get sootheVolume => _soothe.track != null ? _soothe.volume : _sootheVolume;
+  Duration? get sootheTimer => _sootheTimer;
+  NightLightState get nightLight => _nightLight;
+  List<RecentRoom> get recentRooms => _recentRooms;
+  bool get talking => _talking;
+  /// Parent: push-to-talk is available (online, connected, negotiated).
+  bool get canTalk =>
+      _demo || (!_isOfflineMode && isConnected && (_webrtcService?.canTalk ?? false));
+  bool _demo = false;
 
   List<Map<String, String>> get discoveredEndpoints => List.unmodifiable(_discoveredEndpoints);
   bool get discovering => _discovering;
@@ -2567,6 +2667,173 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _notify();
   }
 
+  // V2 phase 3: lullaby, night light, talk, room name -------------------------
+
+  /// Baby: apply the requested sound (room field or Nearby message).
+  void _applyRemoteSoothe(SootheState state) {
+    if (state == _soothe) return;
+    final now = DateTime.now();
+    final changedSound = state.track != _soothe.track || state.volume != _soothe.volume;
+    _soothe = state;
+    if (state.isPlayingAt(now)) {
+      if (changedSound) _sootheThreshold.start(now);
+    } else {
+      _sootheThreshold.stop();
+    }
+    unawaited(_soothePlayer.apply(state, onEnded: _onSootheEnded));
+    _notify();
+  }
+
+  /// Baby: the timer ran out; tell the parent.
+  void _onSootheEnded() {
+    _soothe = SootheState.off;
+    _sootheThreshold.stop();
+    _notify();
+    unawaited(_sendSootheToPeer(SootheState.off));
+  }
+
+  /// Baby: night light on/off/color. Turning it on dims the phone into
+  /// night mode, where the light shows.
+  void _applyRemoteNightLight(NightLightState state) {
+    if (state == _nightLight) return;
+    _nightLight = state;
+    if (state.on && !_nightMode) {
+      unawaited(_enterNightMode());
+    } else if (_nightMode) {
+      unawaited(ScreenBrightness.instance
+          .setApplicationScreenBrightness(_nightBrightness)
+          .catchError((Object e) => debugPrint('Brightness failed: $e')));
+    }
+    _notify();
+  }
+
+  Future<void> _sendSootheToPeer(SootheState state) async {
+    try {
+      if (_isOfflineMode) {
+        final endpoint = _connectedEndpointId;
+        if (endpoint == null) return;
+        await Nearby().sendBytesPayload(
+          endpoint,
+          OfflinePayload.encodeJson(OfflinePayloadType.control, {'type': 'SOOTHE', ...state.toMap()}),
+        );
+      } else {
+        final roomCode = _pairingState?.roomCode;
+        final pairing = _pairingService;
+        if (roomCode == null || pairing == null) return;
+        await pairing.setSoothe(roomCode, state);
+      }
+    } catch (e) {
+      debugPrint('Sending soothe state failed: $e');
+    }
+  }
+
+  /// Parent: play [track] on the baby phone with the chosen volume/timer.
+  Future<void> playSoothe(SootheTrack track) async {
+    final timer = _sootheTimer;
+    final state = SootheState(
+      track: track,
+      volume: _sootheVolume,
+      endsAt: timer == null ? null : DateTime.now().add(timer),
+    );
+    setState(() => _soothe = state);
+    await _sendSootheToPeer(state);
+  }
+
+  Future<void> stopSoothe() async {
+    setState(() => _soothe = SootheState.off);
+    await _sendSootheToPeer(SootheState.off);
+  }
+
+  void setSootheVolume(double volume) {
+    _sootheVolume = volume.clamp(0.0, 1.0);
+    if (_soothe.track == null) {
+      _notify();
+      return;
+    }
+    final state = SootheState(track: _soothe.track, volume: _sootheVolume, endsAt: _soothe.endsAt);
+    setState(() => _soothe = state);
+    _sootheVolumeDebounce?.cancel();
+    _sootheVolumeDebounce =
+        Timer(const Duration(milliseconds: 400), () => unawaited(_sendSootheToPeer(_soothe)));
+  }
+
+  /// null = until stopped.
+  void setSootheTimer(Duration? duration) {
+    _sootheTimer = duration;
+    final track = _soothe.track;
+    if (track == null) {
+      _notify();
+      return;
+    }
+    unawaited(playSoothe(track));
+  }
+
+  Future<void> setNightLight({bool? on, NightLightColor? color}) async {
+    final state = NightLightState(on: on ?? _nightLight.on, color: color ?? _nightLight.color);
+    setState(() => _nightLight = state);
+    try {
+      if (_isOfflineMode) {
+        final endpoint = _connectedEndpointId;
+        if (endpoint == null) return;
+        await Nearby().sendBytesPayload(
+          endpoint,
+          OfflinePayload.encodeJson(OfflinePayloadType.control, {'type': 'NIGHT_LIGHT', ...state.toMap()}),
+        );
+      } else {
+        final roomCode = _pairingState?.roomCode;
+        if (roomCode == null) return;
+        await _pairingService?.setNightLight(roomCode, state);
+      }
+    } catch (e) {
+      debugPrint('Night light update failed: $e');
+    }
+  }
+
+  /// Parent: hold-to-talk (5.3). Asks for the microphone on first use.
+  Future<void> startTalking() async {
+    if (!canTalk || _talking) return;
+    final status = await Permission.microphone.request();
+    if (!status.isGranted) {
+      _messenger?.showSnackBar(SnackBar(content: Text(l10n.talkNeedsMic)));
+      return;
+    }
+    setState(() => _talking = true);
+    final ok = await _webrtcService!.startTalking();
+    if (!ok) setState(() => _talking = false);
+  }
+
+  Future<void> stopTalking() async {
+    if (!_talking) return;
+    setState(() => _talking = false);
+    await _webrtcService?.stopTalking();
+  }
+
+  /// Baby: name of this room (5.2), kept for the next rooms too.
+  Future<void> setRoomName(String name) async {
+    final trimmed = name.trim();
+    setState(() => _babyRoomName = trimmed.isEmpty ? null : trimmed);
+    await _savePref((p) => trimmed.isEmpty ? p.remove(_roomNameKey) : p.setString(_roomNameKey, trimmed));
+    final roomCode = _pairingState?.roomCode;
+    if (trimmed.isNotEmpty && roomCode != null && !_isOfflineMode) {
+      try {
+        await _pairingService?.setRoomName(roomCode, trimmed);
+      } catch (e) {
+        debugPrint('Room name not stored: $e');
+      }
+    }
+  }
+
+  /// Parent: remember the joined room (5.2), once per join and again when
+  /// its name arrives.
+  Future<void> _rememberRoom(String code) async {
+    final name = _pairingState?.roomName;
+    final key = '$code|${name ?? ''}';
+    if (_rememberedRoom == key || !RoomCode.isValid(code)) return;
+    _rememberedRoom = key;
+    _recentRooms = await _recentStore.remember(RecentRoom(code: code, name: name, joinedAt: DateTime.now()));
+    _notify();
+  }
+
   // Demo scenes ---------------------------------------------------------------
 
   /// Puts the controller into a fixed state for store screenshots and
@@ -2576,6 +2843,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   @visibleForTesting
   void debugDemo(DemoScene scene) {
     final now = DateTime.now();
+    _demo = true;
     _roleChosen = scene != DemoScene.roleSelect;
     _isOfflineMode = false;
     _pairingError = null;
@@ -2610,6 +2878,14 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _role = DeviceRole.PARENT;
         _pairingState = null;
         _connectionStatus = ConnectionStatus.DISCONNECTED;
+        final yesterday = now.subtract(const Duration(days: 1));
+        _recentRooms = [
+          RecentRoom(
+            code: 'K7MQT2H9',
+            name: _locale().languageCode == 'en' ? 'Baby room' : (_locale().languageCode == 'az' ? 'Körpə otağı' : 'Bebek odası'),
+            joinedAt: DateTime(yesterday.year, yesterday.month, yesterday.day, 21, 40),
+          ),
+        ];
       case DemoScene.parentLive:
       case DemoScene.cryAlert:
       case DemoScene.connectionLost:
@@ -2621,6 +2897,12 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _currentDecibel = scene == DemoScene.cryAlert ? 74 : 38;
         _noiseAlert = scene == DemoScene.cryAlert;
         _lastRecordedAlertTime = DateTime(now.year, now.month, now.day, 1, 12);
+        _soothe = SootheState(
+          track: SootheTrack.whiteNoise,
+          volume: 0.4,
+          endsAt: now.add(const Duration(minutes: 24, seconds: 10)),
+        );
+        _nightLight = const NightLightState(on: true, color: NightLightColor.amber);
         if (scene == DemoScene.cryAlert) {
           _cryActive = true;
           _cryAlarmVisible = true;

@@ -103,6 +103,8 @@ class WebRTCService {
   /// Closes the peer connection and its signaling subscriptions, but keeps
   /// the local camera/microphone stream.
   Future<void> _closePeer() async {
+    await stopTalking();
+    _talkSender = null;
     _disconnectTimer?.cancel();
     _disconnectTimer = null;
     _offerTimer?.cancel();
@@ -174,6 +176,80 @@ class WebRTCService {
       !kIsWeb &&
       Platform.isIOS &&
       Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
+
+  /// Both audio levels (0..1) from one stats call: our captured audio
+  /// (cry detection) and the received audio (baby: the parent talking, V2
+  /// 5.3). Either can be null.
+  Future<({double? local, double? remote})> getAudioLevels() async {
+    final pc = _peerConnection;
+    if (pc == null) return (local: null, remote: null);
+    double? local;
+    double? remote;
+    try {
+      for (final report in await pc.getStats()) {
+        final v = report.values;
+        final kind = v['kind'] ?? v['mediaType'];
+        if (kind != 'audio') continue;
+        final level = v['audioLevel'];
+        if (level is! num) continue;
+        if (report.type == 'inbound-rtp' || (report.type == 'track' && v['remoteSource'] == true)) {
+          remote = level.toDouble();
+        } else if (report.type == 'media-source' || report.type == 'track') {
+          local ??= level.toDouble();
+        }
+      }
+    } catch (e) {
+      debugPrint('getStats error: $e');
+    }
+    return (local: local, remote: remote);
+  }
+
+  // Parent → baby talk channel (V2 5.3): the parent's answer makes the audio
+  // transceiver sendrecv from the start; the microphone track is attached
+  // only while the talk button is held (no renegotiation).
+  RTCRtpSender? _talkSender;
+  MediaStream? _talkStream;
+  bool _talking = false;
+
+  /// Parent: a talk channel was negotiated with the current baby session.
+  bool get canTalk => _talkSender != null;
+  bool get isTalking => _talking;
+
+  Future<bool> startTalking() async {
+    final sender = _talkSender;
+    if (sender == null || _talking) return false;
+    _talking = true;
+    try {
+      final stream = await navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+      if (!_talking || !identical(sender, _talkSender)) {
+        await stream.dispose();
+        return false;
+      }
+      _talkStream = stream;
+      await sender.replaceTrack(stream.getAudioTracks().first);
+      return true;
+    } catch (e) {
+      debugPrint('Talk start failed: $e');
+      _talking = false;
+      return false;
+    }
+  }
+
+  Future<void> stopTalking() async {
+    if (!_talking && _talkStream == null) return;
+    _talking = false;
+    final sender = _talkSender;
+    try {
+      await sender?.replaceTrack(null);
+    } catch (e) {
+      debugPrint('Talk stop failed: $e');
+    }
+    final stream = _talkStream;
+    _talkStream = null;
+    try {
+      await stream?.dispose();
+    } catch (_) {}
+  }
 
   Future<double?> getAudioLevel() async {
     if (_peerConnection == null) return null;
@@ -420,6 +496,16 @@ class WebRTCService {
       _onPeerState(state, roomCode);
     };
 
+    if (session != null) {
+      // V2 5.3: the parent's voice must come out of the loudspeaker, not
+      // the earpiece.
+      try {
+        await Helper.setSpeakerphoneOn(true);
+      } catch (e) {
+        debugPrint('Speakerphone failed: $e');
+      }
+    }
+
     if (session == null) {
       // Standby (no parent yet): a local description creates the senders.
       // Nothing is sent; candidates without a session are not written.
@@ -453,6 +539,22 @@ class WebRTCService {
       (candidate) => unawaited(_addRemoteCandidate(pc, candidate)),
       onError: (e) => _reportError('ICE candidate okunamadı: $e'),
     );
+  }
+
+  /// Parent: makes the audio transceiver sendrecv before answering, so the
+  /// talk button can attach the microphone later without renegotiation.
+  Future<void> _prepareTalkChannel(RTCPeerConnection pc) async {
+    try {
+      for (final t in await pc.getTransceivers()) {
+        if (t.receiver.track?.kind != 'audio') continue;
+        await t.setDirection(TransceiverDirection.SendRecv);
+        if (identical(_peerConnection, pc)) _talkSender = t.sender;
+        return;
+      }
+    } catch (e) {
+      // Talking is optional; watching must never fail because of it.
+      debugPrint('Talk channel setup failed: $e');
+    }
   }
 
   /// Remote ICE candidates can arrive before the remote description is set
@@ -545,6 +647,7 @@ class WebRTCService {
 
            await pc.setRemoteDescription(offer);
            await _flushPendingCandidates(pc);
+           await _prepareTalkChannel(pc);
 
            // Explicitly request video/audio
            const constraints = {

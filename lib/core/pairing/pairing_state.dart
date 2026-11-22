@@ -1,5 +1,6 @@
 import '../enums/connection_status.dart';
 import '../../models/video_settings.dart';
+import '../audio/soothe.dart';
 import '../monitor/battery_alert.dart';
 
 // Simple pairing state snapshot kept in UI.
@@ -17,6 +18,9 @@ class PairingState {
     this.noiseThreshold,
     this.viewerSession,
     this.battery,
+    this.roomName,
+    this.soothe = SootheState.off,
+    this.nightLight = NightLightState.off,
   });
 
   final String roomCode;
@@ -36,6 +40,12 @@ class PairingState {
   final String? viewerSession;
   /// Baby phone battery as written by the baby (V2 5.7); null if unknown.
   final BabyBattery? battery;
+  /// Name given on the baby phone (V2 5.2).
+  final String? roomName;
+  /// Lullaby / white noise requested for the baby phone (V2 5.4).
+  final SootheState soothe;
+  /// Night light of the baby phone (V2 5.5).
+  final NightLightState nightLight;
 
   PairingState copyWith({
     bool? isPaired,
@@ -49,6 +59,9 @@ class PairingState {
     double? noiseThreshold,
     String? viewerSession,
     BabyBattery? battery,
+    String? roomName,
+    SootheState? soothe,
+    NightLightState? nightLight,
   }) {
     return PairingState(
       roomCode: roomCode,
@@ -63,6 +76,9 @@ class PairingState {
       noiseThreshold: noiseThreshold ?? this.noiseThreshold,
       viewerSession: viewerSession ?? this.viewerSession,
       battery: battery ?? this.battery,
+      roomName: roomName ?? this.roomName,
+      soothe: soothe ?? this.soothe,
+      nightLight: nightLight ?? this.nightLight,
     );
   }
 }
