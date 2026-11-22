@@ -250,8 +250,11 @@ void main() {
       screenshot('baby_07_night_mode');
       final overlay = find.byKey(const Key('nightModeOverlay'));
       if (overlay.evaluate().isNotEmpty) {
+        // Real time between the taps: on a device a double tap needs more
+        // than 40 ms (kDoubleTapMinTime) and less than 300 ms between them.
         await tester.tap(overlay);
-        await tester.pump(const Duration(milliseconds: 60));
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 120));
         await tester.tap(overlay);
         await pumpFor(tester, const Duration(seconds: 1));
       }
