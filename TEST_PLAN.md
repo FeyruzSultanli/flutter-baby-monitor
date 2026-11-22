@@ -508,3 +508,33 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | V2.14 | Ayarlar | Hassasiyet, kalite, dil, tema. | Kaydırıcı 40–80 dB; Tasarruf/Dengeli/Net görüntüyü değiştirir; dil ve tema uygulama yeniden açılınca korunur. | ✅/❌ |
 | V2.15 | Erişilebilirlik (ön kontrol) | TalkBack / VoiceOver açık, ekranları gezin. | Düğmeler ve durumlar anlamlı okunur (ayrıntılı kontrol Faz 4). | ✅/❌ |
 | V2.16 | Küçük ekran | iPhone SE / küçük Android. | Taşma yok; uzun ekranlar kayar. | ✅/❌ |
+
+## 16. Ninni v2 — Faz 3 (yeni özellikler)
+
+| # | Özellik | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| V3.1 | 5.1 QR | B'de kod ekranı; E'de "QR kodu okut" ile QR'ı okutun. | E otomatik bağlanır. Ninni dışı bir QR'da "Bu bir Ninni oda kodu değil". | ✅/❌ |
+| V3.2 | 5.1 QR izin yok | E'de kamera iznini reddedip "QR kodu okut". | "Kamera izni yok… kodu elle girin" + "Ayarları aç"; elle giriş çalışır. | ✅/❌ |
+| V3.3 | 5.2 Oda adı | B'de kod kartında "Oda adı"na dokunup "Bebek odası 2" yazın; E bağlansın. | E'de canlı ekranda ve son odalar kartında bu ad. Ad, B'de sonraki odalarda da korunur. | ✅/❌ |
+| V3.4 | 5.2 Son oda | E bağlantıyı kessin; kod ekranında "Son bağlandığınız" kartına dokunun. | Tek dokunuşla aynı odaya yeniden bağlanır. Oda kapandıysa hata ve kart kaybolur. | ✅/❌ |
+| V3.5 | 5.3 Bas-konuş | E'de "Basılı tutun, bebeğe konuşun"u basılı tutup konuşun (ilk seferde mikrofon izni). | B'nin **hoparlöründen** ses gelir (~0,5 sn gecikme), bırakınca kesilir. Yankı rahatsız edici mi? Not edin. | ✅/❌ + not: |
+| V3.6 | 5.3 Alarm yok | E konuşurken B'nin yanında yüksek sesle konuşulsun. | Konuşma boyunca ve 3 sn sonrasına kadar ağlama alarmı **gelmez**; sonra normal. | ✅/❌ |
+| V3.7 | 5.4 Ninni | E'de Ninni → her ses, ses düzeyi, 15/30/60/Sürekli. | B'de ses çalar, kesintisiz döngü; zamanlayıcı bitince durur ve E'de "Çalıyor" kalkar. iPhone B'de WebRTC sesi bozulmaz. | ✅/❌ |
+| V3.8 | 5.4 Alarm kaçmasın | Beyaz gürültü %70'te çalarken B'nin yanında 3 sn ağlama sesi. | Alarm gelir (eşik en fazla +12 dB yükselir). Ninni tek başına (ağlama yokken) 2 dk boyunca alarm üretmez. | ✅/❌ |
+| V3.9 | 5.4 "Dandini" | Dandini dandini'yi dinleyin. | Melodi tanınıyor mu? (BLOCKERS 9) | not: |
+| V3.10 | 5.5 Gece lambası | E'de gece lambasını açın, renkleri değiştirin. | B gece moduna geçer, ekran seçilen renkte yumuşak yanar (%25 parlaklık); kapatınca kararır. | ✅/❌ |
+| V3.11 | 5.8 Sessize al | Alarm ekranında "5 dk sessize al", 1 dk sonra yeniden ağlama. | 5 dk boyunca alarm ekranı/sesi yok; geçmişe yine yazılır. 5 dk sonra normal. | ✅/❌ |
+| V3.12 | 5.9 Gecelik özet | Birkaç alarmlı bir geceden sonra Geçmiş. | Alarm sayısı, toplam ağlama süresi (her olayın süresi), en uzun sessiz dönem mantıklı. | ✅/❌ |
+| V3.13 | 5.11 AZ | Ayarlar → Dil → Azərbaycanca; tüm ekranları gezin. | Tüm metinler Azerbaycanca, taşma yok. E arka plandayken push AZ (Function deploy sonrası). | ✅/❌ |
+| V3.14 | Offline | İnternetsiz modda ninni ve gece lambası. | Nearby üzerinden çalışır (bas-konuş offline'da yok). | ✅/❌ |
+
+## 17. Ninni v2 — Faz 4 (cila)
+
+| # | Konu | Adımlar | Beklenen | Sonuç |
+|---|---|---|---|---|
+| V4.1 | Ekran okuyucu | TalkBack (Android) / VoiceOver (iPhone) açık; karşılama → rol → kod → canlı → alarm → ayarlar. | Her düğme anlamlı okunur ("Geri", "Kamerayı çevir", "Bebeğe konuşun…"); oda kodu harf harf okunur; alarm ekranı açılınca duyurulur. Bas-konuş çift dokunuşla açılıp kapanır. | ✅/❌ |
+| V4.2 | Büyük yazı | Sistem yazı boyutu en büyük + kalın yazı. | Hiçbir ekranda kesilen/taşan metin yok; uzun ekranlar kayar. | ✅/❌ |
+| V4.3 | Küçük/büyük ekran | iPhone SE (2./3. nesil) ve bir tablet (iPad / Android tablet). | SE'de taşma yok; tablette içerik ortada, en fazla ~560 pt genişlikte. | ✅/❌ |
+| V4.4 | Bebek cihazı ısı/pil | B 1 saat yayında: 30 dk normal ekran, 30 dk gece modu. | Pil tüketimi ve ısınmayı not edin; gece modunda belirgin şekilde daha az olmalı. | %/saat: |
+| V4.5 | Hareket azaltma | Sistemde "Animasyonları kaldır"/"Hareketi azalt" açık. | Yıldızlar, ay, halkalar, nabız durur; sayfa geçişleri anlık. | ✅/❌ |
+| V4.6 | Mağaza görüntüleri | `flutter run --dart-define=NINNI_DEMO=parentLive` (diğer sahneler: roleSelect, babyPairing, babyLive, babyNight, parentJoin, cryAlert, connectionLost). | Uygulama doğrudan o temiz sahnede açılır; ekran görüntüsü alınabilir. | ✅/❌ |

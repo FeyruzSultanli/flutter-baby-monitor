@@ -241,6 +241,20 @@ void main() {
     result('parent_left_session_and_token_cleared', left);
 
     // --- Night mode (D1 stage 1) ------------------------------------------------
+    // V2 5.5: the parent's night light test put this phone into night mode
+    // (it stays dark when the light goes off, A32). Leave it first.
+    Future<void> doubleTapNightView() async {
+      final view = find.byKey(const Key('nightModeOverlay'));
+      if (view.evaluate().isEmpty) return;
+      await tester.tap(view);
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await tester.tap(view);
+      await pumpFor(tester, const Duration(seconds: 1));
+    }
+    final byLight = find.byType(BabyNightView).evaluate().isNotEmpty;
+    result('night_light_put_baby_in_night_mode', byLight);
+    if (byLight) await doubleTapNightView();
     final nightButton = find.byKey(const Key('nightModeButton'));
     if (nightButton.evaluate().isNotEmpty) {
       await tester.tap(nightButton);

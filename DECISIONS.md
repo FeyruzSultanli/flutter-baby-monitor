@@ -192,6 +192,15 @@
 - 320 mevcut metin bir alt ajanla çevrildi, yeni metinler elle eklendi; l10n testi üç dilde anahtar ve yer tutucu eşitliğini denetler. "Ayarlar" karşılığı "Parametrlər", "Tamam" karşılığı "Oldu" (Android'in Azerbaycanca karşılıkları). Function push metinleri de AZ.
 - Anadili Azerbaycanca olan biri metinleri gözden geçirmeli (BLOCKERS).
 
+### A34 — Kontrast için iki renk tonu
+- Plan §6/Faz 4: metin kontrastı ≥ 4,5:1. Açık zemindeki `mintText` (#12936B → **#0B7A57**, 3,7 → 5,0) ve `apricotText` (#C2531F → **#A8461B**, 3,9 → 5,1) koyulaştırıldı. Diğer tüm belirteç çiftleri zaten uygun (`test/contrast_test.dart`). Gece modu saati bilerek sönük: 64 px ince yazı, "büyük metin" sınırı 3:1'i geçiyor.
+- Dokunma alanı: plan ≥44; Android yönergesi 48 dp. Simge düğmeleri görünüşte 40–44 kalıp 48'lik dokunma alanı aldı.
+
+### A35 — Performans (bebek cihazı)
+- Ses seviyesi saniyede 4–10 kez değişiyor; artık yalnızca ölçeri yeniden çiziyor (`MonitorController.level`), ekranın tamamını değil. Gece modunda bebek telefonu yalnızca gece görünümünü çizer (video önizlemesi ve ölçer yok). Animasyonlar `disableAnimations` ile durur; bebek tarafında sürekli animasyon yalnızca kod ekranındaki nabız noktası.
+- Ebeveyn ses çubukları ~10 Hz gelen ses seviyesiyle (WebRTC inbound `audioLevel`), oda alanı (5 sn'de bir) yalnızca yedek.
+- Gerçek CPU/ısı ölçümü emülatörde yapılamaz → TEST_PLAN V4.4.
+
 ## Cavid'in kararı bekleniyor
 
 - **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.

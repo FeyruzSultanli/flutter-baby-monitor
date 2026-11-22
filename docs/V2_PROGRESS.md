@@ -72,6 +72,42 @@ Commit'ler: `339ddea` (servis), `a28e284` (kurallar + Function), `6faf617` (bek�
 ### Faz 1 — Gerçek cihazda test edilecekler
 TEST_PLAN.md §14 (V1.1–V1.16). En önemlileri: **V1.1/V1.2** (ekran kapalıyken / başka uygulamadayken kamera-mikrofon sürüyor mu — en büyük risk), V1.6–V1.8 (kilitliyken dinleme, Android ve iPhone), V1.9–V1.13 (bağlantı koptu alarmı), V1.14–V1.15 (pil).
 
+## Faz 2 — Özet (tamamlandı, `dev` @ `a563e82`)
+
+- **Tasarım sistemi** (`lib/theme/`): belirteçler (renk, yazı ölçeği, yarıçap, boşluk), açık (krem) ve gece temaları (`NinniPalette`), bileşenler: NinniButton, StatusPill, CodeBoxes, SectionCard, SettingsRow, SegmentedControl, NinniSwitch, LevelMeter, SoundBars, IconTile, BottomSheetFrame, AppIcon, Starfield, PulseDot, AlarmRings, BassinetIcon. Plus Jakarta Sans gömülü (OFL).
+- **home_screen.dart parçalandı:** 3700 satırlık ekran silindi; tüm mantık `lib/features/monitor/monitor_controller.dart`'ta (davranış korunarak taşındı, A27). Ekranlar `lib/screens/v2/`: karşılama 1–3, rol seçimi, bebek kod, bebek yayında, gece modu, ebeveyn kod, canlı izleme, tam ekran, ağlama alarmı, bağlantı koptu, alarm geçmişi (gecelik özetle), ayarlar.
+- **Marka:** "Ninni" adı, simge (AppIconPainter'dan üretildi), Android adaptive simge, beyaz hilal bildirim simgesi, #12142B açılış ekranı (Android + iOS).
+- **Animasyon:** SharedAxis/FadeThrough (iOS'ta itilen sayfalarda yerel geçiş, A24), yıldızlar, nefes alan ay, nabız, alarm halkaları, %97 basma; hepsi "hareketi azalt"ta durur.
+- **E2E'nin bulduğu hatalar:** B72 (görüntü gelmeden kayıt durdurulunca çökme — önlem), B73 (Android 10+ kayıt galeriye eklenmiyordu). Kod kutuları + `IntrinsicHeight` çakışması ekran görüntüsü aracıyla bulundu ve düzeltildi.
+- **Testler:** analyze 0 error/0 warning; birim/widget testleri; Android ↔ Android E2E `test-results/20261122-185818-android`: ebeveyn 26/26; bebekte tek ❌ gece modundan çift dokunuşla çıkış — test zamanlaması (iki dokunuş 40 ms'den yakın), test düzeltildi ve Faz 3 koşusunda ✅. iOS derlemesi (`flutter build ios --no-codesign`) ✅.
+- Gerçek cihaz maddeleri: TEST_PLAN §15 (V2.1–V2.16).
+
+## Faz 3 — Özet (tamamlandı, `dev` @ `7facda8`)
+
+- **5.1 QR:** bebek kod kartında QR (`ninni://join?code=…`), ebeveynde "QR kodu okut" (mobile_scanner); izin yoksa açıklama + elle giriş. URL şeması kaydı yok (A30).
+- **5.2 Son oda / oda adı:** ebeveyn son 3 odayı hatırlar, "Tekrar bağlan" tek dokunuş; bebek odaya ad verir (sonraki odalarda da kalır).
+- **5.3 Bas-konuş:** ses kanalı baştan `sendrecv`, mikrofon yalnızca basılıyken; bebekte hoparlör; konuşma sürerken ve 3 sn sonrasına kadar ağlama algılama durur (A31).
+- **5.4 Ninni / beyaz gürültü:** 4 ses kendi sentezimiz (`tool/gen_sounds.py`, `assets/audio/LICENSES.md`); ebeveyn uzaktan çalar/durdurur, ses düzeyi, 15/30/60/sürekli. Çalarken eşik ölçülen ses seviyesine göre en fazla +12 dB (A29).
+- **5.5 Gece lambası:** 4 renk, bebek telefonu gece moduna geçip yumuşak ışık verir (A32).
+- **5.8 5 dk sessize al**, **5.9 gecelik özet** (Faz 2'de ekranla birlikte geldi; süreler alarm geçmişine yazılıyor).
+- **5.11 Azerbaycanca:** tüm metinler (A33), Function push metinleri de.
+- **Testler:** Android ↔ Android E2E `test-results/20261122-190615-android`: iki taraf da geçti; yeni kontroller (son oda, bas-konuş düğmesi, ninni/gece lambası odaya yazıldı ve durdu) ✅. iOS derlemesi ✅.
+- Gerçek cihaz maddeleri: TEST_PLAN §16 (V3.1–V3.14). Kulakla/anadilde kontrol: BLOCKERS 9.
+
+## Faz 4 — Özet
+
+- **Erişilebilirlik:** simge düğmelerinde 48 dp dokunma alanı (görünüm aynı), her denetimde anlamlı etiket, canlı bölgeler (alarm, bağlantı, hata metinleri), kod kutuları ekran okuyucuda harf harf; Flutter'ın dokunma alanı/etiket yönergeleri 9 ekranda test ediliyor (`test/a11y_test.dart`). Tüm renk çiftleri WCAG ≥4,5:1 (`test/contrast_test.dart`, iki ton koyulaştırıldı, A34).
+- **Büyük yazı / küçük ekran / tablet:** ×1,3, ×2, 320×568 ve 820×1180'de tüm ekranlar taşmasız (ekran görüntüsü aracıyla denetlendi; düzeltmeler: ninni kutuları, durum hapları, kelime işareti).
+- **Performans:** canlı ses seviyesi yalnızca ölçeri yeniden çiziyor; ebeveyn ses çubukları ~10 Hz gerçek sesle; gece modunda bebek telefonu yalnızca gece görünümünü çiziyor (A35).
+- **Mağaza görüntüleri:** `--dart-define=NINNI_DEMO=<sahne>` ile uygulama temiz demo durumunda açılır (video yerine çizim). Toplu üretim:
+
+  ```bash
+  flutter test tool/screenshots_test.dart --dart-define=SHOT_W=430 --dart-define=SHOT_H=932 --dart-define=SHOT_RATIO=3
+  ```
+
+  Çıktı `build/screens/tr_430/*.png` (1290×2796, App Store 6,7"). `--dart-define=SHOT_LOCALE=en` / `az` ile diğer diller.
+- Gerçek cihaz maddeleri: TEST_PLAN §17 (V4.1–V4.6).
+
 ## Cavid yapacak
 
 Firebase tarafı (kod hazır, deploy edilmedi):
