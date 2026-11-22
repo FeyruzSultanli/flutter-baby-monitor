@@ -13,7 +13,7 @@ Otonom oturumda (22.11.2026) iki Android emülatöründe ve iki iOS simülatör�
 |---|---|---|---|
 | G1 | Temiz kurulum: izin diyalogları, pil optimizasyonu, ebeveynde bildirim izni | 1.1, 1.6, 12.36 | Testlerde izinler `adb pm grant` ile verildi; diyaloglar hiç görünmedi. |
 | G2 | Bebek Wi-Fi, ebeveyn **mobil veri**: bağlan, 5 dk izle | 2B.1, 2B.3 | İki emülatör aynı makinede, NAT/TURN sorunu oluşmuyor (B07). |
-| G3 | Offline: yayın, arama, bağlan, ses, sessizlik, uzaklaşma, 20 sn kayıt | 3.1–3.3, 3.7, 3.9, 12.3 | Nearby Connections emülatörde çalışmıyor. |
+| G3 | Offline: yayın, arama, bağlan, ses, sessizlik, uzaklaşma, 20 sn kayıt; `fix/audio-license` sürümüyle ses (3.11) | 3.1–3.3, 3.7, 3.9, 3.11, 12.3 | Nearby Connections emülatörde çalışmıyor. |
 | G4 | Function deploy edildikten sonra: ebeveyn arka planda / kilitli / kapalı → push | 12.39–12.42, 5.3–5.5 | Emülatörde Function çalıştı ama gerçek FCM gönderilmedi (DECISIONS A3). |
 | G5 | Gerçek ağlama sesiyle eşik ayarı ve online/offline dB farkı | 12.13, 12.17, 5.9 | Testlerde ses seviyesi `DebugHooks.fakeNoiseDb` ile taklit edildi. |
 | G6 | Gecikme ve ses kalitesi | 4.1, 4.3 | Emülatörde kamera/mikrofon sanal. |
@@ -34,6 +34,7 @@ Otonom oturumda (22.11.2026) iki Android emülatöründe ve iki iOS simülatör�
 | 2A.4 | ✅ | Hayır | Bebek kesince oda siliniyor |
 | 2B.1–2B.3 | — | **Evet** (G2) | |
 | 3.1–3.10 | — | **Evet** (G3: 3.1–3.3, 3.7, 3.9) | Nearby emülatörde yok |
+| 3.11 | Kısmen: yeni ses kanalının mikrofon ve oynatıcısı emülatörde ✅ (smoke test); Nearby üzerinden — | **Evet** (G3) | B68: `sound_stream` yerine kendi kanalımız |
 | 4.1–4.4 | — | **Evet** (G6: 4.1, 4.3) | |
 | 5.1 | ✅ | Hayır | Sahte ağlama: 70 sn'de 2 alarm (60 sn sınırı) |
 | 5.2 | — | Hayır | |
@@ -209,6 +210,7 @@ adb -s <SERIAL> logcat -v time --pid=$(adb -s <SERIAL> shell pidof -s com.exampl
 | 3.8 | 3.3 | E'de pil göstergesine bakın. | B'nin pil yüzdesi görünür; B şarja takılınca "şarj oluyor" olur (1 dk içinde). | ✅/❌ + not: |
 | 3.9 | Bağlıyken | İki cihazı 15–20 m uzaklaştırın, sonra geri getirin. | Bağlantı koparsa E'de "bağlı değil" durumu görünür. Geri getirince **otomatik bağlanmaz**; E'den yeniden arama gerekir (B39, bilinen eksik). | ✅/❌ + not: |
 | 3.10 | Bağlıyken | B'de Bluetooth'u kapatıp açın. | Uygulama çökmez; yeniden arama ile tekrar bağlanılabilir. | ✅/❌ + not: |
+| 3.11 | **`fix/audio-license` sürümü iki telefona kurulu** (B68), offline bağlı | 1) E'de B'nin yanındaki konuşmayı 1 dk dinleyin. 2) B'nin mikrofonunu kapatın (sessizlik). 3) Ağlama sesi çalın. 4) E'de bağlantıyı kesip yeniden bağlanın; B'de offline ↔ online modu bir kez değiştirip geri gelin. | 1) Ses anlaşılır, cızırtı ve takılma yok; `dev` sürümüyle aynı kalitede. 2) Ses çubuğu ~0'a iner. 3) dB değerleri `dev` sürümüyle aynı aralıkta; ~2 sn sonra alarm. 4) Ses yeniden gelir; logda `Offline microphone error` / `AudioTrack` hatası yok. İlk açılışta kamera izninden sonra mikrofon izni sorulur. | ✅/❌ + not: |
 
 ## 4. Görüntü/ses kalitesi ve gecikme
 

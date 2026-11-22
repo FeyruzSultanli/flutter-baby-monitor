@@ -73,11 +73,39 @@
 - **Seçim:** `--platform mixed` iki tarafa da `E2E_SKIP_NETWORK_DROP=true` veriyor.
 - **Neden:** Ağ kesintisi adımı iki cihazın eş zamanlı ilerlemesine bağlı. iOS simülatöründe uçak modu yok (simülatör Mac'in ağını kullanıyor). Bu adım Android ↔ Android koşusunda test ediliyor.
 
+### A15 — `sound_stream` (GPL-3.0) yerine kendi Android platform kanalımız
+- **Karar (Cavid):** GPL paketi değiştirilecek. İş `fix/audio-license` branch'inde yapılacak, `dev`'e dokunulmayacak.
+- **Seçenekler:**
+  - (a) `record` (BSD-3) ile mikrofon + ayrı bir PCM oynatıcı paketi. `flutter_sound` MPL-2.0 (zayıf copyleft); diğer PCM oynatıcılar küçük, tek kişilik projeler.
+  - (b) Android'e özel kısa bir platform kanalı (`AudioRecord` + `AudioTrack`).
+- **Seçim:** (b): `android/.../OfflineAudio.kt` + `lib/core/audio/offline_audio.dart`.
+- **Neden:**
+  - Yeni bağımlılık ve lisans riski yok.
+  - Offline mod zaten yalnızca Android'de.
+  - Ses biçimi eskisiyle birebir aynı: 16 kHz, mono, PCM16 little-endian, mikrofon kaynağı `MIC`, parça boyutu `getMinBufferSize` örnek (aynı Nearby paket hızı ve dB penceresi). Oynatma medya akışında, ses modu `MODE_NORMAL`.
+  - iOS'ta `AppDelegate`'teki geçici çözüm (A11) kalktı, çünkü iOS'a artık ses eklentisi girmiyor.
+- **Davranış farkları:**
+  - Mikrofon izni eskiden eklentinin `initialize` çağrısında soruluyordu. Artık açılışta aynı noktada `permission_handler` ile soruluyor (kamera, sonra mikrofon). Böylece B12 sırası korunuyor.
+  - `AudioTrack.write` UI thread'inde değil, ayrı bir thread'de çalışıyor (eskiden ana thread'i bloklayabiliyordu).
+- **Doğrulama:**
+  - Unit testler (kanal mesajları, PCM → dB, Nearby çerçevesi).
+  - Emülatörde smoke test (`integration_test/offline_audio_smoke_test.dart`): mikrofon parçaları, yeniden başlatma, oynatıcı.
+  - İki telefonla offline ses testi gerekiyor (TEST_PLAN 3.11).
+- **Geri alma:** `fix/audio-license` branch'ini merge etmemek yeterli.
+
+### A16 — Lisans taraması (`pubspec.lock`, 158 paket)
+- **Yöntem:** Her paketin pub önbelleğindeki LICENSE dosyası okundu.
+- **Sonuç (`sound_stream` kaldırıldıktan sonra):** BSD-3-Clause 103 (+8 Flutter SDK paketi), MIT 37, Apache-2.0 4, BSD-2-Clause 4, MPL-2.0 2. **GPL/LGPL/AGPL lisanslı paket kalmadı.**
+- **Kaldırılan:** `sound_stream` 0.4.2: GPL-3.0.
+- **MPL-2.0 olanlar:** `dbus` 0.7.15 ve `upower` 0.7.0. `battery_plus`'ın Linux tarafı için dolaylı bağımlılık; Android/iOS uygulamasında kullanılmıyorlar. Tarayıcı bunları "GPL" diye işaretledi, çünkü MPL metni GPL/LGPL'den "ikincil lisans" olarak bahsediyor. MPL dosya düzeyinde copyleft: değiştirilmeden kullanıldıkça sorun yok.
+- **Taranmayanlar:** Yerel SDK'lar (Google Play Services / Nearby, Firebase, libwebrtc) Dart paketi değil, bu taramaya girmedi. Bunlar BSD/Apache ya da Google'ın kendi koşulları altında, GPL değil.
+
 ## Cavid'in kararı bekleniyor
 
-- **`sound_stream` GPL-3.0 lisanslı:** Offline modda ses akışı için kullanılan bu paket GPL-3.0. Uygulama App Store/Play'de dağıtılırsa GPL yükümlülükleri (kaynak kodun açılması) doğar; App Store ile GPL uyumu da tartışmalı. Seçenekler:
-  - (a) Offline ses akışını MIT/BSD lisanslı bir paketle değiştirmek (ör. `record` + `flutter_sound` / `just_audio` ya da Android'e özel kısa bir platform kanalı),
-  - (b) Uygulamayı GPL ile yayınlamayı kabul etmek.
-  - **Önerim (a).** iOS'ta bu paket zaten kullanılmıyor (offline iOS'ta kapalı), ama açılışta ses motorunu başlatıyor.
+- **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN G2) sonucuna göre karar verilecek.
+- **7. adım (D1-b foreground service):** Telefon test sonuçlarından sonra.
 
-- **Android ↔ iOS offline:** Gerekli mi? Seçenekler ve önerim (yerel Wi-Fi üzerinden WebRTC + LAN signaling, sonra hotspot) PLAN_NEXT.md bölüm 6'da.
+## Karara bağlananlar
+
+- **`sound_stream` GPL-3.0:** Değiştir (A15).
+- **Android ↔ iOS offline:** Şimdilik yok. PLAN_NEXT.md §6'da "sonra" olarak duruyor.

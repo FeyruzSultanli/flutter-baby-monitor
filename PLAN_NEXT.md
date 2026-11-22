@@ -382,7 +382,7 @@ match /rooms/{code} {
 **Adım 0, deneme (spike, ~0,5 gün; kod commit'lenmeden önce cihazda kanıt):**
 - Asgari bir foreground service ile şunlar doğrulanacak:
   - (a) flutter_webrtc kamera yakalaması uygulama arka plandayken ve ekran kapalıyken sürüyor mu?
-  - (b) `camera` eklentisinin image stream'i (offline) ve sound_stream sürüyor mu?
+  - (b) `camera` eklentisinin image stream'i (offline) ve offline ses (OfflineAudio, eskiden sound_stream) sürüyor mu?
   - (c) Dart isolate'i, Firestore dinleyicileri ve Nearby payload'ları ekran kapalıyken çalışmaya devam ediyor mu?
 - Bilinen bir risk: `camera` eklentisi ve Flutter'ın yaşam döngüsü uygulama arka plana geçince kamerayı bırakmayı bekleyebilir. Şu an home_screen'de `WidgetsBindingObserver` **yok**; bu iyi (kamera elle kapatılmıyor), ama CameraX tabanlı uygulamanın kendi davranışı test edilmeli.
 
@@ -444,6 +444,8 @@ match /rooms/{code} {
 ---
 
 ## 6. Android ↔ iOS offline bağlantı (yalnızca plan; kod yazılmadı)
+
+> **Karar (Cavid): sonra.** Şimdilik yapılmayacak; seçenekler ileride değerlendirilmek üzere burada duruyor.
 
 **Bugünkü durum:** Offline mod, Google Nearby Connections (`nearby_connections` paketi) kullanıyor ve yalnızca Android'de çalışıyor. iOS'ta offline seçeneği açıklamayla gizlendi (`94a21df`). Android ↔ Android offline aynen çalışıyor.
 

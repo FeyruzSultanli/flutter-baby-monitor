@@ -7,7 +7,7 @@
 3. **Android bebek ↔ iOS ebeveyn:** ✅ iki test de geçti, bağlantı kuruluyor. **iOS ↔ iOS:** koşu 7'de her şey geçti; tek sorun B67'ydi. B67 düzeltildikten sonraki tekrar koşusu bitirilemedi (BLOCKERS 5).
 4. **iOS uyumluluğu:** İzin metinleri TR/EN, minimum iOS 15, arka plan modları. Offline seçeneği iOS'ta gizli. iPhone bebekse gece modu öneriliyor. Simülatörde açılış çökmesi giderildi (B63).
 5. **Emülatörde test edilemeyenler:** offline (Nearby), farklı ağlar (TURN yok), gerçek push, gerçek ses kalibrasyonu, ekran kapalıyken yayın (7. adım bekliyor), iPhone kamerası.
-6. **Kararınız bekleniyor (DECISIONS.md):** `sound_stream` GPL-3.0 lisanslı (önerim: değiştirmek). Android ↔ iOS offline gerekli mi? TURN (D4)?
+6. **Kararlar:** `sound_stream` (GPL-3.0) `fix/audio-license` branch'inde kendi Android kanalımızla değiştirildi (B68, merge bekliyor). Android ↔ iOS offline: sonra. TURN (D4) ve foreground service: telefon testlerinden sonra.
 7. **Sizin ilk 3 işiniz:**
 8. ① Firebase konsolu: Anonymous girişi açın, kuralları yayınlayın, TTL politikasını tanımlayın; Blaze kararından sonra Function'ı deploy edin (PLAN_NEXT.md, "D3 + D8 için konsol adımları" ve "D2 deploy adımları").
 9. ② İki Android telefonla TEST_PLAN.md'nin başındaki **G1–G8** kısa listesini yapın (~1,5 saat).
@@ -98,7 +98,7 @@
   - Offline seçeneği iOS'ta gizli; yerine "yalnızca Android" açıklaması var.
   - iPhone'da oda açılınca, kamera arka planda çalışmadığı için gece modu öneriliyor.
   - Simülatörde yalnızca debug'da sesli yedek akış var (BLOCKERS 1).
-  - `nearby_connections` ve `sound_stream` yalnızca Android'de çağrılıyor. `sound_stream` iOS'ta hiç kaydedilmiyor (DECISIONS A11).
+  - `nearby_connections` ve offline ses yalnızca Android'de çağrılıyor. `fix/audio-license` branch'inde `sound_stream` tamamen kaldırıldı (B68, DECISIONS A15).
 - **Paket desteği:** firebase_*, flutter_webrtc, camera, permission_handler, flutter_local_notifications, wakelock_plus, screen_brightness, gal, video_player ve share_plus iOS'u destekliyor.
 - **Bilinen:** `flutter build ios --simulator` Flutter 3.44'te hata veriyor; `flutter run` / `flutter test -d <udid>` çalışıyor (DECISIONS A12). Gerçek cihaz derlemesi etkilenmiyor.
 - **Android ↔ iOS offline:** Kod yazılmadı. Seçenekler PLAN_NEXT.md §6'da.
@@ -131,7 +131,7 @@
 | B08 yeniden katılma, B36 | ✅ Emülatörde doğrulandı |
 | D4 TURN (B07) | Karar bekliyor. Farklı ağlarda bağlantı G2 testine bağlı. |
 | D9 yayın hazırlığı (B45), D10 iOS kapsamı (B17, B52) | Karar bekliyor (iOS'un temel uyumluluğu bu oturumda yapıldı) |
-| `sound_stream` GPL-3.0 | Karar bekliyor (DECISIONS.md) |
+| `sound_stream` GPL-3.0 (B68) | `fix/audio-license` branch'inde değiştirildi; telefonda offline ses testi (TEST_PLAN 3.11) sonrası merge edilecek. Lisans taraması: GPL/LGPL/AGPL kalmadı (DECISIONS A16). |
 | Açık hatalar | B16 (WebRTC kayıtlarında ses yok), B35 (dil/tema kalıcı değil), B37 (online video ayarları), B39 (offline otomatik yeniden bağlanma) ve düşük öncelikliler. Hepsi BUGS.md'de. |
 
 ## Nerede ne var

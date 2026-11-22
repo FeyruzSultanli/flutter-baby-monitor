@@ -471,6 +471,7 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Dosya:** `ios/Runner/AppDelegate.swift`, `home_screen.dart` `_initAudioServices` / `_stopAudioStream`.
 - **Sorun:** `SwiftSoundStreamPlugin.init` → `attachPlayer` → `AVAudioEngine.mainMixerNode`. iOS 26.5 ve 27 simülatörlerinde CoreAudio RPC zaman aşımı yüzünden `abort`. Gerçek cihazda da, kullanılmadığı halde ses donanımını açılışta alıyor.
 - **Durum:** Düzeltildi (`4a28326`): eklenti iOS'ta kaydedilmiyor; Dart tarafı onu yalnızca Android'de çağırıyor (DECISIONS A11). Gerçek iPhone'da doğrulanmalı.
+- **Not:** `fix/audio-license` branch'inde `sound_stream` tamamen kaldırıldı (B68); orada bu geçici çözüm de kalktı.
 
 ### B64 — Uzak ICE adayları answer uygulanmadan geliyor ve kayboluyor (Yüksek)
 - **Dosya:** `webrtc_service.dart` (aday dinleyicileri).
@@ -495,6 +496,18 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Sorun:** Flutter'ın yeni sürümlerinde eylem düğmesi olan bir `SnackBar` varsayılan olarak ekranda kalıyor (`persist`). Bu yüzden uyarılar kendiliğinden kapanmıyor ve alttaki kontrolleri, ör. "Bağlantıyı kes" düğmesini, sürekli örtüyordu.
 - **Nasıl bulundu:** iOS simülatörü E2E testi (koşu 7). Bebek "Bağlantıyı kes"e dokunamadı.
 - **Durum:** Düzeltildi (`9e10308`): uyarılar 8 sn sonra kapanıyor (`persist: false`).
+
+## Lisans
+
+### B68 — Offline ses paketi `sound_stream` GPL-3.0 lisanslı (Yüksek, yayın engeli)
+- **Dosya:** `pubspec.yaml`, `home_screen.dart` (offline ses).
+- **Sorun:** GPL-3.0 bir paket, uygulama mağazada dağıtılırsa tüm uygulamanın kaynak kodunun GPL ile açılmasını gerektirir; App Store koşullarıyla da uyumu tartışmalı.
+- **Karar:** Cavid: değiştir (DECISIONS A15).
+- **Durum:** `fix/audio-license` branch'inde düzeltildi, `dev`'e merge edilmedi.
+  - Yerine kendi Android platform kanalımız geldi (`OfflineAudio.kt` + `offline_audio.dart`); ses biçimi aynı.
+  - iOS'taki geçici çözüm (A11) kaldırıldı.
+  - `pubspec.lock`'ta GPL/LGPL/AGPL lisanslı paket kalmadı (A16).
+  - Doğrulama: unit testler ve emülatörde mikrofon/oynatıcı smoke testi geçti. **İki telefonla offline ses testi gerekiyor** (TEST_PLAN 3.11).
 
 ---
 
