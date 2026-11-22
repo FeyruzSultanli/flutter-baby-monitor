@@ -547,6 +547,11 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Önlem:** `VideoRecorderService`: başlangıçtaki ve durdurmadaki gelen kare sayısı (`framesDecoded`) karşılaştırılıyor; en az 1,5 sn ve 15 kare geçmeden yerel `stop()` çağrılmıyor (en fazla 4 sn beklenir). Kare gelmediyse kayıt bırakılıyor, kullanıcıya "Görüntü gelmediği için kayıt yapılamadı" deniyor.
 - **Kalan:** Eklentide düzeltilmesi gerekir (yukarı akışa hata bildirimi). Önlem, kare sayacı alınamayan (istatistik yok) durumda eski davranışa döner.
 
+### B73 — Android 10+: kaydı durdurunca "Mutation of _data is not allowed" (Orta) — ✅ düzeltildi
+- **Belirti:** Ebeveyn kaydı durdurunca hata mesajı (yerel yığın iziyle) çıkıyor, kayıt galeriye eklenmiyordu. Eski E2E koşularında da vardı (`recording_start_stop_no_crash` yalnızca çökme olmadığını ölçüyordu). Yeni tasarımda bu uzun mesaj kayan snackbar'a sığmadığı için hata ayıklama derlemesinde assertion'a yol açtı.
+- **Neden:** flutter_webrtc `stopRecording` dosyayı bitirdikten sonra MediaStore'a eski `_data` sütunuyla eklemeye çalışıyor; Android 10+ bunu reddediyor.
+- **Düzeltme:** Bu hata yok sayılıyor, dosya `gal` ile galeriye bizim tarafımızda ekleniyor. Snackbar'lardaki hata metinleri tek satıra ve 120 karaktere kısaltıldı.
+
 ## Hiç çalışmayan veya yarım kalmış özellikler
 
 1. **Arka planda izleme:** İki cihazda da yok (B01, B02).

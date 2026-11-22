@@ -296,7 +296,10 @@ void main() {
     } else {
       result('recording_start_stop_no_crash', 'record button not shown');
     }
+    await pumpFor(tester, const Duration(seconds: 2)); // let a snackbar settle
     await tester.tap(find.byKey(const Key('settingsButton')));
+    await pumpUntil(tester, () => find.byType(ListView).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
     await pumpFor(tester, const Duration(seconds: 1));
     final galleryRow = find.byKey(const Key('galleryButton'));
     await tester.dragUntilVisible(galleryRow, find.byType(ListView), const Offset(0, -250));

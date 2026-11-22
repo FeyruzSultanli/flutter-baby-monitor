@@ -1877,7 +1877,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       } catch (e) {
         if (!mounted) return;
         _messenger?.showSnackBar(
-          SnackBar(content: Text('${l10n.error}: $e')),
+          SnackBar(content: Text(_shortError(e))),
         );
       }
       return;
@@ -1901,7 +1901,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       } catch (e) {
         if (!mounted) return;
         _messenger?.showSnackBar(
-          SnackBar(content: Text('${l10n.error}: $e')),
+          SnackBar(content: Text(_shortError(e))),
         );
       }
       return;
@@ -2176,17 +2176,26 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _handlePairingError(l10n.roomClosed);
         return;
       }
-      _handlePairingError('${l10n.error}: $e');
+      _handlePairingError(_shortError(e));
     });
   }
 
+
+  /// One short line for snackbars: platform errors can carry whole native
+  /// stack traces, which do not fit on the screen.
+  String _shortError(Object e) {
+    var text = e is PlatformException ? (e.message ?? e.code) : e.toString();
+    text = text.split('\n').first.trim();
+    if (text.length > 120) text = '${text.substring(0, 117)}…';
+    return '${l10n.error}: $text';
+  }
 
   /// User-facing text for room create/join errors (D3).
   String _pairingErrorText(Object e) {
     if (e is RoomUnavailableException) return l10n.roomUnavailable;
     if (e is AnonymousAuthDisabledException) return l10n.anonymousAuthDisabled;
     if (e is PairingTimeoutException) return l10n.noServerResponse;
-    return '${l10n.error}: $e';
+    return _shortError(e);
   }
 
   /// Parent: stores this device's FCM token and UI language in the room so
@@ -2287,7 +2296,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('Recording error: $e');
       if (mounted) {
         _messenger?.showSnackBar(
-          SnackBar(content: Text('${l10n.error}: $e')),
+          SnackBar(content: Text(_shortError(e))),
         );
       }
     }

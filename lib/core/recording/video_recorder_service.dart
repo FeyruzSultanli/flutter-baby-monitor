@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
@@ -136,6 +137,12 @@ class VideoRecorderService {
 
     try {
       await recorder.stop();
+    } on PlatformException catch (e) {
+      // B73: on Android 10+ flutter_webrtc finishes the file, then fails to
+      // add it to MediaStore with the old `_data` column. The file is fine;
+      // we save it to the gallery ourselves below.
+      if (!(e.message ?? '').contains('_data')) rethrow;
+      debugPrint('Recorder stop: MediaStore insert failed (ignored, B73)');
     } finally {
       // Always leave the recording state, even if the native stop failed (B13).
       _mediaRecorder = null;
