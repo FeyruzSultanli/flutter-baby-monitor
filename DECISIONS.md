@@ -168,6 +168,30 @@
 - Yeni bir ağlama başlayınca tam ekran alarm açılır, ses (`alarm_cry.wav`, döngü) + titreşim çalar. Ağlama bitince ses durur ama ekran ebeveyn bir şey seçene kadar kalır ("6 saniyedir" yerine "durdu"). "5 dk sessize al" 5 dk boyunca ekran ve ses açmaz; geçmiş ve bildirimler sürer.
 - Bildirim sesi zaten çalıyor; uygulama içi ses yalnızca uygulama açıkken (arka planda bildirim + push).
 
+### A29 — Ninni çalarken ağlama algılama (V2 5.4)
+- **Sorun:** Bebek telefonunun çaldığı ses kendi mikrofonuna giriyor; sabit eşikle ninni alarm tetikleyebilir. Ses çıkarma (yankı giderme) bizim ses yolumuz için yok: `audioplayers` WebRTC'nin çalma yolunda değil.
+- **Seçenekler:** (a) çalarken algılamayı kapatmak — alarm kaçar, kabul edilemez; (b) eşiği çalan sesin ölçülen seviyesine göre yükseltmek; (c) ses düzeyini sınırlamak.
+- **Seçim:** (b) + (c). Ses başlayınca/düzeyi değişince 4 sn ölçülür (alarm sırasındaki örnekler sayılmaz), medyan + 8 dB yeni eşik olur; **en fazla +12 dB**, kullanıcının eşiğinin altına hiç inmez. Ölçüm süresince temkinli olarak +12 dB. Ninni sesi en fazla %70 (`SoothePlayer.maxVolume`).
+- **Neden:** Telefonun yanında ağlayan bebek, kısık bir ninniden belirgin biçimde yüksek; +12 dB sınırı alarmın tamamen kaybolmasını önler. 2 sn kuralı ve 60 sn bildirim aralığı aynen geçerli.
+- **Test:** `test/soothe_test.dart`; gerçek cihazda TEST_PLAN V3.6–V3.8.
+
+### A30 — QR yalnızca uygulama içinden
+- İçerik planlandığı gibi `ninni://join?code=ABCD-EF23`. Ebeveyn "QR kodu okut" ile uygulama içinde okur. Sistem kamerasının bağlantıyı açması için URL şeması kaydı (Android intent filtresi / iOS `CFBundleURLTypes`) **eklenmedi**: ek yapılandırma ve doğrulanmamış bağlantıların uygulamayı açması gerekmiyor. Gerekirse sonra eklenebilir.
+- `mobile_scanner` Android'de Google ML Kit (Play Services, ücretsiz) kullanır; paket BSD-3.
+
+### A31 — Bas-konuş (V2 5.3)
+- Ebeveyn, bebeğin teklifine cevap vermeden önce ses alıcı-vericisini `sendrecv` yapar (yeniden müzakere yok); düğmeye basınca mikrofon parçası `replaceTrack` ile bağlanır, bırakınca `null` ve mikrofon kapanır (gizlilik göstergesi sürekli yanmasın).
+- Bebek tarafında: çağrı kurulunca hoparlör açılır (`Helper.setSpeakerphoneOn(true)`), aksi halde ses kulaklıktan gelirdi. Gelen sesin seviyesi (inbound-rtp `audioLevel` ≥ 0,02) duyulduğu sürece ve 3 sn sonrasına kadar ağlama algılama durur.
+- Yalnızca online. Offline (Nearby) tek yönlü PCM akışı olduğu için düğme gizli.
+- Ekran okuyucuda basılı tutulamadığı için çift dokunuş konuşmayı açıp kapatır.
+
+### A32 — Gece lambası
+- Ebeveyn lambayı açınca bebek telefonu gece moduna geçer (ışık yalnızca orada görünür); parlaklık %25, renk yumuşak radyal dolgu. Kapatınca gece modu sürer, parlaklık en düşüğe iner.
+
+### A33 — Azerbaycanca
+- 320 mevcut metin bir alt ajanla çevrildi, yeni metinler elle eklendi; l10n testi üç dilde anahtar ve yer tutucu eşitliğini denetler. "Ayarlar" karşılığı "Parametrlər", "Tamam" karşılığı "Oldu" (Android'in Azerbaycanca karşılıkları). Function push metinleri de AZ.
+- Anadili Azerbaycanca olan biri metinleri gözden geçirmeli (BLOCKERS).
+
 ## Cavid'in kararı bekleniyor
 
 - **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.

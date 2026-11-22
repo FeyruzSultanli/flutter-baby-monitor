@@ -6,6 +6,7 @@
 
 import 'package:bebek_monitor_clean/core/alert_history_service.dart';
 import 'package:bebek_monitor_clean/core/firebase/emulator_config.dart';
+import 'package:bebek_monitor_clean/core/pairing/recent_room_store.dart';
 import 'package:bebek_monitor_clean/core/pairing/room_code.dart';
 import 'package:bebek_monitor_clean/firebase_options.dart';
 import 'package:bebek_monitor_clean/main.dart' as app;
@@ -219,6 +220,46 @@ void main() {
         timeout: const Duration(seconds: 75));
     result('rejoin_webrtc_connected', reconnected);
     screenshot('parent_07_rejoined');
+
+    // --- V2 phase 3: recent room, lullaby and night light, talk button --------------
+    result('recent_room_remembered', await pumpUntil(tester, () async {
+      final rooms = await RecentRoomStore().load();
+      return rooms.isNotEmpty && rooms.first.code == code;
+    }, timeout: const Duration(seconds: 10)));
+    result('talk_button_enabled', await pumpUntil(tester, () {
+      final talk = find.byKey(const Key('talkButton'));
+      if (talk.evaluate().isEmpty) return false;
+      return tester.widget<GestureDetector>(talk).onTapDown != null;
+    }, timeout: const Duration(seconds: 15)));
+    await tester.tap(find.byKey(const Key('lullabyButton')));
+    await pumpUntil(tester, () => find.byKey(const Key('soothe_white')).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 10));
+    await pumpFor(tester, const Duration(milliseconds: 600));
+    await tester.tap(find.byKey(const Key('soothe_white')));
+    final sootheInRoom = await pumpUntil(tester, () async {
+      final soothe = (await db.get('rooms/$code'))?['soothe'];
+      return soothe is Map && soothe['track'] == 'white';
+    }, timeout: const Duration(seconds: 15));
+    result('lullaby_requested_in_room', sootheInRoom);
+    await tester.tap(find.byKey(const Key('nightLightSwitch')));
+    final lightInRoom = await pumpUntil(tester, () async {
+      final light = (await db.get('rooms/$code'))?['nightLight'];
+      return light is Map && light['on'] == true;
+    }, timeout: const Duration(seconds: 15));
+    result('night_light_requested_in_room', lightInRoom);
+    screenshot('parent_07a_lullaby');
+    await pumpFor(tester, const Duration(seconds: 3));
+    await tester.tap(find.byKey(const Key('soothe_white'))); // stop
+    await tester.tap(find.byKey(const Key('nightLightSwitch'))); // off
+    final stopped = await pumpUntil(tester, () async {
+      final r = await db.get('rooms/$code');
+      final soothe = r?['soothe'];
+      final light = r?['nightLight'];
+      return soothe is Map && soothe['track'] == null && light is Map && light['on'] == false;
+    }, timeout: const Duration(seconds: 15));
+    result('lullaby_and_light_stopped', stopped);
+    await goBack(tester); // close the sheet
+    await pumpFor(tester, const Duration(seconds: 1));
 
     // --- Connection drop -> automatic rejoin (B08/B36) -----------------------------
     // (Skipped where the runner cannot cut the network, e.g. iOS simulator.)

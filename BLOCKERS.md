@@ -62,3 +62,8 @@
   - Dil ve tema: ✅
 - **Koşulamayanlar:** kayıt, galeri, gece modu, ebeveynin son ayrılışı, bebeğin odayı silmesi. Bunlar B68–B70'te değişmedi; önceki tam koşuda (`test-results/20261122-133651-android`) geçmişti.
 - **Sizden:** Gerek yok. İsterseniz `scripts/firebase_emulators.sh` açıkken `python3 scripts/run_e2e.py` ile tamamlayın (~7 dk).
+
+## 9. Ninni v2: kulakla / anadilde kontrol gereken içerik
+- **"Dandini dandini" melodisi** (`assets/audio/soothe_dandini.wav`): geleneksel melodinin nota aktarımını kendim yaptım (`tool/gen_sounds.py`, `DANDINI`). Doğrulayacak kaynağım yoktu. Telefonda dinleyip yanlışsa notaları düzeltin (dosyada açık liste) ya da CC0 bir kayıtla değiştirin.
+- **Azerbaycanca metinler:** çeviri anadili Azerbaycanca olan biri tarafından gözden geçirilmeli (özellikle kısa düğme metinleri).
+- **Sizden:** Dinleyip/okuyup not düşmeniz yeterli.
