@@ -215,6 +215,13 @@
 - **Taze kontrolü:** Ebeveyn saatine güvenilmiyor (B75). Seçenekler: (a) sunucu saatiyle karşılaştırma (eski, saat farkına açık), (b) ilk değerden sonra yerel değişim zamanı (seçildi), (c) Firestore'dan sunucu saati okumak (ek yazma/okuma). (b) ek maliyetsiz.
 - **iOS oturumu:** `videoChat` (hoparlör, ses işleme açık: yankı engelleme bas-konuşta gerekli) + `mixWithOthers` (A23 ile aynı). Alternatif `voiceChat` + port override, WebRTC her yeniden yapılandırmada geri aldığı için seçilmedi.
 
+### A39 — V2.1 arayüz kararları
+- **"Bağlantıyı kes"** ebeveyn canlı ekranında sağ üst menüye taşındı (yanlışlıkla basılmasın); geri tuşu onaylı kesmeye devam ediyor. E2E menüden basıyor.
+- **Son 1 saat grafiği** yalnızca bebek telefonunda (bellekte). Ebeveyne göndermek yeni bir oda alanı ve kurallar deploy'u gerektirir; ParentLive21 bu grafiği göstermediği için gönderilmedi. İstenirse: `noiseHistory` (60 sayılık dizi, dakikada bir) + `ownerFields` güncellemesi.
+- **Ana ekran** rol seçiminin yerine geçti; "Yeni oda" ebeveyn rolüne (kod/QR ekranına), "Bebek telefonu" bebek rolüne gider. Anahtarlar (`roleBaby`, `roleParent`, `settingsButton`) korunarak E2E değişmedi.
+- **Dar ekran:** Huawei RNE-L01 (360 dp) + uzun oda adında bebek başlığındaki "Bağlı" hapı yalnızca noktaya iner (ekran okuyucu tam metni okur), §4.2'ye uygun. "…" ile kesme hiçbir yerde yok; haplar ve segmentler küçülür, diğerleri satır kaydırır.
+- **Ekran görüntüleri** `design/screens_v21/` altında depoya eklendi (~30 MB, 8 set × 20 ekran), Cavid'in başka cihazdan karşılaştırabilmesi için. Yeniden üretim: `./tool/screens_v21.sh`.
+
 ## Cavid'in kararı bekleniyor
 
 - **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.

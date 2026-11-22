@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>v2.1 Ana ekran</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+a{color:#B9B9FF}a:hover{color:#FFFFFF}
+@keyframes twinkle{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes drift{0%,100%{transform:translateX(0)}50%{transform:translateX(10px)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.star{animation:twinkle 3.2s ease-in-out infinite}
+.cloud{animation:drift 9s ease-in-out infinite}
+.moon{animation:breathe 4s ease-in-out infinite;transform-origin:300px 70px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #12142B; display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #FFFFFF; overflow: hidden">
+  <div style="position: relative; height: 330px; flex-shrink: 0; background: linear-gradient(180deg, #23275A 0%, #12142B 100%)">
+    <svg width="390" height="330" viewBox="0 0 390 330" aria-hidden="true" style="position: absolute; inset: 0">
+      <defs><mask id="mm"><rect width="390" height="330" fill="#fff"></rect><circle cx="318" cy="52" r="34" fill="#000"></circle></mask></defs>
+      <circle class="star" cx="40" cy="70" r="2" fill="#FFFFFF"></circle>
+      <circle class="star" cx="120" cy="40" r="1.5" fill="#FFFFFF" style="animation-delay: .8s"></circle>
+      <circle class="star" cx="200" cy="96" r="2" fill="#FFD2BF" style="animation-delay: 1.6s"></circle>
+      <circle class="star" cx="250" cy="30" r="1.5" fill="#FFFFFF" style="animation-delay: 2.3s"></circle>
+      <circle class="star" cx="70" cy="150" r="1.5" fill="#C4C7E3" style="animation-delay: 1.2s"></circle>
+      <circle class="star" cx="350" cy="150" r="2" fill="#FFFFFF" style="animation-delay: .4s"></circle>
+      <g class="moon">
+        <circle cx="300" cy="70" r="40" fill="#FBF8F3" mask="url(#mm)"></circle>
+        <circle cx="324" cy="62" r="9" fill="#FF8A5B"></circle>
+      </g>
+      <g class="cloud"><ellipse cx="90" cy="214" rx="70" ry="22" fill="#2A2E5E"></ellipse><ellipse cx="128" cy="200" rx="40" ry="24" fill="#2A2E5E"></ellipse></g>
+      <g class="cloud" style="animation-delay: 3s"><ellipse cx="300" cy="240" rx="80" ry="22" fill="#242853"></ellipse><ellipse cx="268" cy="226" rx="40" ry="22" fill="#242853"></ellipse></g>
+      <path d="M0 290 Q 100 250 200 280 T 390 270 L 390 330 L 0 330 Z" fill="#1A1D40"></path>
+      <g transform="translate(160 236)">
+        <rect x="0" y="24" width="72" height="30" rx="10" fill="#FBF8F3"></rect>
+        <rect x="6" y="54" width="6" height="12" rx="3" fill="#FBF8F3"></rect>
+        <rect x="60" y="54" width="6" height="12" rx="3" fill="#FBF8F3"></rect>
+        <path d="M4 24 Q 36 -4 68 24" fill="none" stroke="#FBF8F3" stroke-width="5" stroke-linecap="round"></path>
+        <circle cx="24" cy="30" r="7" fill="#FFD2BF"></circle>
+      </g>
+    </svg>
+    <div style="position: absolute; left: 20px; top: 60px; display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 14px; font-weight: 700; color: #C4C7E3">ninni</span>
+      <span style="font-size: 30px; font-weight: 800; letter-spacing: -0.8px; line-height: 1.1">İyi geceler</span>
+    </div>
+    <button type="button" aria-label="Ayarlar" style="position: absolute; right: 16px; top: 140px; width: 44px; height: 44px; border: none; border-radius: 14px; background: rgba(18,20,43,0.5); display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10"></path><path d="M18 7h2"></path><circle cx="16" cy="7" r="2"></circle><path d="M4 17h4"></path><path d="M12 17h8"></path><circle cx="10" cy="17" r="2"></circle></svg></button>
+  </div>
+
+  <div style="flex: 1; padding: 8px 20px 30px; display: flex; flex-direction: column; gap: 14px">
+    <a href="ParentLive21.dc.html" style="text-decoration: none; color: #FFFFFF; display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 22px; background: #5B5BF0">
+      <span style="width: 46px; height: 46px; border-radius: 15px; background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 800">Bebek odasını izle</span><span style="font-size: 13px; color: #DCDCFF">Son bağlantı · dün 21:40</span></span>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+    </a>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <a href="BabyLive21.dc.html" style="text-decoration: none; color: #FFFFFF; display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 22px; background: #1C1F3D; border: 1px solid #262A52">
+        <span style="width: 44px; height: 44px; border-radius: 14px; background: #2A2E55; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FBF8F3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18v4a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"></path><circle cx="9" cy="8" r="2"></circle></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 16px; font-weight: 800">Bebek telefonu</span><span style="font-size: 13px; line-height: 1.4; color: #A9ADCF">Kamera ve mikrofon olur</span></span>
+      </a>
+      <a href="ParentJoin.dc.html" style="text-decoration: none; color: #FFFFFF; display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 22px; background: #1C1F3D; border: 1px solid #262A52">
+        <span style="width: 44px; height: 44px; border-radius: 14px; background: #2A2E55; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B9B9FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M7 12h10"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 16px; font-weight: 800">Yeni oda</span><span style="font-size: 13px; line-height: 1.4; color: #A9ADCF">QR ya da kodla bağlan</span></span>
+      </a>
+    </div>
+
+    <div style="margin-top: auto; display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 18px; background: #1A1D3A; border: 1px dashed #2E3260">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB45E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"></path></svg>
+      <span style="font-size: 13px; line-height: 1.45; color: #C4C7E3"><b style="color: #FFFFFF">İpucu:</b> Bebek telefonunu şarja takın ve gece modunu açın. Telefon daha az ısınır, ekran ışığı bebeği rahatsız etmez.</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
