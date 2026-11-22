@@ -28,8 +28,10 @@ import '../../core/auth/auth_service.dart';
 import '../../core/debug/debug_hooks.dart';
 import '../../core/enums/connection_status.dart';
 import '../../core/enums/device_role.dart';
+import '../../core/errors/user_facing_error.dart';
 import '../../core/monitor/battery_alert.dart';
 import '../../core/monitor/connection_watchdog.dart';
+import '../../core/network/network_status.dart';
 import '../../core/offline/offline_payload.dart';
 import '../../core/pairing/pairing_service.dart';
 import '../../core/pairing/pairing_state.dart';
@@ -56,7 +58,9 @@ enum DemoScene {
   parentJoin,
   parentLive,
   cryAlert,
-  connectionLost;
+  connectionLost,
+  /// V2.1 §3: home screen without internet (offline banner).
+  offline;
 
   /// `--dart-define=NINNI_DEMO=parentLive` (empty: normal app).
   static DemoScene? fromDefine() {
@@ -273,6 +277,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   /// Former initState. The camera starts only when the baby role is chosen.
   void _init() {
     WidgetsBinding.instance.addObserver(this);
+    NetworkStatus.instance.start();
+    NetworkStatus.instance.addListener(_onNetworkChanged);
     unawaited(_loadPreferences());
     _pushTokenSub = HybridNotificationManager().onPushTokenRefresh.listen((token) {
       final roomCode = _pairingState?.roomCode;
@@ -289,6 +295,30 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       _recentRooms = rooms;
       _notify();
     }));
+  }
+
+  /// V2.1 §3: the network came back: sign in again (anonymous auth may have
+  /// failed while offline) and let a waiting parent rejoin right away instead
+  /// of after the remaining backoff.
+  void _onNetworkChanged() {
+    if (_disposing) return;
+    final online = NetworkStatus.instance.online;
+    _notify();
+    if (!online || _isOfflineMode || Firebase.apps.isEmpty) return;
+    unawaited(AuthService.instance.ensureSignedIn().then<void>((_) {}, onError: (Object e) {
+      debugPrint('Sign-in after reconnect failed: $e');
+    }));
+    if (_pairingError != null && _pairingState == null) {
+      setState(() => _pairingError = null);
+    }
+    if (_role == DeviceRole.PARENT &&
+        _viewerSession != null &&
+        _connectionStatus != ConnectionStatus.CONNECTED &&
+        (_rejoinTimer?.isActive ?? false)) {
+      _rejoinTimer?.cancel();
+      _rejoinBackoff.reset();
+      unawaited(_rejoinRoom());
+    }
   }
 
   /// Completes when Firebase/WebRTC services are set up (or failed).
@@ -563,7 +593,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _message = '${l10n.camerasReadError}$e';
+          _message = UserFacingError.describe(e, l10n, context: 'cameras');
           _initializing = false;
         });
       }
@@ -649,7 +679,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       await newController.dispose();
       if (!mounted) return;
       setState(() {
-        _message = '${l10n.cameraInitError}$e';
+        _message = UserFacingError.describe(e, l10n, context: 'camera init');
       });
     }
   }
@@ -661,6 +691,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     // dispose, so the handlers check this flag instead (B62).
     _disposing = true;
     WidgetsBinding.instance.removeObserver(this);
+    NetworkStatus.instance.removeListener(_onNetworkChanged);
     _watchdogTimer?.cancel();
     unawaited(_connectionAlarm.dispose());
     unawaited(MonitorForegroundService.instance.stop());
@@ -869,7 +900,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         signalingService: signaling,
         pairingService: pairing,
         onStatusChanged: _handleConnectionStatus,
-        onError: _handlePairingError,
+        onError: (Object e) => _handlePairingError(
+            UserFacingError.describe(e, l10n, context: 'webrtc')),
         // Cry detection: own microphone meter in standby, WebRTC's audio
         // level during a call; never both on the microphone at once.
         beforeBabyCall: _stopStandbyMic,
@@ -893,7 +925,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _firebaseReady = false;
-        _pairingError = '${l10n.pairingInitError}$e';
+        _pairingError = UserFacingError.describe(e, l10n, context: 'pairing init');
       });
     }
   }
@@ -1160,9 +1192,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _pairingError = message;
         _connectionStatus = ConnectionStatus.FAILED;
       });
-      _messenger?.showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      _showErrorSnack(e, message, () => unawaited(_createRoomCode()));
     } finally {
       if (mounted) {
         setState(() => _pairingBusy = false);
@@ -1243,9 +1273,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _connectionStatus = ConnectionStatus.FAILED;
         _pairingState = null;
       });
-      _messenger?.showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      _showErrorSnack(e, message, () => unawaited(_joinRoomWithCode(roomCode)));
     } finally {
       if (mounted) {
         setState(() => _pairingBusy = false);
@@ -2299,26 +2327,25 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         _handlePairingError(l10n.roomClosed);
         return;
       }
-      _handlePairingError(_shortError(e));
+      _handlePairingError(UserFacingError.describe(e, l10n, context: 'room listener'));
     });
   }
 
 
-  /// One short line for snackbars: platform errors can carry whole native
-  /// stack traces, which do not fit on the screen.
-  String _shortError(Object e) {
-    var text = e is PlatformException ? (e.message ?? e.code) : e.toString();
-    text = text.split('\n').first.trim();
-    if (text.length > 120) text = '${text.substring(0, 117)}…';
-    return '${l10n.error}: $text';
-  }
+  /// User-facing text for any error (V2.1 §3): the raw text is only logged.
+  String _shortError(Object e) => UserFacingError.describe(e, l10n);
 
-  /// User-facing text for room create/join errors (D3).
-  String _pairingErrorText(Object e) {
-    if (e is RoomUnavailableException) return l10n.roomUnavailable;
-    if (e is AnonymousAuthDisabledException) return l10n.anonymousAuthDisabled;
-    if (e is PairingTimeoutException) return l10n.noServerResponse;
-    return _shortError(e);
+  /// User-facing text for room create/join errors (D3, V2.1 §3).
+  String _pairingErrorText(Object e) => UserFacingError.describe(e, l10n, context: 'pairing');
+
+  /// Snackbar for a failed action; network/unknown errors get "Try again".
+  void _showErrorSnack(Object e, String text, VoidCallback? retry) {
+    final canRetry = retry != null && UserFacingError.from(e).retryable;
+    _messenger?.showSnackBar(SnackBar(
+      content: Text(text),
+      persist: false,
+      action: canRetry ? SnackBarAction(label: l10n.retry, onPressed: retry) : null,
+    ));
   }
 
   /// Parent: stores this device's FCM token and UI language in the room so
@@ -2504,6 +2531,9 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   bool get pairingBusy => _pairingBusy;
   String? get pairingError => _pairingError;
   bool get firebaseReady => _firebaseReady;
+  /// V2.1 §3: false while the phone has no network (offline banner).
+  bool get online => _demoOffline ? false : NetworkStatus.instance.online;
+  bool _demoOffline = false;
   bool get parentEverConnected => _parentEverConnected;
 
   CameraController? get cameraController => _controller;
@@ -2882,7 +2912,8 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   void debugDemo(DemoScene scene) {
     final now = DateTime.now();
     _demo = true;
-    _roleChosen = scene != DemoScene.roleSelect;
+    _roleChosen = scene != DemoScene.roleSelect && scene != DemoScene.offline;
+    _demoOffline = scene == DemoScene.offline;
     _isOfflineMode = false;
     _pairingError = null;
     _pairingBusy = false;
@@ -2897,6 +2928,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _firebaseReady = true;
     switch (scene) {
       case DemoScene.roleSelect:
+      case DemoScene.offline:
         _pairingState = null;
       case DemoScene.babyPairing:
         _role = DeviceRole.BABY;

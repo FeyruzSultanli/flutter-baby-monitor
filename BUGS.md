@@ -552,6 +552,11 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Neden:** flutter_webrtc `stopRecording` dosyayı bitirdikten sonra MediaStore'a eski `_data` sütunuyla eklemeye çalışıyor; Android 10+ bunu reddediyor.
 - **Düzeltme:** Bu hata yok sayılıyor, dosya `gal` ile galeriye bizim tarafımızda ekleniyor. Snackbar'lardaki hata metinleri tek satıra ve 120 karaktere kısaltıldı.
 
+### B74 — Kullanıcıya ham Firebase hata metni gösteriliyordu (Orta) — ✅ düzeltildi (V2.1 §3)
+- **Belirti (Cavid, Huawei RNE-L01):** "Firebase auth network request failed … timeout, interrupted connection or unreachable host" snackbar'da.
+- **Neden:** `_shortError`, `pairingInitError$e`, kamera hataları ve WebRTC `onError` ham `toString()`'i gösteriyordu.
+- **Düzeltme:** Tek eşleme `lib/core/errors/user_facing_error.dart` (ağ → "İnternet bağlantısı yok…", oda, giriş, izin, kamera, bilinmeyen; TR/EN/AZ). Ham metin yalnızca `debugPrint`. Ağ/bilinmeyen hatalarda snackbar'da "Tekrar dene". İnternet yokken üstte amber şerit; ağ gelince anonim giriş ve ebeveynin yeniden bağlanması beklemeden tekrar denenir (`NetworkStatus`, yerel kanal `ninni/network`, A37). Test: `test/user_facing_error_test.dart`.
+
 ## Hiç çalışmayan veya yarım kalmış özellikler
 
 1. **Arka planda izleme:** İki cihazda da yok (B01, B02).

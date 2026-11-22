@@ -44,7 +44,9 @@ class WebRTCService {
   final SignalingInterface _signalingService;
   final PairingService? _pairingService;
   final void Function(ConnectionStatus status)? onStatusChanged;
-  final void Function(String message)? onError;
+  /// Errors for the user; the controller maps them to a readable text
+  /// (V2.1 §3), the raw text is only logged.
+  final void Function(Object error)? onError;
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
@@ -96,7 +98,7 @@ class WebRTCService {
 
   void _reportError(String message, [Object? error]) {
     debugPrint('WebRTC error: $message ${error ?? ''}');
-    onError?.call(message);
+    onError?.call(error ?? message);
     _setStatus(ConnectionStatus.FAILED);
   }
 
@@ -411,7 +413,7 @@ class WebRTCService {
       // detection) available before a parent joins.
       await _buildBabyPeer(roomCode, session: null, generation: _generation);
     } catch (e) {
-      _reportError('Teklif oluşturulamadı: $e', e);
+      _reportError('Teklif oluşturulamadı', e);
       rethrow;
     }
   }
@@ -445,7 +447,7 @@ class WebRTCService {
         }
         // Let the next room snapshot with this session try again.
         _babySession = null;
-        _reportError('Teklif oluşturulamadı: $e', e);
+        _reportError('Teklif oluşturulamadı', e);
       }
     });
     return _babyNegotiation;
@@ -532,12 +534,12 @@ class WebRTCService {
         await pc.setRemoteDescription(answer);
         await _flushPendingCandidates(pc);
       },
-      onError: (e) => _reportError('Yanıta ulaşılamadı: $e'),
+      onError: (Object e) => _reportError('Yanıta ulaşılamadı', e),
     );
 
     _remoteCandidateSub = _signalingService.onCandidate.listen(
       (candidate) => unawaited(_addRemoteCandidate(pc, candidate)),
-      onError: (e) => _reportError('ICE candidate okunamadı: $e'),
+      onError: (Object e) => _reportError('ICE candidate okunamadı', e),
     );
   }
 
@@ -669,11 +671,11 @@ class WebRTCService {
            // Let the automatic rejoin start a new session.
            _setStatus(ConnectionStatus.FAILED);
          }
-      }, onError: (e) => _reportError('Teklif alınamadı: $e'));
+      }, onError: (Object e) => _reportError('Teklif alınamadı', e));
 
       _remoteCandidateSub = _signalingService.onCandidate.listen(
         (candidate) => unawaited(_addRemoteCandidate(pc, candidate)),
-        onError: (e) => _reportError('ICE candidate okunamadı: $e'),
+        onError: (Object e) => _reportError('ICE candidate okunamadı', e),
       );
 
       _offerTimer = Timer(offerTimeout, () async {
@@ -684,7 +686,7 @@ class WebRTCService {
         }
       });
     } catch (e) {
-      _reportError('Bağlantı kurulamadı: $e', e);
+      _reportError('Bağlantı kurulamadı', e);
       rethrow;
     }
   }

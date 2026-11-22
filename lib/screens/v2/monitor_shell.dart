@@ -13,6 +13,7 @@ import 'baby_screens.dart';
 import 'onboarding_screen.dart';
 import 'parent_screens.dart';
 import 'role_select_screen.dart';
+import 'widgets/offline_banner.dart';
 
 enum MonitorStage { roleSelect, babyPairing, babyLive, parentJoin, parentLive }
 
@@ -117,7 +118,11 @@ class MonitorOverlays extends StatelessWidget {
                 onOpenVideo: () => rootNavigatorKey.currentState?.popUntil((r) => r.isFirst),
               )
             : null;
-    return Stack(
+    // V2.1 §3: no network -> amber strip on top; the screens below lose the
+    // top safe area it already covers. Hidden in the baby's dark night view
+    // and in offline (Nearby) mode, which does not need the internet.
+    final showOffline = !c.online && !c.isOffline && !c.nightMode;
+    final stack = Stack(
       children: [
         child,
         Positioned.fill(
@@ -126,6 +131,13 @@ class MonitorOverlays extends StatelessWidget {
             child: overlay ?? const SizedBox.shrink(key: ValueKey('none')),
           ),
         ),
+      ],
+    );
+    if (!showOffline) return stack;
+    return Column(
+      children: [
+        const OfflineBanner(),
+        Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: stack)),
       ],
     );
   }

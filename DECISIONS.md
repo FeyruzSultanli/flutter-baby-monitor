@@ -204,6 +204,12 @@
 ### A36 — v2 lisans taraması
 - `pubspec.lock` 180 paket (A16'da 165): GPL/LGPL/AGPL yok. v2'de eklenenler: `audioplayers` + alt paketleri (MIT), `shared_preferences` (BSD-3), `animations` (BSD-3), `qr_flutter` + `qr` (BSD-3), `mobile_scanner` (BSD-3; Android'de Google ML Kit), `flutter_native_splash` (MIT, yalnızca geliştirme). Yazı tipi Plus Jakarta Sans: SIL OFL 1.1 (`assets/fonts/OFL.txt`). Sesler kendi sentezimiz (`assets/audio/LICENSES.md`).
 
+### A37 — Ağ durumu: `connectivity_plus` yerine küçük yerel kanal (V2.1 §3)
+- Plan `connectivity_plus`'ı (BSD-3) öneriyordu, ama paket Linux için `nm` bağımlılığını çekiyor: **MPL-2.0**. Kural yalnızca MIT/BSD/Apache/OFL/zlib.
+- Seçenekler: (a) `connectivity_plus` + MPL istisnası (yalnızca Linux masaüstünde derlenir); (b) kendi ~100 satırlık kanalımız. En güvenli olan **(b)** seçildi.
+- `ninni/network` olay kanalı: Android `ConnectivityManager.registerDefaultNetworkCallback` (NET_CAPABILITY_INTERNET), iOS `NWPathMonitor` (`satisfied`). Kanal yoksa (test, masaüstü) "çevrim içi" sayılır. Aynı dosyalarda `ninni/device` → `audioRoute` (tanı ekranı, §1/§2).
+- Not: ağ "var" görünüp internet olmayabilir (kapalı ağ); o durumda yine §3 hata eşlemesi ve "Tekrar dene" devreye girer.
+
 ## Cavid'in kararı bekleniyor
 
 - **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.

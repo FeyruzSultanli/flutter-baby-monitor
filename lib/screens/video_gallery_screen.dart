@@ -5,6 +5,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'video_player_screen.dart';
+import '../core/errors/user_facing_error.dart';
 import '../l10n/app_localizations.dart';
 
 class VideoGalleryScreen extends StatefulWidget {
@@ -118,7 +119,7 @@ class _VideoGalleryScreenState extends State<VideoGalleryScreen> {
       debugPrint('Error sharing video: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.error}: $e')),
+          SnackBar(content: Text(UserFacingError.describe(e, l10n, context: 'share'))),
         );
       }
     }

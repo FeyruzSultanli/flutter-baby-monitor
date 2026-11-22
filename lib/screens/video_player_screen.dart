@@ -73,11 +73,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         looping: false,
         aspectRatio: controller.value.aspectRatio,
         errorBuilder: (context, errorMessage) {
+          debugPrint('Video playback error: $errorMessage');
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                errorMessage,
+                AppLocalizations.of(context).videoPlaybackError,
                 style: const TextStyle(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
@@ -131,7 +132,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${l10n.error}: $_errorMessage',
+                      l10n.errUnknown,
                       style: const TextStyle(color: Colors.white70),
                       textAlign: TextAlign.center,
                     ),

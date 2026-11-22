@@ -9,10 +9,12 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var offlineAudio: OfflineAudio? = null
     private var monitorChannel: MethodChannel? = null
+    private var deviceChannels: DeviceChannels? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         offlineAudio = OfflineAudio(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+        deviceChannels = DeviceChannels(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
         monitorChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ninni/monitor_service").apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -56,6 +58,8 @@ class MainActivity : FlutterActivity() {
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         monitorChannel?.setMethodCallHandler(null)
         monitorChannel = null
+        deviceChannels?.dispose()
+        deviceChannels = null
         offlineAudio?.dispose()
         offlineAudio = null
         super.cleanUpFlutterEngine(flutterEngine)

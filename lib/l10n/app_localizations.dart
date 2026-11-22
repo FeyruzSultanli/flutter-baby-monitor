@@ -376,6 +376,16 @@ class AppLocalizations {
       'colorPurple': 'Purple',
       'colorBlue': 'Blue',
       'languageAz': 'Azərbaycanca',
+      'errNoInternet': 'No internet connection. Check Wi-Fi or mobile data.',
+      'errSignIn': 'Could not sign in. Try again in a moment.',
+      'errPermission': 'A required permission is missing. Allow camera and microphone in Settings.',
+      'errCamera': 'The camera could not be opened. Close and reopen the app.',
+      'errNotConfigured': 'Online connection is not available in this build.',
+      'errUnknown': 'Something went wrong. Try again.',
+      'offlineBannerTitle': 'No internet',
+      'offlineBannerBody': 'We will try again as soon as you are back online.',
+      'offlineBannerAndroid': 'To monitor without internet, use Offline mode on two Android phones.',
+      'backOnline': 'Back online',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -737,6 +747,16 @@ class AppLocalizations {
       'colorPurple': 'Mor',
       'colorBlue': 'Mavi',
       'languageAz': 'Azərbaycanca',
+      'errNoInternet': 'İnternet bağlantısı yok. Wi-Fi veya mobil veriyi kontrol edin.',
+      'errSignIn': 'Giriş yapılamadı. Biraz sonra tekrar deneyin.',
+      'errPermission': 'Gerekli izin verilmedi. Ayarlardan kamera ve mikrofon iznini açın.',
+      'errCamera': 'Kamera açılamadı. Uygulamayı kapatıp yeniden açın.',
+      'errNotConfigured': 'Bu sürümde çevrim içi bağlantı kullanılamıyor.',
+      'errUnknown': 'Bir şeyler ters gitti. Tekrar deneyin.',
+      'offlineBannerTitle': 'İnternet yok',
+      'offlineBannerBody': 'Bağlantı gelince otomatik yeniden denenecek.',
+      'offlineBannerAndroid': 'İnternetsiz izlemek için iki Android telefonda İnternetsiz modu kullanın.',
+      'backOnline': 'İnternet geri geldi',
     },
     'az': {
       'settings': 'Parametrlər',
@@ -1098,6 +1118,16 @@ class AppLocalizations {
       'colorPurple': 'Bənövşəyi',
       'colorBlue': 'Mavi',
       'languageAz': 'Azərbaycanca',
+      'errNoInternet': 'İnternet bağlantısı yoxdur. Wi-Fi və ya mobil interneti yoxlayın.',
+      'errSignIn': 'Daxil olmaq mümkün olmadı. Bir az sonra yenidən cəhd edin.',
+      'errPermission': 'Lazımi icazə verilməyib. Ayarlardan kamera və mikrofon icazəsini açın.',
+      'errCamera': 'Kamera açılmadı. Tətbiqi bağlayıb yenidən açın.',
+      'errNotConfigured': 'Bu versiyada onlayn bağlantı mövcud deyil.',
+      'errUnknown': 'Nəsə səhv getdi. Yenidən cəhd edin.',
+      'offlineBannerTitle': 'İnternet yoxdur',
+      'offlineBannerBody': 'Bağlantı bərpa olunanda avtomatik yenidən cəhd ediləcək.',
+      'offlineBannerAndroid': 'İnternetsiz izləmək üçün iki Android telefonda İnternetsiz rejimdən istifadə edin.',
+      'backOnline': 'İnternet bərpa olundu',
     },
   };
 
@@ -1463,6 +1493,16 @@ class AppLocalizations {
   String get colorPurple => _t('colorPurple');
   String get colorBlue => _t('colorBlue');
   String get languageAz => _t('languageAz');
+  String get errNoInternet => _t('errNoInternet');
+  String get errSignIn => _t('errSignIn');
+  String get errPermission => _t('errPermission');
+  String get errCamera => _t('errCamera');
+  String get errNotConfigured => _t('errNotConfigured');
+  String get errUnknown => _t('errUnknown');
+  String get offlineBannerTitle => _t('offlineBannerTitle');
+  String get offlineBannerBody => _t('offlineBannerBody');
+  String get offlineBannerAndroid => _t('offlineBannerAndroid');
+  String get backOnline => _t('backOnline');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
