@@ -27,6 +27,12 @@ class CryDetector {
 
   bool get alarm => _alarm;
 
+  /// How long the level has been at or above the threshold (diagnostics).
+  Duration aboveFor(DateTime now) {
+    final since = _aboveSince;
+    return since == null ? Duration.zero : now.difference(since);
+  }
+
   /// Feeds one reading taken at [now] and returns whether the alarm is on.
   bool update(double db, DateTime now) {
     if (db >= threshold) {

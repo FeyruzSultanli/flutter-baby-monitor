@@ -210,6 +210,11 @@
 - `ninni/network` olay kanalı: Android `ConnectivityManager.registerDefaultNetworkCallback` (NET_CAPABILITY_INTERNET), iOS `NWPathMonitor` (`satisfied`). Kanal yoksa (test, masaüstü) "çevrim içi" sayılır. Aynı dosyalarda `ninni/device` → `audioRoute` (tanı ekranı, §1/§2).
 - Not: ağ "var" görünüp internet olmayabilir (kapalı ağ); o durumda yine §3 hata eşlemesi ve "Tekrar dene" devreye girer.
 
+### A38 — Görüşmede ağlama ölçümü, ebeveyn "taze" kontrolü, iOS görüşme oturumu (V2.1 §1/§2)
+- **Ölçüm:** `audioLevel` ile enerji RMS'inin büyüğü (`callAudioDb`). Android'de `audioLevel` zaten çalışıyor ve RMS ondan büyük olmadığı için davranış aynı kalır; yalnızca `audioLevel`'ın gelmediği/0 kaldığı cihazlarda RMS devreye girer. Ölçek değişmedi (bekleme ölçeri de parça RMS'i kullanıyor). Gerçek iPhone değerleri LIVE_DEBUG oturumunda karşılaştırılacak; gerekirse ölçeğe sabit bir düzeltme eklenir (karar: veriden sonra).
+- **Taze kontrolü:** Ebeveyn saatine güvenilmiyor (B75). Seçenekler: (a) sunucu saatiyle karşılaştırma (eski, saat farkına açık), (b) ilk değerden sonra yerel değişim zamanı (seçildi), (c) Firestore'dan sunucu saati okumak (ek yazma/okuma). (b) ek maliyetsiz.
+- **iOS oturumu:** `videoChat` (hoparlör, ses işleme açık: yankı engelleme bas-konuşta gerekli) + `mixWithOthers` (A23 ile aynı). Alternatif `voiceChat` + port override, WebRTC her yeniden yapılandırmada geri aldığı için seçilmedi.
+
 ## Cavid'in kararı bekleniyor
 
 - **D4 TURN:** Telefondaki farklı ağ testinin (TEST_PLAN AI-11/AI-12, G2) sonucuna göre karar verilecek.

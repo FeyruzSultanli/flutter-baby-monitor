@@ -6,7 +6,54 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../enums/connection_status.dart';
 import '../pairing/pairing_service.dart';
+import 'rtc_audio_stats.dart';
+import 'sdp_utils.dart';
 import 'signaling_interface.dart';
+
+/// Talk channel and audio diagnostics (V2.1 §1, §2), shown on the hidden
+/// diagnostics screen and in the TALKDIAG log lines.
+class WebRtcDiag {
+  /// Parent: an audio transceiver was found and set to sendrecv.
+  bool talkSenderFound = false;
+  /// How the talk transceiver was found: "track", "mid" or "none".
+  String talkSenderVia = 'none';
+  /// Audio direction in the offer and in the answer (sendrecv expected).
+  String? offerAudioDirection;
+  String? answerAudioDirection;
+  /// Last replaceTrack result while talking: "ok", "null" or "error: …".
+  String? lastReplaceTrack;
+  /// Last getUserMedia result for the talk microphone.
+  String? talkMicResult;
+  /// iOS audio session configuration result.
+  String? audioSessionResult;
+  /// Last speakerphone call result.
+  String? speakerResult;
+
+  void resetCall() {
+    talkSenderFound = false;
+    talkSenderVia = 'none';
+    offerAudioDirection = null;
+    answerAudioDirection = null;
+    lastReplaceTrack = null;
+    talkMicResult = null;
+  }
+}
+
+/// Audio levels of one stats sample.
+class AudioLevels {
+  const AudioLevels({this.local, this.localRms, this.remote, this.remoteRms, this.stats = RtcStatsSnapshot.empty});
+
+  /// Captured audio: `audioLevel` (short peak) and the RMS over the interval
+  /// from totalAudioEnergy (V2.1 §1). Either can be null.
+  final double? local;
+  final double? localRms;
+  /// Received audio (baby: the parent talking).
+  final double? remote;
+  final double? remoteRms;
+  final RtcStatsSnapshot stats;
+
+  static const none = AudioLevels();
+}
 
 /// Owns RTCPeerConnection, local/remote renderers and signaling wiring.
 ///
@@ -47,6 +94,11 @@ class WebRTCService {
   /// Errors for the user; the controller maps them to a readable text
   /// (V2.1 §3), the raw text is only logged.
   final void Function(Object error)? onError;
+
+  final WebRtcDiag diag = WebRtcDiag();
+  final EnergyLevelMeter _localEnergy = EnergyLevelMeter();
+  final EnergyLevelMeter _remoteEnergy = EnergyLevelMeter();
+  RTCPeerConnection? _statsPeer;
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
@@ -107,6 +159,7 @@ class WebRTCService {
   Future<void> _closePeer() async {
     await stopTalking();
     _talkSender = null;
+    diag.resetCall();
     _disconnectTimer?.cancel();
     _disconnectTimer = null;
     _offerTimer?.cancel();
@@ -179,31 +232,76 @@ class WebRTCService {
       Platform.isIOS &&
       Platform.environment.containsKey('SIMULATOR_DEVICE_NAME');
 
-  /// Both audio levels (0..1) from one stats call: our captured audio
-  /// (cry detection) and the received audio (baby: the parent talking, V2
-  /// 5.3). Either can be null.
-  Future<({double? local, double? remote})> getAudioLevels() async {
+  /// One stats sample of the current peer (V2.1 §1, §2), or empty.
+  Future<RtcStatsSnapshot> sampleStats() async {
     final pc = _peerConnection;
-    if (pc == null) return (local: null, remote: null);
-    double? local;
-    double? remote;
+    if (pc == null) return RtcStatsSnapshot.empty;
     try {
-      for (final report in await pc.getStats()) {
-        final v = report.values;
-        final kind = v['kind'] ?? v['mediaType'];
-        if (kind != 'audio') continue;
-        final level = v['audioLevel'];
-        if (level is! num) continue;
-        if (report.type == 'inbound-rtp' || (report.type == 'track' && v['remoteSource'] == true)) {
-          remote = level.toDouble();
-        } else if (report.type == 'media-source' || report.type == 'track') {
-          local ??= level.toDouble();
-        }
-      }
+      final reports = await pc.getStats();
+      return RtcStatsSnapshot.parse(reports.map((r) => (r.type, r.values)));
     } catch (e) {
       debugPrint('getStats error: $e');
+      return RtcStatsSnapshot.empty;
     }
-    return (local: local, remote: remote);
+  }
+
+  /// Audio levels (0..1) from one stats call: our captured audio (cry
+  /// detection, the parent's talk level) and the received audio (baby: the
+  /// parent talking, V2 5.3), each as `audioLevel` and as RMS from the
+  /// energy counters (V2.1 §1). Values can be null.
+  Future<AudioLevels> getAudioLevels() async {
+    final pc = _peerConnection;
+    if (pc == null) return AudioLevels.none;
+    if (!identical(pc, _statsPeer)) {
+      _statsPeer = pc;
+      _localEnergy.reset();
+      _remoteEnergy.reset();
+    }
+    final s = await sampleStats();
+    return AudioLevels(
+      local: s.localLevel,
+      localRms: _localEnergy.update(s.localEnergy, s.localDuration),
+      remote: s.remoteLevel,
+      remoteRms: _remoteEnergy.update(s.remoteEnergy, s.remoteDuration),
+      stats: s,
+    );
+  }
+
+  /// iOS: one audio session for the call on both phones (V2.1 §2):
+  /// playAndRecord + videoChat mode, which plays through the loudspeaker
+  /// (voiceChat, WebRTC's default, uses the quiet earpiece), with the same
+  /// mixWithOthers option as the app's own sounds (A23). Setting it through
+  /// flutter_webrtc also changes WebRTC's own default configuration, so the
+  /// session WebRTC sets up when the call audio starts keeps these values.
+  Future<void> configureCallAudio() async {
+    if (kIsWeb || !Platform.isIOS) return;
+    try {
+      await Helper.setAppleAudioConfiguration(AppleAudioConfiguration(
+        appleAudioCategory: AppleAudioCategory.playAndRecord,
+        appleAudioCategoryOptions: const {
+          AppleAudioCategoryOption.defaultToSpeaker,
+          AppleAudioCategoryOption.allowBluetooth,
+          AppleAudioCategoryOption.allowBluetoothA2DP,
+          AppleAudioCategoryOption.mixWithOthers,
+        },
+        appleAudioMode: AppleAudioMode.videoChat,
+      ));
+      diag.audioSessionResult = 'ok';
+    } catch (e) {
+      diag.audioSessionResult = 'error: $e';
+      debugPrint('Call audio session setup failed: $e');
+    }
+  }
+
+  /// Loudspeaker for the received voice (baby: the parent talking).
+  Future<void> setSpeaker() async {
+    try {
+      await Helper.setSpeakerphoneOn(true);
+      diag.speakerResult = 'ok';
+    } catch (e) {
+      diag.speakerResult = 'error: $e';
+      debugPrint('Speakerphone failed: $e');
+    }
   }
 
   // Parent → baby talk channel (V2 5.3): the parent's answer makes the audio
@@ -222,17 +320,42 @@ class WebRTCService {
     if (sender == null || _talking) return false;
     _talking = true;
     try {
-      final stream = await navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+      final MediaStream stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+        diag.talkMicResult = 'ok';
+      } catch (e) {
+        diag.talkMicResult = 'error: $e';
+        rethrow;
+      }
       if (!_talking || !identical(sender, _talkSender)) {
         await stream.dispose();
         return false;
       }
       _talkStream = stream;
-      await sender.replaceTrack(stream.getAudioTracks().first);
+      final tracks = stream.getAudioTracks();
+      if (tracks.isEmpty) {
+        diag.lastReplaceTrack = 'error: no audio track';
+        throw StateError('Talk microphone has no audio track');
+      }
+      try {
+        await sender.replaceTrack(tracks.first);
+        diag.lastReplaceTrack = 'ok';
+      } catch (e) {
+        diag.lastReplaceTrack = 'error: $e';
+        rethrow;
+      }
+      debugPrint('TALKDIAG role=parent start replace=ok via=${diag.talkSenderVia} '
+          'answer=${diag.answerAudioDirection}');
       return true;
     } catch (e) {
-      debugPrint('Talk start failed: $e');
+      debugPrint('TALKDIAG role=parent start failed: $e');
       _talking = false;
+      final stream = _talkStream;
+      _talkStream = null;
+      try {
+        await stream?.dispose();
+      } catch (_) {}
       return false;
     }
   }
@@ -243,6 +366,7 @@ class WebRTCService {
     final sender = _talkSender;
     try {
       await sender?.replaceTrack(null);
+      diag.lastReplaceTrack = 'null';
     } catch (e) {
       debugPrint('Talk stop failed: $e');
     }
@@ -251,25 +375,6 @@ class WebRTCService {
     try {
       await stream?.dispose();
     } catch (_) {}
-  }
-
-  Future<double?> getAudioLevel() async {
-    if (_peerConnection == null) return null;
-    try {
-      final stats = await _peerConnection!.getStats();
-      for (var report in stats) {
-        // Check for media-source (standard) or track (some implementations)
-        if ((report.type == 'media-source' || report.type == 'track') &&
-            report.values['kind'] == 'audio' &&
-            report.values['audioLevel'] != null) {
-          final val = report.values['audioLevel'];
-          if (val is num) return val.toDouble();
-        }
-      }
-    } catch (e) {
-      debugPrint('getStats error: $e');
-    }
-    return null;
   }
 
   /// Parent: total bytes received over inbound RTP (video + audio), used to
@@ -334,6 +439,12 @@ class WebRTCService {
         _disconnectTimer?.cancel();
         _disconnectTimer = null;
         _setStatus(ConnectionStatus.CONNECTED);
+        // The call's audio unit runs now; WebRTC may have reconfigured the
+        // iOS session meanwhile, so set it (and the loudspeaker) again (§2).
+        unawaited(() async {
+          await configureCallAudio();
+          if (_isBaby) await setSpeaker();
+        }());
         final pairing = _pairingService;
         if (pairing != null) {
           unawaited(pairing.setPaired(roomCode, true).catchError(
@@ -406,6 +517,7 @@ class WebRTCService {
       // Connect signaling
       await _signalingService.connect(roomCode);
 
+      await configureCallAudio();
       _localStream = await _createLocalStream(facingMode: facingMode);
       localRenderer.srcObject = _localStream;
 
@@ -473,6 +585,8 @@ class WebRTCService {
         }
       }
       if (generation != _generation) return;
+      // The standby meter (record) set its own iOS session category.
+      await configureCallAudio();
     }
     _babyInCall = session != null;
 
@@ -500,12 +614,8 @@ class WebRTCService {
 
     if (session != null) {
       // V2 5.3: the parent's voice must come out of the loudspeaker, not
-      // the earpiece.
-      try {
-        await Helper.setSpeakerphoneOn(true);
-      } catch (e) {
-        debugPrint('Speakerphone failed: $e');
-      }
+      // the earpiece (again on CONNECTED, see _onPeerState).
+      await setSpeaker();
     }
 
     if (session == null) {
@@ -523,6 +633,7 @@ class WebRTCService {
 
     final offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    diag.offerAudioDirection = sdpDirection(offer.sdp);
     await _signalingService.sendOffer(offer);
     if (generation != _generation || !identical(_peerConnection, pc)) return;
 
@@ -531,6 +642,9 @@ class WebRTCService {
         if (!identical(_peerConnection, pc)) return;
         final existingRemote = await pc.getRemoteDescription();
         if (existingRemote != null) return;
+        diag.answerAudioDirection = sdpDirection(answer.sdp);
+        debugPrint('TALKDIAG role=baby answerAudio=${diag.answerAudioDirection} '
+            'offerAudio=${diag.offerAudioDirection}');
         await pc.setRemoteDescription(answer);
         await _flushPendingCandidates(pc);
       },
@@ -545,13 +659,38 @@ class WebRTCService {
 
   /// Parent: makes the audio transceiver sendrecv before answering, so the
   /// talk button can attach the microphone later without renegotiation.
-  Future<void> _prepareTalkChannel(RTCPeerConnection pc) async {
+  /// The transceiver is found by its receiver track kind, or (V2.1 §2) by
+  /// the mid of the offer's audio section when the track is not reported.
+  Future<void> _prepareTalkChannel(RTCPeerConnection pc, String? offerSdp) async {
     try {
-      for (final t in await pc.getTransceivers()) {
-        if (t.receiver.track?.kind != 'audio') continue;
-        await t.setDirection(TransceiverDirection.SendRecv);
-        if (identical(_peerConnection, pc)) _talkSender = t.sender;
-        return;
+      final transceivers = await pc.getTransceivers();
+      RTCRtpTransceiver? audio;
+      var via = 'none';
+      for (final t in transceivers) {
+        if (t.receiver.track?.kind == 'audio') {
+          audio = t;
+          via = 'track';
+          break;
+        }
+      }
+      if (audio == null) {
+        final mid = sdpMid(offerSdp);
+        for (final t in transceivers) {
+          if (mid != null && t.mid == mid) {
+            audio = t;
+            via = 'mid';
+            break;
+          }
+        }
+      }
+      debugPrint('TALKDIAG role=parent transceivers=${transceivers.length} '
+          'kinds=${transceivers.map((t) => '${t.mid}:${t.receiver.track?.kind}').join(',')} via=$via');
+      if (audio == null) return;
+      await audio.setDirection(TransceiverDirection.SendRecv);
+      if (identical(_peerConnection, pc)) {
+        _talkSender = audio.sender;
+        diag.talkSenderFound = true;
+        diag.talkSenderVia = via;
       }
     } catch (e) {
       // Talking is optional; watching must never fail because of it.
@@ -607,6 +746,7 @@ class WebRTCService {
       // Connect signaling
       await _signalingService.connect(roomCode);
       if (generation != _generation) return; // hangUp()/another start meanwhile
+      await configureCallAudio();
 
       final pc = await _createPeerConnection();
       if (generation != _generation) {
@@ -649,7 +789,8 @@ class WebRTCService {
 
            await pc.setRemoteDescription(offer);
            await _flushPendingCandidates(pc);
-           await _prepareTalkChannel(pc);
+           diag.offerAudioDirection = sdpDirection(offer.sdp);
+           await _prepareTalkChannel(pc, offer.sdp);
 
            // Explicitly request video/audio
            const constraints = {
@@ -662,6 +803,12 @@ class WebRTCService {
 
            final answer = await pc.createAnswer(constraints);
            if (!identical(_peerConnection, pc)) return;
+           diag.answerAudioDirection = sdpDirection(answer.sdp);
+           if (diag.answerAudioDirection != 'sendrecv') {
+             // The talk track would not reach the baby (§2).
+             debugPrint('TALKDIAG role=parent answerAudio=${diag.answerAudioDirection}: talk disabled');
+             _talkSender = null;
+           }
            await pc.setLocalDescription(answer);
            await _signalingService.sendAnswer(answer);
          } catch (e) {

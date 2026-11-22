@@ -26,11 +26,13 @@ import '../../core/audio/offline_audio.dart';
 import '../../core/audio/pcm_microphone.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/debug/debug_hooks.dart';
+import '../../core/debug/monitor_diag.dart';
 import '../../core/enums/connection_status.dart';
 import '../../core/enums/device_role.dart';
 import '../../core/errors/user_facing_error.dart';
 import '../../core/monitor/battery_alert.dart';
 import '../../core/monitor/connection_watchdog.dart';
+import '../../core/monitor/cry_freshness.dart';
 import '../../core/network/network_status.dart';
 import '../../core/offline/offline_payload.dart';
 import '../../core/pairing/pairing_service.dart';
@@ -42,6 +44,7 @@ import '../../core/services/hybrid_notification_manager.dart';
 import '../../core/services/monitor_foreground_service.dart';
 import '../../core/webrtc/firestore_signaling.dart';
 import '../../core/webrtc/reconnect_backoff.dart';
+import '../../core/webrtc/rtc_audio_stats.dart';
 import '../../core/webrtc/signaling_interface.dart';
 import '../../core/webrtc/signaling_messages.dart';
 import '../../core/webrtc/webrtc_service.dart';
@@ -195,6 +198,38 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   // Parent online: the received audio level, ~10 Hz (sound bars).
   Timer? _parentLevelTimer;
 
+  // V2.1 §1/§2: real-device diagnostics -----------------------------------
+  /// Live values for the hidden diagnostics screen and the 1 Hz
+  /// CRYDIAG / TALKDIAG log lines.
+  final MonitorDiagNotifier diag = MonitorDiagNotifier();
+  Timer? _diagTimer;
+  int _diagTicks = 0;
+  RtcStatsSnapshot _lastStats = RtcStatsSnapshot.empty;
+  String _dbSource = 'none';
+  double? _lastRawLevel;
+  double? _lastRmsLevel;
+  double? _lastDetectorDb;
+  String _lastCryWrite = '-';
+  int? _lastCryWriteMs;
+  int _cryWritesOk = 0;
+  int _cryWritesFailed = 0;
+  // Parent: freshness of the room's cry state without trusting the phone
+  // clock (B75).
+  final CryFreshness _cryFreshness = CryFreshness();
+  bool _remoteCryAlert = false;
+  double? _remoteCryDb;
+  // Talk channel (B76): our audio bytes (parent) / the parent's (baby).
+  final ByteFlow _talkOutFlow = ByteFlow();
+  final ByteFlow _talkInFlow = ByteFlow();
+  bool _talkFlowing = false;
+  bool _speakerReasserted = false;
+  final ValueNotifier<double> _talkLevel = ValueNotifier<double>(0);
+  String _micPermission = '-';
+  // Parent: connection quality pill (V2.1 §4).
+  final ConnectionQualityMeter _qualityMeter = ConnectionQualityMeter();
+  ConnectionQuality? _quality;
+  int _parentPollTicks = 0;
+
   double _noiseThreshold = 60.0;
   bool _noiseAlert = false;
   // Alarm only after >= 2 s above the threshold (D5 / B27).
@@ -279,6 +314,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     NetworkStatus.instance.start();
     NetworkStatus.instance.addListener(_onNetworkChanged);
+    _diagTimer = Timer.periodic(const Duration(seconds: 1), (_) => _diagTick());
     unawaited(_loadPreferences());
     _pushTokenSub = HybridNotificationManager().onPushTokenRefresh.listen((token) {
       final roomCode = _pairingState?.roomCode;
@@ -295,6 +331,89 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       _recentRooms = rooms;
       _notify();
     }));
+  }
+
+  /// Baby in a call (B76): notices the parent's voice arriving (audio bytes
+  /// growing) and, on iOS, sets the loudspeaker again once per call, since
+  /// iOS can move the call audio to the earpiece when it starts playing.
+  void _onBabyCallAudio(AudioLevels levels, DateTime now) {
+    _talkInFlow.update(levels.stats.audioBytesReceived, now);
+    final hearing = _talkInFlow.flowing(now);
+    if (hearing && !_speakerReasserted) {
+      _speakerReasserted = true;
+      debugPrint('TALKDIAG role=baby parent audio arriving, speaker on');
+      final webrtc = _webrtcService;
+      if (webrtc != null) {
+        unawaited(() async {
+          await webrtc.configureCallAudio();
+          await webrtc.setSpeaker();
+        }());
+      }
+    }
+  }
+
+  /// 1 Hz: fills [diag] and logs one CRYDIAG line (and a TALKDIAG line
+  /// while talking, else every 10 s) during a session (V2.1 §1, §2).
+  void _diagTick() {
+    if (_disposing) return;
+    final d = diag.value;
+    final now = DateTime.now();
+    final webrtc = _webrtcService;
+    d
+      ..role = _role == DeviceRole.BABY ? 'baby' : (_role == DeviceRole.PARENT ? 'parent' : '-')
+      ..mode = _isOfflineMode ? 'offline' : 'online'
+      ..connection = _connectionStatus.name
+      ..online = NetworkStatus.instance.online
+      ..source = _isOfflineMode ? 'nearby' : _dbSource
+      ..rawLevel = _lastRawLevel
+      ..rmsLevel = _lastRmsLevel
+      ..db = _role == DeviceRole.BABY ? _lastDetectorDb : _currentDecibel
+      ..threshold = _cryDetector.threshold
+      ..overMs = _cryDetector.aboveFor(now).inMilliseconds
+      ..alarm = _role == DeviceRole.BABY ? _lastCryAlertSent : _noiseAlert
+      ..talkSuppressed = _talkGate.suppressed(now)
+      ..write = _lastCryWrite
+      ..writeMs = _lastCryWriteMs
+      ..writesOk = _cryWritesOk
+      ..writesFailed = _cryWritesFailed
+      ..standbyMic = _standbyMicActive
+      ..cryAlert = _remoteCryAlert
+      ..cryDb = _remoteCryDb
+      ..cryAgeMs = _cryFreshness.skew?.inMilliseconds
+      ..cryFresh = _noiseAlert || !_remoteCryAlert
+      ..alarmShown = _cryAlarmVisible
+      ..audioBytesSent = _lastStats.audioBytesSent
+      ..audioBytesReceived = _lastStats.audioBytesReceived
+      ..remoteLevel = _lastStats.remoteLevel
+      ..rttMs = _lastStats.rttMs
+      ..quality = _quality?.name ?? '-'
+      ..canTalk = canTalk
+      ..talking = _talking
+      ..micPermission = _micPermission
+      ..talkFlowing = _talkFlowing
+      ..hearingParent = _talkInFlow.flowing(now)
+      ..talkVia = webrtc?.diag.talkSenderVia ?? 'none'
+      ..offerAudio = webrtc?.diag.offerAudioDirection
+      ..answerAudio = webrtc?.diag.answerAudioDirection
+      ..replaceTrack = webrtc?.diag.lastReplaceTrack
+      ..talkMic = webrtc?.diag.talkMicResult
+      ..audioSession = webrtc?.diag.audioSessionResult
+      ..speaker = webrtc?.diag.speakerResult;
+    diag.changed();
+    if (!_roleChosen || _pairingState == null || _demo) return;
+    _diagTicks++;
+    debugPrint(d.cryLine());
+    if (_talking || d.hearingParent || _diagTicks % 10 == 0) debugPrint(d.talkLine());
+  }
+
+  /// Native audio route for the diagnostics screen (ninni/device).
+  Future<Map<String, Object?>> audioRoute() async {
+    try {
+      final r = await const MethodChannel('ninni/device').invokeMapMethod<String, Object?>('audioRoute');
+      return r ?? const {};
+    } catch (e) {
+      return {'error': '$e'};
+    }
   }
 
   /// V2.1 §3: the network came back: sign in again (anonymous auth may have
@@ -692,6 +811,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _disposing = true;
     WidgetsBinding.instance.removeObserver(this);
     NetworkStatus.instance.removeListener(_onNetworkChanged);
+    _diagTimer?.cancel();
     _watchdogTimer?.cancel();
     unawaited(_connectionAlarm.dispose());
     unawaited(MonitorForegroundService.instance.stop());
@@ -1029,6 +1149,18 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _sootheThreshold.stop();
     _talkGate.reset();
     _talking = false;
+    _talkLevel.value = 0;
+    _talkFlowing = false;
+    _talkOutFlow.reset();
+    _talkInFlow.reset();
+    _speakerReasserted = false;
+    _cryFreshness.reset();
+    _remoteCryAlert = false;
+    _remoteCryDb = null;
+    _qualityMeter.reset();
+    _quality = null;
+    _lastStats = RtcStatsSnapshot.empty;
+    _dbSource = 'none';
     _soothe = SootheState.off;
     _nightLight = NightLightState.off;
     _rememberedRoom = null;
@@ -1561,6 +1693,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
 
     final now = DateTime.now();
     final bool alert = _detectCry(db, now);
+    _lastDetectorDb = db;
 
     // Publish (local UI + parent) on alert changes or every 200 ms. Audio
     // chunks arrive many times per second; rebuilding the whole HomeScreen
@@ -2048,23 +2181,30 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       // Debug builds only: integration tests can inject a "fake cry" level.
       final fakeDb = DebugHooks.fakeNoiseDb;
       if (fakeDb != null) {
+        _dbSource = 'fake';
         _processNoiseLevel(fakeDb);
         return;
       }
       if (_standbyMicActive) {
         // Standby: loudest chunk of our own microphone since the last tick.
         final db = _standbyPeak.take();
+        _dbSource = 'record';
+        _lastRawLevel = null;
+        _lastRmsLevel = null;
         if (db != null) _processNoiseLevel(db);
         return;
       }
       if (_webrtcService == null) return;
       final levels = await _webrtcService!.getAudioLevels();
-      _talkGate.onRemoteLevel(levels.remote, DateTime.now());
-      final level = levels.local;
-      if (level != null) {
-        // Linear 0..1 -> 20*log10(level) + 100, clamped to 0..120.
-        _processNoiseLevel(webrtcAudioLevelToDb(level));
-      }
+      final now = DateTime.now();
+      _lastStats = levels.stats;
+      _talkGate.onRemoteLevel(levels.remote ?? levels.remoteRms, now);
+      _onBabyCallAudio(levels, now);
+      final db = callAudioDb(levels.local, levels.localRms);
+      _dbSource = db == null ? 'webrtc-none' : 'webrtc';
+      _lastRawLevel = levels.local;
+      _lastRmsLevel = levels.localRms;
+      if (db != null) _processNoiseLevel(db);
     });
 
     if (mounted) {
@@ -2110,6 +2250,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   void _processNoiseLevel(double db) {
     final now = DateTime.now();
     final bool alert = _detectCry(db, now);
+    _lastDetectorDb = db;
 
     if (_role == DeviceRole.BABY) {
       _setLevel(db);
@@ -2128,12 +2269,23 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
       if (roomCode != null && _pairingService != null && (statusChanged || timeToUpdate)) {
         _lastCryAlertSent = alert;
         _lastCrySentAt = now;
+        final started = DateTime.now();
         unawaited(
           _pairingService!.setCryAlert(
             roomCode,
             alert: alert,
             decibel: db,
-          ).catchError((Object e) => debugPrint('Cry state update failed: $e')),
+          ).then((_) {
+            _lastCryWrite = 'ok';
+            _lastCryWriteMs = DateTime.now().difference(started).inMilliseconds;
+            _cryWritesOk++;
+          }).catchError((Object e) {
+            // e.g. permission-denied (rules) or unavailable (network), B75.
+            _lastCryWrite = e is FirebaseException ? 'err:${e.code}' : 'err:${e.runtimeType}';
+            _lastCryWriteMs = DateTime.now().difference(started).inMilliseconds;
+            _cryWritesFailed++;
+            debugPrint('CRYDIAG role=baby write failed: $e');
+          }),
         );
 
         if (alert && _takeCryNotificationSlot(now)) {
@@ -2163,8 +2315,32 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
     _parentLevelTimer = Timer.periodic(const Duration(milliseconds: 100), (_) async {
       if (_disposing || _role != DeviceRole.PARENT || _isOfflineMode) return;
       final levels = await _webrtcService?.getAudioLevels();
-      final remote = levels?.remote;
+      if (levels == null || _disposing) return;
+      final now = DateTime.now();
+      _lastStats = levels.stats;
+      final remote = levels.remote ?? levels.remoteRms;
       if (remote != null) _setLevel(webrtcAudioLevelToDb(remote));
+      // V2.1 §2: the talk button shows our real outgoing level and whether
+      // our audio really leaves the phone.
+      _talkOutFlow.update(levels.stats.audioBytesSent, now);
+      if (_talking) {
+        _talkLevel.value = (levels.localRms ?? levels.local ?? 0).clamp(0.0, 1.0);
+        _lastRawLevel = levels.local;
+      } else if (_talkLevel.value != 0) {
+        _talkLevel.value = 0;
+      }
+      final flowing = _talking && _talkOutFlow.flowing(now);
+      if (flowing != _talkFlowing) {
+        _talkFlowing = flowing;
+        _notify();
+      }
+      if (++_parentPollTicks % 10 == 0) {
+        final q = _qualityMeter.update(levels.stats);
+        if (q != _quality) {
+          _quality = q;
+          _notify();
+        }
+      }
     });
   }
 
@@ -2230,6 +2406,7 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _listenRoomUpdates(String roomCode) {
     _roomSub?.cancel();
+    _cryFreshness.reset();
     _roomSub = _pairingService?.watchRoom(roomCode).listen((roomState) {
       if (!mounted) return;
       setState(() {
@@ -2299,9 +2476,10 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
         if (battery != null) {
           setState(() => _onRemoteBattery(battery.level, battery.charging));
         }
-        final updatedAt = roomState.cryUpdatedAt;
-        final isFresh =
-            updatedAt == null || DateTime.now().difference(updatedAt) < const Duration(seconds: 20);
+        // B75: freshness without comparing the phone clock to server time.
+        final isFresh = _cryFreshness.isFresh(roomState.cryUpdatedAt, DateTime.now());
+        _remoteCryAlert = roomState.cryAlert;
+        _remoteCryDb = roomState.cryDecibel;
         final remoteAlert = roomState.cryAlert && isFresh;
         if (remoteAlert != _noiseAlert) setState(() => _noiseAlert = remoteAlert);
         // The live bars use the received audio (10 Hz); the room value only
@@ -2596,6 +2774,13 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   NightLightState get nightLight => _nightLight;
   List<RecentRoom> get recentRooms => _recentRooms;
   bool get talking => _talking;
+  /// Parent, while talking: our real outgoing level 0..1 (V2.1 §2).
+  ValueListenable<double> get talkLevel => _talkLevel;
+  /// Parent, while talking: our audio really leaves the phone ("the baby
+  /// hears you"); false for a moment after pressing.
+  bool get talkFlowing => _demo ? _talking : _talkFlowing;
+  /// Parent: connection quality from RTT and packet loss (V2.1 §4).
+  ConnectionQuality? get connectionQuality => _demo ? ConnectionQuality.good : _quality;
   /// Parent: push-to-talk is available (online, connected, negotiated).
   bool get canTalk =>
       _demo || (!_isOfflineMode && isConnected && (_webrtcService?.canTalk ?? false));
@@ -2860,18 +3045,39 @@ class MonitorController extends ChangeNotifier with WidgetsBindingObserver {
   /// Parent: hold-to-talk (5.3). Asks for the microphone on first use.
   Future<void> startTalking() async {
     if (!canTalk || _talking) return;
-    final status = await Permission.microphone.request();
+    if (_demo) {
+      setState(() => _talking = true);
+      return;
+    }
+    var status = await Permission.microphone.status;
+    if (!status.isGranted && !status.isPermanentlyDenied && !status.isRestricted) {
+      status = await Permission.microphone.request();
+    }
+    _micPermission = status.name;
+    debugPrint('TALKDIAG role=parent permission=${status.name}');
     if (!status.isGranted) {
-      _messenger?.showSnackBar(SnackBar(content: Text(l10n.talkNeedsMic)));
+      // B76: a clear message and a way to the settings, instead of silence.
+      _messenger?.showSnackBar(SnackBar(
+        content: Text(l10n.talkNeedsMic),
+        duration: const Duration(seconds: 6),
+        persist: false,
+        action: SnackBarAction(label: l10n.openSettings, onPressed: () => unawaited(openAppSettings())),
+      ));
       return;
     }
     setState(() => _talking = true);
+    _talkOutFlow.reset();
     final ok = await _webrtcService!.startTalking();
-    if (!ok) setState(() => _talking = false);
+    if (!ok) {
+      setState(() => _talking = false);
+      _messenger?.showSnackBar(SnackBar(content: Text(l10n.talkFailed), persist: false));
+    }
   }
 
   Future<void> stopTalking() async {
     if (!_talking) return;
+    _talkLevel.value = 0;
+    _talkFlowing = false;
     setState(() => _talking = false);
     await _webrtcService?.stopTalking();
   }

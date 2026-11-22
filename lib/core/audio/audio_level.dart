@@ -38,3 +38,15 @@ double webrtcAudioLevelToDb(double level) {
   }
   return db.clamp(0.0, 120.0);
 }
+
+/// Cry detection level during a WebRTC call (V2.1 §1, B75): the louder of
+/// `audioLevel` (short peak) and the energy RMS of the poll interval, so a
+/// device where one of the two stays 0 or is missing (seen on real iPhones)
+/// still detects crying. Null when neither is available.
+double? callAudioDb(double? audioLevel, double? energyRms) {
+  final a = audioLevel == null ? null : webrtcAudioLevelToDb(audioLevel);
+  final b = energyRms == null ? null : webrtcAudioLevelToDb(energyRms);
+  if (a == null) return b;
+  if (b == null) return a;
+  return a > b ? a : b;
+}

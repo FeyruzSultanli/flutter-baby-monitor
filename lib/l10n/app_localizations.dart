@@ -386,6 +386,26 @@ class AppLocalizations {
       'offlineBannerBody': 'We will try again as soon as you are back online.',
       'offlineBannerAndroid': 'To monitor without internet, use Offline mode on two Android phones.',
       'backOnline': 'Back online',
+      'talkFailed': 'The microphone could not be opened. Try again.',
+      'talkBabyHears': 'Your baby can hear you',
+      'talkStarting': 'Opening the microphone',
+      'talkNotReaching': 'Your voice is not reaching the baby',
+      'micTestTitle': 'Test the microphone',
+      'micTestSubtitle': 'See the room\'s sound, set the threshold',
+      'micTestOwn': 'This phone\'s microphone',
+      'micTestInCall': 'Broadcast microphone (what cry detection measures)',
+      'micTestFromBaby': 'Sound from the baby phone',
+      'micTestOver': 'Above threshold',
+      'micTestUnder': 'Below threshold',
+      'micTestPeak': 'Loudest in 10 s',
+      'micTestNoMic': 'The microphone could not be opened. Check the microphone permission.',
+      'micTestHint': 'Make a sound close to your baby\'s cry (speak loudly or play a cry recording). If the bar stays past the marker for 2 seconds, the alarm goes off. Raise the threshold in a noisy room.',
+      'thresholdShort': 'Threshold',
+      'diagTitle': 'Diagnostics',
+      'diagCopy': 'Copy',
+      'diagCopied': 'Copied',
+      'diagHint': 'Live values for finding real-device bugs. The same values are logged once a second as CRYDIAG / TALKDIAG lines.',
+      'version': 'Version',
     },
     'tr': {
       'settings': 'Ayarlar',
@@ -757,6 +777,26 @@ class AppLocalizations {
       'offlineBannerBody': 'Bağlantı gelince otomatik yeniden denenecek.',
       'offlineBannerAndroid': 'İnternetsiz izlemek için iki Android telefonda İnternetsiz modu kullanın.',
       'backOnline': 'İnternet geri geldi',
+      'talkFailed': 'Mikrofon açılamadı. Tekrar deneyin.',
+      'talkBabyHears': 'Bebek sizi duyuyor',
+      'talkStarting': 'Mikrofon açılıyor',
+      'talkNotReaching': 'Ses bebeğe ulaşmıyor',
+      'micTestTitle': 'Mikrofonu test et',
+      'micTestSubtitle': 'Odadaki sesi görün, eşiği ayarlayın',
+      'micTestOwn': 'Bu telefonun mikrofonu',
+      'micTestInCall': 'Yayındaki mikrofon (ağlama algılamanın ölçtüğü)',
+      'micTestFromBaby': 'Bebek telefonundan gelen ses',
+      'micTestOver': 'Eşik aşıldı',
+      'micTestUnder': 'Eşiğin altında',
+      'micTestPeak': 'Son 10 sn en yüksek',
+      'micTestNoMic': 'Mikrofon açılamadı. Mikrofon iznini kontrol edin.',
+      'micTestHint': 'Bebeğin ağlamasına yakın bir ses çıkarın (yüksek sesle konuşun ya da bir ağlama kaydı çalın). Çubuk kesikli çizgiyi 2 saniye aşarsa alarm çalar. Odanız gürültülüyse eşiği yükseltin.',
+      'thresholdShort': 'Eşik',
+      'diagTitle': 'Tanı',
+      'diagCopy': 'Kopyala',
+      'diagCopied': 'Kopyalandı',
+      'diagHint': 'Gerçek cihaz hatalarını bulmak için canlı değerler. Aynı bilgiler saniyede bir CRYDIAG / TALKDIAG satırı olarak loga yazılır.',
+      'version': 'Sürüm',
     },
     'az': {
       'settings': 'Parametrlər',
@@ -1128,6 +1168,26 @@ class AppLocalizations {
       'offlineBannerBody': 'Bağlantı bərpa olunanda avtomatik yenidən cəhd ediləcək.',
       'offlineBannerAndroid': 'İnternetsiz izləmək üçün iki Android telefonda İnternetsiz rejimdən istifadə edin.',
       'backOnline': 'İnternet bərpa olundu',
+      'talkFailed': 'Mikrofon açılmadı. Yenidən cəhd edin.',
+      'talkBabyHears': 'Körpə sizi eşidir',
+      'talkStarting': 'Mikrofon açılır',
+      'talkNotReaching': 'Səs körpəyə çatmır',
+      'micTestTitle': 'Mikrofonu yoxla',
+      'micTestSubtitle': 'Otaqdakı səsi görün, həddi tənzimləyin',
+      'micTestOwn': 'Bu telefonun mikrofonu',
+      'micTestInCall': 'Yayımdakı mikrofon (ağlama aşkarlamasının ölçdüyü)',
+      'micTestFromBaby': 'Körpə telefonundan gələn səs',
+      'micTestOver': 'Hədd aşıldı',
+      'micTestUnder': 'Həddən aşağı',
+      'micTestPeak': 'Son 10 san ən yüksək',
+      'micTestNoMic': 'Mikrofon açılmadı. Mikrofon icazəsini yoxlayın.',
+      'micTestHint': 'Körpənin ağlamasına yaxın səs çıxarın (ucadan danışın və ya ağlama səsi səsləndirin). Zolaq işarəni 2 saniyə aşarsa, siqnal çalır. Otaq səs-küylüdürsə, həddi qaldırın.',
+      'thresholdShort': 'Hədd',
+      'diagTitle': 'Diaqnostika',
+      'diagCopy': 'Kopyala',
+      'diagCopied': 'Kopyalandı',
+      'diagHint': 'Real cihaz xətalarını tapmaq üçün canlı dəyərlər. Eyni məlumat saniyədə bir dəfə CRYDIAG / TALKDIAG sətri kimi loga yazılır.',
+      'version': 'Versiya',
     },
   };
 
@@ -1503,6 +1563,26 @@ class AppLocalizations {
   String get offlineBannerBody => _t('offlineBannerBody');
   String get offlineBannerAndroid => _t('offlineBannerAndroid');
   String get backOnline => _t('backOnline');
+  String get talkFailed => _t('talkFailed');
+  String get talkBabyHears => _t('talkBabyHears');
+  String get talkStarting => _t('talkStarting');
+  String get talkNotReaching => _t('talkNotReaching');
+  String get micTestTitle => _t('micTestTitle');
+  String get micTestSubtitle => _t('micTestSubtitle');
+  String get micTestOwn => _t('micTestOwn');
+  String get micTestInCall => _t('micTestInCall');
+  String get micTestFromBaby => _t('micTestFromBaby');
+  String get micTestOver => _t('micTestOver');
+  String get micTestUnder => _t('micTestUnder');
+  String get micTestPeak => _t('micTestPeak');
+  String get micTestNoMic => _t('micTestNoMic');
+  String get micTestHint => _t('micTestHint');
+  String get thresholdShort => _t('thresholdShort');
+  String get diagTitle => _t('diagTitle');
+  String get diagCopy => _t('diagCopy');
+  String get diagCopied => _t('diagCopied');
+  String get diagHint => _t('diagHint');
+  String get version => _t('version');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

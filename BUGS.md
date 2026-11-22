@@ -557,6 +557,23 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
 - **Neden:** `_shortError`, `pairingInitError$e`, kamera hataları ve WebRTC `onError` ham `toString()`'i gösteriyordu.
 - **Düzeltme:** Tek eşleme `lib/core/errors/user_facing_error.dart` (ağ → "İnternet bağlantısı yok…", oda, giriş, izin, kamera, bilinmeyen; TR/EN/AZ). Ham metin yalnızca `debugPrint`. Ağ/bilinmeyen hatalarda snackbar'da "Tekrar dene". İnternet yokken üstte amber şerit; ağ gelince anonim giriş ve ebeveynin yeniden bağlanması beklemeden tekrar denenir (`NetworkStatus`, yerel kanal `ninni/network`, A37). Test: `test/user_facing_error_test.dart`.
 
+### B75 — iPhone bebek → Android ebeveyn: ağlama alarmı hiç gelmedi (Kritik) — 🔧 olası nedenler düzeltildi, gerçek cihazda doğrulanacak (V2.1 §1)
+- **Belirti (Cavid):** iPhone bebek, Huawei RNE-L01 ebeveyn bağlıyken çok yüksek sesle bağırıldı; ebeveyne alarm gelmedi.
+- **Kodda bulunan olası nedenler:**
+  1. **Ebeveyn saati:** Ebeveyn, odadaki `cryUpdated` (sunucu saati) ile kendi saatini karşılaştırıyordu; ebeveyn saati sunucudan 20 sn'den fazla ileriyse her güncelleme "bayat" sayılıyor ve alarm hiç açılmıyordu. Artık yalnızca katıldıktan sonraki ilk anlık görüntü sunucu saatine göre değerlendiriliyor, sonrası ebeveynin kendi zamanıyla (`CryFreshness`, test: `test/rtc_diag_test.dart`). Gecikme en fazla bir güncelleme (5 sn).
+  2. **iOS'ta görüşme sırasında ölçüm:** Yalnızca `audioLevel` okunuyordu; değer gelmezse (`level is! num`) hiç dB üretilmiyordu. Artık `totalAudioEnergy`/`totalSamplesDuration` farkından RMS de hesaplanıyor ve ikisinin büyüğü kullanılıyor (`callAudioDb`, A38). İkisi de CRYDIAG'da `raw=` / `rms=` olarak görünüyor.
+  3. **Yazma hataları sessizdi:** `setCryAlert` hatası yalnızca `debugPrint`'ti. Artık sonuç, süre ve ok/hata sayıları CRYDIAG'da ve tanı ekranında (`write=ok(120ms)` / `write=err:permission-denied`).
+  4. **iOS ses oturumu:** `record` (bekleme ölçeri) kendi kategorisini kuruyor; görüşme başlarken WebRTC oturumu artık açıkça yeniden kuruluyor (B76 ile aynı düzeltme).
+- **Teşhis:** Saniyede bir `CRYDIAG` satırı (iki rol), Ayarlar → sürüm satırına 5 dokunuş → tanı ekranı. Gerçek cihaz senaryosu: `docs/LIVE_DEBUG.md`.
+
+### B76 — Bas-konuş: Android ebeveyn → iPhone bebek ses gelmedi (Kritik) — 🔧 olası nedenler düzeltildi, gerçek cihazda doğrulanacak (V2.1 §2)
+- **Kodda bulunan olası nedenler:**
+  1. **iPhone'da ahize:** WebRTC'nin varsayılan iOS oturumu `voiceChat` modu; konuşma sesi kulağa tutulan ahizeden, çok kısık çıkar. `setSpeakerphoneOn(true)` görüşme sesi başlamadan önce çağrılıyordu ve WebRTC oturumu sonra kendi ayarıyla kuruyordu. Artık iki telefonda da iOS oturumu `playAndRecord` + `videoChat` + `defaultToSpeaker` olarak WebRTC'nin kendi varsayılanına yazılıyor (`configureCallAudio`); bağlantı kurulunca ve ebeveyn sesi ilk geldiğinde hoparlör yeniden açılıyor.
+  2. **Konuşma kanalı bulunamazsa sessiz kalıyordu:** Ses transceiver'ı yalnızca alıcı izinin türüyle aranıyordu; artık teklifteki `a=mid` ile de bulunuyor. Cevap SDP'sinde ses `sendrecv` değilse konuşma kapatılıp loglanıyor.
+  3. **İzin reddi:** Kalıcı reddedilmişse tekrar sorulmuyor; açık mesaj + "Ayarları aç". `replaceTrack`/`getUserMedia` hatası artık "Mikrofon açılamadı" diyor.
+- **Ekranda:** Basılıyken "Bebek sizi duyuyor" yalnızca giden ses baytları gerçekten artıyorsa; dalga gerçek giden seviyeden (`talkLevel`).
+- **Teşhis:** `TALKDIAG` satırları (izin, yol, cevap yönü, replaceTrack, giden/gelen bayt, iOS oturumu, hoparlör), tanı ekranında yerel ses yolu (iOS kategori/mod/çıkış portu, Android mod/hoparlör/ses düzeyi).
+
 ## Hiç çalışmayan veya yarım kalmış özellikler
 
 1. **Arka planda izleme:** İki cihazda da yok (B01, B02).

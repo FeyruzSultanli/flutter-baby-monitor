@@ -11,6 +11,8 @@ import '../../theme/app_theme.dart';
 import '../../theme/components/components.dart';
 import '../../theme/tokens.dart';
 import '../video_gallery_screen.dart';
+import 'diagnostics_screen.dart';
+import 'mic_test_screen.dart';
 import 'onboarding_screen.dart';
 
 /// Settings (mockup Settings). Follows the system theme.
@@ -95,6 +97,14 @@ class SettingsScreen extends StatelessWidget {
                           ],
                         ),
                       ],
+                    ),
+                  ),
+                  SettingsRow(
+                    key: const Key('micTestRow'),
+                    title: l10n.micTestTitle,
+                    subtitle: l10n.micTestSubtitle,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const MicTestScreen()),
                     ),
                   ),
                   SettingsRow(title: l10n.alarmDuration, subtitle: l10n.alarmDurationSub, value: l10n.secondsShort.replaceAll('{s}', '2')),
@@ -206,7 +216,7 @@ class SettingsScreen extends StatelessWidget {
                 SectionLabel(l10n.sectionAbout),
                 const SizedBox(height: 8),
                 card([
-                  SettingsRow(title: 'Ninni', subtitle: l10n.appTagline, value: '1.0.0'),
+                  const _VersionRow(),
                   SettingsRow(
                     title: l10n.licenses,
                     divider: false,
@@ -263,5 +273,47 @@ class SettingsScreen extends StatelessWidget {
         ),
       );
     });
+  }
+}
+
+/// "Ninni 1.0.0" row; 5 taps within 3 s open the hidden diagnostics screen
+/// (V2.1 §1).
+class _VersionRow extends StatefulWidget {
+  const _VersionRow();
+
+  static const String version = '1.0.0';
+
+  @override
+  State<_VersionRow> createState() => _VersionRowState();
+}
+
+class _VersionRowState extends State<_VersionRow> {
+  int _taps = 0;
+  DateTime? _first;
+
+  void _onTap() {
+    final now = DateTime.now();
+    if (_first == null || now.difference(_first!) > const Duration(seconds: 3)) {
+      _first = now;
+      _taps = 0;
+    }
+    if (++_taps >= 5) {
+      _taps = 0;
+      _first = null;
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DiagnosticsScreen()));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return SettingsRow(
+      key: const Key('versionRow'),
+      title: 'Ninni',
+      subtitle: l10n.appTagline,
+      value: '${l10n.version} ${_VersionRow.version}',
+      showChevron: false,
+      onTap: _onTap,
+    );
   }
 }
