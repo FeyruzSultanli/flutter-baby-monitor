@@ -1,5 +1,5 @@
 name: bebek_monitor_clean
-description: "Bebek Monitor - temiz proje"
+description: "Ninni - bebek monitörü"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -41,6 +41,7 @@ dependencies:
   record: ^7.2.0
   audioplayers: ^6.8.1
   shared_preferences: ^2.5.6
+  animations: ^3.0.0
 
 dependency_overrides:
   permission_handler: ^12.0.1
@@ -52,13 +53,43 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.8
 
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/icon/babyicon.png"
+  image_path: "assets/icon/ninni_icon_1024.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#12142B"
+  adaptive_icon_foreground: "assets/icon/ninni_foreground_1024.png"
+
+flutter_native_splash:
+  color: "#12142B"
+  image: assets/icon/ninni_splash_768.png
+  android_12:
+    color: "#12142B"
+    image: assets/icon/ninni_splash_768.png
+    icon_background_color: "#12142B"
+  ios: true
+  android: true
+  web: false
 
 flutter:
   uses-material-design: true
   assets:
     - assets/audio/
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Light.ttf
+          weight: 300
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
+          weight: 800
