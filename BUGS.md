@@ -564,6 +564,7 @@ Bağımsız inceleme, betikle yapılan düzenlemelerde hasar bulmadı. Bütün F
   2. **iOS'ta görüşme sırasında ölçüm:** Yalnızca `audioLevel` okunuyordu; değer gelmezse (`level is! num`) hiç dB üretilmiyordu. Artık `totalAudioEnergy`/`totalSamplesDuration` farkından RMS de hesaplanıyor ve ikisinin büyüğü kullanılıyor (`callAudioDb`, A38). İkisi de CRYDIAG'da `raw=` / `rms=` olarak görünüyor.
   3. **Yazma hataları sessizdi:** `setCryAlert` hatası yalnızca `debugPrint`'ti. Artık sonuç, süre ve ok/hata sayıları CRYDIAG'da ve tanı ekranında (`write=ok(120ms)` / `write=err:permission-denied`).
   4. **iOS ses oturumu:** `record` (bekleme ölçeri) kendi kategorisini kuruyor; görüşme başlarken WebRTC oturumu artık açıkça yeniden kuruluyor (B76 ile aynı düzeltme).
+- **Kanıt (E2E, 23.11):** Android ebeveyn emülatörünün saati sunucudan 78 sn ileriydi (`CRYDIAG role=parent … age=78017`). Eski kontrolle bu cihazda alarm hiç açılmazdı; yeni kontrolle `fresh=true` ve alarm geldi. Gerçek telefonlarda da saat farkı olabileceği için en güçlü aday bu.
 - **Teşhis:** Saniyede bir `CRYDIAG` satırı (iki rol), Ayarlar → sürüm satırına 5 dokunuş → tanı ekranı. Gerçek cihaz senaryosu: `docs/LIVE_DEBUG.md`.
 
 ### B76 — Bas-konuş: Android ebeveyn → iPhone bebek ses gelmedi (Kritik) — 🔧 olası nedenler düzeltildi, gerçek cihazda doğrulanacak (V2.1 §2)

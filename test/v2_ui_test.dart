@@ -207,4 +207,44 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     controller.dispose();
   });
+
+  testWidgets('V2.1: switching to dark in settings keeps the scroll position', (tester) async {
+    final controller = MonitorController(locale: () => const Locale('tr'));
+    final theme = ThemeProvider();
+    await tester.pumpWidget(MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: theme),
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ChangeNotifierProvider.value(value: controller),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, t, _) => MaterialApp(
+          locale: const Locale('tr'),
+          theme: NinniTheme.light,
+          darkTheme: NinniTheme.night,
+          themeMode: t.mode,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const SettingsScreen(),
+        ),
+      ),
+    ));
+    await tester.pump();
+    await tester.dragUntilVisible(find.byKey(const Key('themeRow')), find.byType(ListView), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(find.byKey(const Key('themeRow')));
+    theme.setThemeMode(ThemeMode.dark);
+    // Stars twinkle forever in the dark theme: no pumpAndSettle.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byKey(const Key('themeRow')), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const Key('themeRow'))), before);
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+  });
 }

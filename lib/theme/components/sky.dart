@@ -259,7 +259,9 @@ class _HomePainter extends CustomPainter {
 }
 
 /// [NightSky] behind menu screens when they are shown in the dark theme
-/// (V2.1 §4.3); nothing in the light theme.
+/// (V2.1 §4.3); nothing in the light theme. The widget tree keeps the same
+/// shape in both themes, so switching the theme does not reset the state
+/// below (e.g. the settings list scroll position).
 class ThemedSky extends StatelessWidget {
   const ThemedSky({super.key, required this.child, this.starStrength = 0.8});
   final Widget child;
@@ -268,6 +270,26 @@ class ThemedSky extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final night = Theme.of(context).brightness == Brightness.dark;
-    return night ? NightSky(starStrength: starStrength, child: child) : child;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: night
+            ? const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [NinniColors.nightSkyTop, NinniColors.night900],
+                stops: [0, 0.42],
+              )
+            : null,
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: night ? _FaintStars(strength: starStrength, seed: 11) : const SizedBox.shrink(),
+          ),
+          child,
+        ],
+      ),
+    );
   }
 }

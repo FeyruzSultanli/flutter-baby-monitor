@@ -316,7 +316,7 @@ void main() {
         find.text(en('language')).evaluate().isNotEmpty);
     await pickRow('themeRow', en('themeDark'));
     screenshot('parent_10_english_dark');
-    final theme = Theme.of(tester.element(find.byKey(const Key('languageRow'))));
+    final theme = Theme.of(tester.element(find.byKey(const Key('themeRow'))));
     result('theme_dark_applied', theme.brightness == Brightness.dark);
     await pickRow('languageRow', 'Türkçe');
     result('language_switch_back_to_turkish',
@@ -375,5 +375,7 @@ Future<void> tapLiveMenuDisconnect(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('liveMenuButton')));
   await pumpUntil(tester, () => find.byKey(const Key('disconnectButton')).evaluate().isNotEmpty,
       timeout: const Duration(seconds: 5));
+  // The menu ignores taps until its opening animation has finished.
+  await pumpFor(tester, const Duration(milliseconds: 800));
   await tester.tap(find.byKey(const Key('disconnectButton')));
 }
