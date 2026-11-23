@@ -67,3 +67,15 @@
 - **"Dandini dandini" melodisi** (`assets/audio/soothe_dandini.wav`): geleneksel melodinin nota aktarımını kendim yaptım (`tool/gen_sounds.py`, `DANDINI`). Doğrulayacak kaynağım yoktu. Telefonda dinleyip yanlışsa notaları düzeltin (dosyada açık liste) ya da CC0 bir kayıtla değiştirin.
 - **Azerbaycanca metinler:** çeviri anadili Azerbaycanca olan biri tarafından gözden geçirilmeli (özellikle kısa düğme metinleri).
 - **Sizden:** Dinleyip/okuyup not düşmeniz yeterli.
+
+## 10. Karma E2E (Android bebek ↔ iOS ebeveyn) 23.11'de ortam yüzünden durdu
+
+- **Belirti:** iOS simülatörü ebeveyn yanlış kod girince 15 sn zaman aşımı (`wrong_code_rejected=false`). Test burada bitiyor; geri kalan karma adımlar koşmadı.
+- **Kanıt:** Simülatör logunda iOS Firestore SDK'sı (11.15.0) emülatöre yazarken sürekli `WriteStream … Stream error: 'Unknown: An internal error has occurred'` veriyor. Emülatör "belge yok" (NOT_FOUND) yanıtını dönüyor; SDK bunu işleyemiyor, yazma hiç bitmiyor.
+- **V2.1 kaynaklı değil:** V2.1 öncesi commit `1f72f95` ayrı bir worktree'de aynı testle koşuldu, aynı adımda aynı şekilde düştü. 22.11'deki karma koşu geçmişti; arada Firestore emülatörü ya da simülatör (iOS 27) değişmiş olabilir.
+- **Android ↔ Android E2E (aynı emülatör):** tamamen geçti (`test-results/20261123-041748-android`, 53/53).
+- **Öneri:** Gerçek cihazda etkisi yok (gerçek sunucu NOT_FOUND'u doğru döner; LIVE_DEBUG D adımı da kontrol eder). Seçenekler:
+  - (a) Emülatörü sabit bir sürüme sabitle (`firebase-tools` / emülatör jar'ı).
+  - (b) Karma testte yanlış kod adımını iOS'ta atla.
+  - (c) `cloud_firestore` iOS SDK güncellemesi.
+  - Karar Cavid'de; o güne kadar karma koşu yalnızca bu adıma kadar anlamlı.

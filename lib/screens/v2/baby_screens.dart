@@ -349,45 +349,6 @@ class _BabyPairingScreenState extends State<BabyPairingScreen> {
   }
 }
 
-/// Pills with the room code on the right (mockup); with large text the
-/// code moves to its own line and the pills wrap (V2 phase 4).
-class _StatusRow extends StatelessWidget {
-  const _StatusRow({required this.pills, this.trailing});
-  final List<Widget> pills;
-  final String? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final large = MediaQuery.textScalerOf(context).scale(10) > 12.5;
-    final code = trailing == null
-        ? null
-        : Text(
-            trailing!,
-            style: NinniType.numeric(NinniType.label
-                .copyWith(letterSpacing: 0, fontWeight: FontWeight.w600, color: NinniColors.onNightMuted)),
-          );
-    if (large) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(spacing: 8, runSpacing: 8, children: pills),
-          if (code != null) ...[const SizedBox(height: 8), code],
-        ],
-      );
-    }
-    return Row(
-      children: [
-        for (var i = 0; i < pills.length; i++) ...[
-          if (i > 0) const SizedBox(width: 8),
-          Flexible(child: pills[i]),
-        ],
-        const SizedBox(width: 8),
-        if (code != null) Expanded(child: Align(alignment: Alignment.centerRight, child: code)),
-      ],
-    );
-  }
-}
-
 /// Baby phone while broadcasting (mockup BabyLive).
 class BabyLiveScreen extends StatelessWidget {
   const BabyLiveScreen({super.key});
