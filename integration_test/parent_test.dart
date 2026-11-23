@@ -338,6 +338,11 @@ void main() {
       result('recording_start_stop_no_crash', 'record button not shown');
     }
     await pumpFor(tester, const Duration(seconds: 2)); // let a snackbar settle
+    // V2.1: the settings button is in the bottom row, under the "saved"
+    // snackbar; wait until it is gone.
+    await pumpUntil(tester, () => find.byType(SnackBar).evaluate().isEmpty,
+        timeout: const Duration(seconds: 15));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const Key('settingsButton')));
     await pumpUntil(tester, () => find.byType(ListView).evaluate().isNotEmpty,
         timeout: const Duration(seconds: 10));
